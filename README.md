@@ -1,156 +1,224 @@
-# Choosy - Group Decision Making App
+# Choosy - Production MVP Roadmap
 
-A social group decision-making app inspired by Tinder/Hinge swipe mechanics. Friends create plans, add activity options, and vote by swiping through curated local events.
+A social group decision-making app with Tinder-style voting mechanics. This roadmap transforms the current mock prototype into a production-ready MVP.
 
-## 🚀 Features
+## 🎯 **Phase 1: Backend Infrastructure (Week 1)**
 
-- **Smart Event Recommendations** - Location-based event suggestions per topic
-- **Group Size Optimization** - Solo, date night (2 people), or group (3+ people) experiences
-- **Swipe Interface** - Tinder-style card swiping for voting
-- **Random Generators** - "Choose for me" buttons for topic and event selection
-- **Contact Integration** - Direct phone calls and contact info for winning events
-- **15-Minute Timer** - Creates urgency and time pressure
-- **Anonymous Voting** - localStorage-based voter IDs
+### **1.1 Supabase Setup**
+- [ ] Create Supabase account and project
+- [ ] Design database schema:
+  - `users` (id, email, phone, name, created_at)
+  - `plans` (id, topic, group_size, zip_code, host_name, host_phone, created_at, expires_at)
+  - `events` (id, plan_id, name, image, hours, contact, votes, source_type, external_id)
+  - `votes` (id, plan_id, event_id, voter_id, created_at)
+  - `custom_events` (id, plan_id, name, description, contact, created_by)
+- [ ] Set up authentication with email/phone
+- [ ] Configure row-level security policies
+- [ ] Test real-time subscriptions for live voting
 
-## 🛠️ Tech Stack
+**Resources:**
+- [Supabase Quickstart](https://supabase.com/docs/guides/getting-started)
+- [PostgreSQL Tutorial](https://www.postgresql.org/docs/current/tutorial.html)
+- [Next.js + Supabase](https://supabase.com/docs/guides/getting-started/tutorials/with-nextjs)
 
-- **Frontend**: Next.js, TypeScript, Tailwind CSS
-- **Animations**: Framer Motion, React Spring
-- **Swipe**: react-tinder-card
-- **Backend**: Supabase (ready for integration)
-- **Deployment**: Vercel
+### **1.2 Replace Mock APIs**
+- [ ] Replace `/api/createPlan.ts` with Supabase calls
+- [ ] Replace `/api/voteOption.ts` with real vote persistence
+- [ ] Replace `/api/getResults.ts` with database queries
+- [ ] Replace `/api/makeReservation.ts` with real booking logic
+- [ ] Add real-time vote updates across all devices
 
-## 📱 Topics Available
+**Resources:**
+- [Supabase Client](https://supabase.com/docs/reference/javascript)
+- [Real-time Subscriptions](https://supabase.com/docs/guides/realtime)
 
-- 🎤 Concerts
-- 🌃 Nightlife  
-- 🍽️ Foodie
-- 💕 Date Night
-- 🏀 Sports
-- 🌳 Parks
-- 🏎️ Go Karting
-- 🏊 Swimming
-- 🍹 Fun Drinks
+## 🎯 **Phase 2: Event Discovery API (Week 2)**
 
-## 🚀 Quick Start
+### **2.1 Hybrid API Architecture**
+- [ ] Design unified event data model
+- [ ] Create API gateway pattern:
+  - External APIs (Yelp, Ticketmaster, Google Places, Eventbrite)
+  - Custom events database
+  - Search aggregation across all sources
+- [ ] Build event search endpoint: `GET /api/events/search`
+- [ ] Build custom event submission: `POST /api/events/custom`
 
-```bash
-# Install dependencies
-npm install
+### **2.2 External API Integration**
+- [ ] Yelp Fusion API (food, bars, restaurants)
+- [ ] Ticketmaster API (concerts, sports, events)
+- [ ] Google Places API (parks, attractions, general)
+- [ ] Eventbrite API (local events, workshops)
+- [ ] Implement rate limiting and caching
 
-# Run development server
-npm run dev
+### **2.3 Custom Events System**
+- [ ] User-submitted events form
+- [ ] Business partner event submission
+- [ ] Local event discovery (garage sales, community events)
+- [ ] Event moderation system
 
-# Open http://localhost:3000
-```
+**Resources:**
+- [REST API Design](https://restfulapi.net/)
+- [API Gateway Pattern](https://microservices.io/patterns/apigateway.html)
+- [Yelp Fusion API](https://docs.developer.yelp.com/docs/fusion-intro)
+- [Ticketmaster API](https://developer.ticketmaster.com/)
 
-## 📁 Project Structure
+## 🎯 **Phase 3: User Experience & Features (Week 3)**
 
-```
-Choosy/
-├── pages/
-│   ├── index.tsx          # Landing page
-│   ├── create.tsx         # Plan creation flow
-│   ├── vote/[planId].tsx  # Voting interface
-│   ├── results/[planId].tsx # Results display
-│   └── api/
-│       ├── createPlan.ts  # Plan creation API
-│       ├── getResults.ts  # Results fetching API
-│       └── voteOption.ts  # Vote recording API
-├── styles/
-│   └── globals.css        # Global styles
-└── lib/
-    └── supabaseClient.ts  # Supabase configuration
-```
+### **3.1 Real-time Features**
+- [ ] Live vote counting across devices
+- [ ] Real-time plan status updates
+- [ ] Live participant indicators
+- [ ] Push notifications for vote reminders
 
-## 🎯 Core Workflows
+### **3.2 Enhanced Voting**
+- [ ] Tie-breaking algorithms
+- [ ] Vote expiration handling
+- [ ] Advanced filtering (price, distance, rating)
+- [ ] Vote analytics and insights
 
-### 1. Plan Creation
-- Select topic (concerts, nightlife, etc.)
-- Choose group size (solo, date, group)
-- Enter zip code for location
-- Add phone number for sharing
-- Optionally add custom events
+### **3.3 Mobile Optimization**
+- [ ] Progressive Web App (PWA) setup
+- [ ] Touch-optimized interactions
+- [ ] Offline capability
+- [ ] Native app-like experience
 
-### 2. Voting Interface
-- Swipe right to vote ✅, left to skip ❌
-- Manual buttons for precise control
-- Random "Choose for me" generator
-- 15-minute voting timer
-- Real-time friend avatars with vote status
+**Resources:**
+- [PWA Guide](https://web.dev/progressive-web-apps/)
+- [Real-time WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
 
-### 3. Results Display
-- Winner announcement with trophy
-- Complete contact information
-- Direct "Call Now" button
-- Share functionality
-- Option to create new plans
+## 🎯 **Phase 4: Monetization & Business Features (Week 4)**
 
-## 🔧 Development
+### **4.1 Subscription System**
+- [ ] Implement pricing tiers:
+  - Free: 1 plan/week, basic features
+  - $5/month: Unlimited plans, reservations, all APIs
+  - $10/month: Analytics, priority support, advanced features
+  - $25/month: Business features, white-label options
+- [ ] Stripe integration for payments
+- [ ] Subscription management dashboard
 
-### Environment Setup
-```bash
-# Create .env.local
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
-```
+### **4.2 Business Partnerships**
+- [ ] Event booking commission system
+- [ ] Business dashboard for partners
+- [ ] Direct reservation integrations
+- [ ] Revenue tracking and analytics
 
-### Key Dependencies
-```json
-{
-  "react-tinder-card": "^1.4.0",
-  "framer-motion": "^10.16.4",
-  "@react-spring/web": "^9.7.3"
-}
-```
+### **4.3 Analytics & Insights**
+- [ ] User behavior tracking
+- [ ] Plan success metrics
+- [ ] Popular event categories
+- [ ] Business intelligence dashboard
 
-## 🎨 UI/UX Features
+**Resources:**
+- [Stripe Integration](https://stripe.com/docs)
+- [Analytics Implementation](https://developers.google.com/analytics)
 
-- **Mobile-First Design** - Optimized for phone usage
-- **Gradient Backgrounds** - Purple to blue gradients
-- **Glass Morphism** - Backdrop blur effects
-- **Smooth Animations** - Framer Motion transitions
-- **Responsive Cards** - Swipeable event cards
-- **Timer Display** - Countdown with urgency
+## 🎯 **Phase 5: Production & Launch (Week 5)**
 
-## 🔮 Future Enhancements
+### **5.1 Performance & Security**
+- [ ] CDN setup for images and assets
+- [ ] Rate limiting implementation
+- [ ] Security hardening (CORS, CSP, etc.)
+- [ ] Error monitoring and logging
 
-- [ ] Supabase integration for real data
-- [ ] Real-time voting updates
-- [ ] Push notifications
-- [ ] Event booking integration
-- [ ] Social sharing features
-- [ ] User authentication
-- [ ] Event recommendations API
+### **5.2 Deployment & Monitoring**
+- [ ] Production environment setup
+- [ ] CI/CD pipeline
+- [ ] Performance monitoring
+- [ ] Uptime monitoring
 
-## 📊 Mock Data Structure
+### **5.3 Launch Preparation**
+- [ ] App store optimization
+- [ ] Marketing materials
+- [ ] User onboarding flow
+- [ ] Customer support system
 
-Events are organized by topic and group size:
-```typescript
-MOCK_EVENTS = {
-  concerts: {
-    solo: [...],
-    date: [...],
-    group: [...]
-  },
-  // ... other topics
-}
-```
+**Resources:**
+- [Vercel Deployment](https://vercel.com/docs)
+- [Security Best Practices](https://owasp.org/www-project-top-ten/)
 
-## 🚀 Deployment
+## 💰 **Cost Breakdown (Monthly)**
 
-```bash
-# Build for production
-npm run build
+### **MVP Launch (0-1,000 users)**
+- Supabase: $0 (free tier)
+- APIs: $0-50 (free tiers)
+- Vercel: $0 (free tier)
+- **Total: $0-50/month**
 
-# Deploy to Vercel
-vercel --prod
-```
+### **Growth Phase (1,000-10,000 users)**
+- Supabase: $25
+- APIs: $100-200
+- Vercel: $0-20
+- **Total: $125-245/month**
 
-## 📝 License
+### **Scale Phase (10,000+ users)**
+- Supabase: $25-599
+- APIs: $300-500
+- Vercel: $20
+- Monitoring: $50
+- **Total: $395-1,169/month**
 
-MIT License - feel free to use this code for your own projects!
+## 🚀 **Revenue Projections**
+
+### **Conservative (1,000 users)**
+- 5% conversion rate = 50 paid users
+- Average $7.50/month = $375/month revenue
+- **Profit: $130-250/month**
+
+### **Optimistic (10,000 users)**
+- 8% conversion rate = 800 paid users
+- Average $8/month = $6,400/month revenue
+- **Profit: $5,200-6,000/month**
+
+## 📚 **Learning Resources by Phase**
+
+### **Phase 1: Backend**
+- [Supabase Documentation](https://supabase.com/docs)
+- [PostgreSQL Tutorial](https://www.postgresql.org/docs/current/tutorial.html)
+- [Next.js API Routes](https://nextjs.org/docs/api-routes/introduction)
+
+### **Phase 2: APIs**
+- [REST API Design](https://restfulapi.net/)
+- [API Gateway Pattern](https://microservices.io/patterns/apigateway.html)
+- [Caching Strategies](https://redis.io/topics/caching)
+
+### **Phase 3: Real-time**
+- [WebSockets Guide](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
+- [PWA Development](https://web.dev/progressive-web-apps/)
+- [Real-time Data](https://supabase.com/docs/guides/realtime)
+
+### **Phase 4: Business**
+- [Stripe Integration](https://stripe.com/docs)
+- [Analytics Implementation](https://developers.google.com/analytics)
+- [Business Model Canvas](https://strategyzer.com/canvas/business-model-canvas)
+
+### **Phase 5: Production**
+- [Vercel Deployment](https://vercel.com/docs)
+- [Security Best Practices](https://owasp.org/www-project-top-ten/)
+- [Performance Monitoring](https://nextjs.org/docs/advanced-features/measuring-performance)
+
+## 🎯 **Success Metrics**
+
+### **Technical Metrics**
+- [ ] 99.9% uptime
+- [ ] < 2 second page load times
+- [ ] < 100ms API response times
+- [ ] Zero data loss
+
+### **Business Metrics**
+- [ ] 1,000 users in first month
+- [ ] 5% conversion to paid plans
+- [ ] $500/month revenue by month 3
+- [ ] 4.5+ star app store rating
+
+## 🚀 **Next Steps**
+
+1. **Start with Phase 1** - Set up Supabase and replace mock APIs
+2. **Build incrementally** - Test each phase before moving to next
+3. **Focus on user value** - Each feature should solve a real problem
+4. **Measure everything** - Track metrics from day one
+5. **Iterate quickly** - Use user feedback to improve
 
 ---
 
-**Built with ❤️ for making group decisions easier and more fun!**
+**Ready to build?** Start with Supabase setup and come back with questions! 🚀
