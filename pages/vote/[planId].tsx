@@ -24,6 +24,24 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.6, count: 892 },
         contact: { phone: '(555) 234-5678', email: 'reservations@bluenote.com' },
         voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Rock Concert at Central Park',
+        image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 9:00 PM',
+        reviews: { stars: 4.5, count: 567 },
+        contact: { phone: '(555) 345-6789', email: 'info@centralpark.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '4',
+        name: 'Classical Symphony',
+        image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+        hours: '7:30 PM - 10:30 PM',
+        reviews: { stars: 4.7, count: 1234 },
+        contact: { phone: '(555) 456-7890', email: 'symphony@classical.com' },
+        voters: ['friendC']
       }
     ],
     date: [
@@ -44,6 +62,24 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.5, count: 234 },
         contact: { phone: '(555) 345-6789', email: 'info@acousticlove.com' },
         voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Piano Bar Duet',
+        image: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 9:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 456-7890', email: 'piano@bar.com' },
+        voters: ['friendA', 'friendB']
+      },
+      {
+        id: '4',
+        name: 'Smooth Jazz Evening',
+        image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+        hours: '8:30 PM - 11:30 PM',
+        reviews: { stars: 4.8, count: 789 },
+        contact: { phone: '(555) 567-8901', email: 'jazz@smooth.com' },
+        voters: ['friendC']
       }
     ],
     group: [
@@ -64,6 +100,24 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.6, count: 1234 },
         contact: { phone: '(555) 456-7890', email: 'tickets@stadium.com' },
         voters: ['friendA', 'friendC']
+      },
+      {
+        id: '3',
+        name: 'Indie Music Festival',
+        image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+        hours: '5:00 PM - 10:00 PM',
+        reviews: { stars: 4.3, count: 456 },
+        contact: { phone: '(555) 567-8901', email: 'indie@festival.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Country Music Night',
+        image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+        hours: '8:00 PM - 11:00 PM',
+        reviews: { stars: 4.5, count: 678 },
+        contact: { phone: '(555) 678-9012', email: 'country@night.com' },
+        voters: ['friendA', 'friendB']
       }
     ]
   },
@@ -192,6 +246,33 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.3, count: 234 },
         contact: { phone: '(555) 123-4567', email: 'info@solobar.com' },
         voters: ['friendA']
+      },
+      {
+        id: '2',
+        name: 'Cocktail Lounge',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 1:00 AM',
+        reviews: { stars: 4.6, count: 456 },
+        contact: { phone: '(555) 234-5678', email: 'cocktails@lounge.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Wine Bar Experience',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 12:00 AM',
+        reviews: { stars: 4.4, count: 345 },
+        contact: { phone: '(555) 345-6789', email: 'wine@bar.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '4',
+        name: 'Speakeasy Night',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '9:00 PM - 2:00 AM',
+        reviews: { stars: 4.7, count: 567 },
+        contact: { phone: '(555) 456-7890', email: 'speakeasy@night.com' },
+        voters: ['friendA']
       }
     ],
     date: [
@@ -203,6 +284,33 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.7, count: 1567 },
         contact: { phone: '(555) 456-7890', email: 'reservations@skylinebar.com' },
         voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '2',
+        name: 'Jazz Club Date Night',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 11:00 PM',
+        reviews: { stars: 4.8, count: 789 },
+        contact: { phone: '(555) 567-8901', email: 'jazz@club.com' },
+        voters: ['friendA', 'friendB']
+      },
+      {
+        id: '3',
+        name: 'Craft Beer Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '6:30 PM - 10:30 PM',
+        reviews: { stars: 4.5, count: 456 },
+        contact: { phone: '(555) 678-9012', email: 'beer@craft.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Salsa Dancing Night',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '8:00 PM - 12:00 AM',
+        reviews: { stars: 4.6, count: 678 },
+        contact: { phone: '(555) 789-0123', email: 'salsa@dancing.com' },
+        voters: ['friendA', 'friendC']
       }
     ],
     group: [
@@ -439,6 +547,11 @@ export default function VotePage() {
 
   // Timer countdown - redirects to results when time expires
   useEffect(() => {
+    // Stop timer if voting is complete
+    if (currentIndex >= events.length) {
+      return;
+    }
+
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -451,7 +564,7 @@ export default function VotePage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [planId, router]);
+  }, [planId, router, currentIndex, events.length]);
 
   // Handle swipe gestures
   const swiped = (dir, eventId) => {
@@ -467,13 +580,7 @@ export default function VotePage() {
     }
   };
 
-  // Random choice generator
-  const handleRandomChoice = () => {
-    if (currentIndex < events.length) {
-      const randomDirection = Math.random() > 0.5 ? 'right' : 'left';
-      handleManualSwipe(randomDirection);
-    }
-  };
+
 
   // Get winning event for results page
   const getWinningEvent = () => {
@@ -525,52 +632,51 @@ export default function VotePage() {
       {/* Swipeable event cards */}
       <div className="relative w-full max-w-sm h-[500px]">
         <AnimatePresence>
-          {events.map((event, index) => (
+          {currentIndex < events.length && (
             <motion.div
-              key={event.id}
+              key={events[currentIndex].id}
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -60 }}
               transition={{ duration: 0.3 }}
               className="absolute w-full"
-              style={{ zIndex: events.length - index }}
             >
               <TinderCard
-                onSwipe={(dir) => swiped(dir, event.id)}
+                onSwipe={(dir) => swiped(dir, events[currentIndex].id)}
                 preventSwipe={['up', 'down']}
               >
                 <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
                   {/* Event image with hours overlay */}
                   <div className="relative h-48 bg-gradient-to-br from-purple-400 to-blue-500">
                     <img 
-                      src={event.image} 
-                      alt={event.name}
+                      src={events[currentIndex].image} 
+                      alt={events[currentIndex].name}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">
-                      {event.hours}
+                      {events[currentIndex].hours}
                     </div>
                   </div>
 
                   {/* Event details */}
                   <div className="p-6">
-                    <h2 className="text-xl font-bold text-gray-900 mb-3">{event.name}</h2>
+                    <h2 className="text-xl font-bold text-gray-900 mb-3">{events[currentIndex].name}</h2>
                     
                     {/* Star rating */}
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="text-yellow-400">{renderStars(event.reviews.stars)}</span>
-                      <span className="text-sm text-gray-600">({event.reviews.count} reviews)</span>
+                      <span className="text-yellow-400">{renderStars(events[currentIndex].reviews.stars)}</span>
+                      <span className="text-sm text-gray-600">({events[currentIndex].reviews.count} reviews)</span>
                     </div>
 
                     {/* Contact information */}
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <span className="w-4 h-4">📞</span>
-                        <span>{event.contact.phone}</span>
+                        <span>{events[currentIndex].contact.phone}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <span className="w-4 h-4">✉️</span>
-                        <span>{event.contact.email}</span>
+                        <span>{events[currentIndex].contact.email}</span>
                       </div>
                     </div>
 
@@ -579,7 +685,7 @@ export default function VotePage() {
                       <span className="text-sm text-gray-500">Voted by:</span>
                       <div className="flex -space-x-2">
                         {Object.keys(MOCK_FRIENDS).map((friendId) => {
-                          const hasVoted = event.voters.includes(friendId);
+                          const hasVoted = events[currentIndex].voters.includes(friendId);
                           return (
                             <div
                               key={friendId}
@@ -602,7 +708,7 @@ export default function VotePage() {
                 </div>
               </TinderCard>
             </motion.div>
-          ))}
+          )}
         </AnimatePresence>
 
         {/* Completion state */}
@@ -637,31 +743,20 @@ export default function VotePage() {
 
       {/* Manual control buttons */}
       {currentIndex < events.length && (
-        <div className="mt-8 flex items-center justify-center gap-6">
-          {/* Random choice button */}
-          <button
-            onClick={handleRandomChoice}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-2xl hover:scale-105 transition-all duration-200 shadow-lg"
-          >
-            <span className="text-xl">🎲</span>
-            <span>Choose for me</span>
-          </button>
-          
+        <div className="mt-8 flex items-center justify-center gap-4">
           {/* Manual swipe buttons */}
-          <div className="flex gap-4">
-            <button
-              onClick={() => handleManualSwipe('left')}
-              className="w-16 h-16 bg-red-500 hover:bg-red-600 text-white text-3xl font-bold rounded-full shadow-lg hover:scale-110 transition-all duration-200 flex items-center justify-center"
-            >
-              ✕
-            </button>
-            <button
-              onClick={() => handleManualSwipe('right')}
-              className="w-16 h-16 bg-green-500 hover:bg-green-600 text-white text-3xl font-bold rounded-full shadow-lg hover:scale-110 transition-all duration-200 flex items-center justify-center"
-            >
-              ✓
-            </button>
-          </div>
+          <button
+            onClick={() => handleManualSwipe('left')}
+            className="w-16 h-16 bg-red-500 hover:bg-red-600 text-white text-3xl font-bold rounded-full shadow-lg hover:scale-110 transition-all duration-200 flex items-center justify-center"
+          >
+            ✕
+          </button>
+          <button
+            onClick={() => handleManualSwipe('right')}
+            className="w-16 h-16 bg-green-500 hover:bg-green-600 text-white text-3xl font-bold rounded-full shadow-lg hover:scale-110 transition-all duration-200 flex items-center justify-center"
+          >
+            ✓
+          </button>
         </div>
       )}
 

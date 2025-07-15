@@ -38,11 +38,178 @@ export default function Create() {
     setStep(2);
   };
 
-  // Random topic generator
+  // Regular random topic generator for non-solo users
   const handleRandomTopic = () => {
     const randomTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
     setTopic(randomTopic.key);
     setStep(2);
+  };
+
+  // Complete random choice for solo users - picks topic, group size, and event
+  const handleCompleteRandomChoice = async () => {
+    setIsLoading(true);
+    
+    try {
+      // Pick random topic and set to solo
+      const randomTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+      const randomGroupSize = 'solo';
+      
+      // Import mock events data to pick a random event
+      const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
+        concerts: {
+          solo: [
+            {
+              id: '1',
+              name: 'Taylor Swift Concert',
+              image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+              hours: '8:00 PM - 11:00 PM',
+              reviews: { stars: 4.8, count: 1247 },
+              contact: { phone: '(555) 123-4567', email: 'info@madisonsquaregarden.com' },
+              voters: ['friendA', 'friendC']
+            }
+          ]
+        },
+        datenight: {
+          solo: [
+            {
+              id: '1',
+              name: 'Self-Care Spa Day',
+              image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=400&h=300&fit=crop',
+              hours: '10:00 AM - 6:00 PM',
+              reviews: { stars: 4.8, count: 456 },
+              contact: { phone: '(555) 123-4567', email: 'spa@wellness.com' },
+              voters: ['friendA']
+            }
+          ]
+        },
+        foodie: {
+          solo: [
+            {
+              id: '1',
+              name: 'Food Truck Festival',
+              image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+              hours: '11:00 AM - 8:00 PM',
+              reviews: { stars: 4.5, count: 1234 },
+              contact: { phone: '(555) 123-4567', email: 'info@foodtruckfest.com' },
+              voters: ['friendA']
+            }
+          ]
+        },
+        nightlife: {
+          solo: [
+            {
+              id: '1',
+              name: 'Solo Bar Hopping',
+              image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+              hours: '8:00 PM - 2:00 AM',
+              reviews: { stars: 4.3, count: 234 },
+              contact: { phone: '(555) 123-4567', email: 'info@solobar.com' },
+              voters: ['friendA']
+            }
+          ]
+        },
+        parks: {
+          solo: [
+            {
+              id: '1',
+              name: 'Solo Hiking Trail',
+              image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop',
+              hours: '9:00 AM - 5:00 PM',
+              reviews: { stars: 4.7, count: 456 },
+              contact: { phone: '(555) 123-4567', email: 'info@hikingtrail.com' },
+              voters: ['friendA']
+            }
+          ]
+        },
+        sports: {
+          solo: [
+            {
+              id: '1',
+              name: 'Solo Tennis Session',
+              image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+              hours: '9:00 AM - 11:00 AM',
+              reviews: { stars: 4.6, count: 123 },
+              contact: { phone: '(555) 123-4567', email: 'tennis@solo.com' },
+              voters: ['friendA']
+            }
+          ]
+        },
+        gokart: {
+          solo: [
+            {
+              id: '1',
+              name: 'Solo Go Kart Racing',
+              image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+              hours: '10:00 AM - 6:00 PM',
+              reviews: { stars: 4.4, count: 234 },
+              contact: { phone: '(555) 123-4567', email: 'racing@gokart.com' },
+              voters: ['friendA']
+            }
+          ]
+        },
+        swimming: {
+          solo: [
+            {
+              id: '1',
+              name: 'Solo Swim Session',
+              image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+              hours: '7:00 AM - 9:00 AM',
+              reviews: { stars: 4.5, count: 123 },
+              contact: { phone: '(555) 123-4567', email: 'swim@solo.com' },
+              voters: ['friendA']
+            }
+          ]
+        },
+        drinks: {
+          solo: [
+            {
+              id: '1',
+              name: 'Solo Craft Beer Tasting',
+              image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+              hours: '5:00 PM - 9:00 PM',
+              reviews: { stars: 4.4, count: 123 },
+              contact: { phone: '(555) 123-4567', email: 'beer@solo.com' },
+              voters: ['friendA']
+            }
+          ]
+        }
+      };
+      
+      // Pick a random event from the selected topic
+      const eventsForTopic = MOCK_EVENTS[randomTopic.key]?.solo || [];
+      const randomEvent = eventsForTopic[Math.floor(Math.random() * eventsForTopic.length)];
+      
+      // Create plan with random choices
+      const response = await fetch('/api/createPlan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: randomTopic.key,
+          groupSize: randomGroupSize,
+          zipCode: '10001', // Default zip code
+          phoneNumber: '555-123-4567', // Default phone
+          customEvents: []
+        })
+      });
+      
+      if (response.ok) {
+        const { planId } = await response.json();
+        // Go directly to results for solo users with the random event
+        const params = new URLSearchParams({
+          topic: randomTopic.key,
+          groupSize: randomGroupSize,
+          zip: '10001',
+          winningEvent: JSON.stringify(randomEvent)
+        });
+        router.push(`/results/${planId}?${params.toString()}`);
+      } else {
+        alert('Failed to create plan. Please try again.');
+      }
+    } catch (error) {
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle group size selection
@@ -51,12 +218,7 @@ export default function Create() {
     setStep(3);
   };
 
-  // Random group size generator
-  const handleRandomGroupSize = () => {
-    const randomGroupSize = GROUP_SIZES[Math.floor(Math.random() * GROUP_SIZES.length)];
-    setGroupSize(randomGroupSize.key);
-    setStep(3);
-  };
+
 
   // Handle zip code submission
   const handleZipSubmit = (e: React.FormEvent) => {
@@ -155,12 +317,14 @@ export default function Create() {
               {/* Random topic button */}
               <div className="mt-8 text-center">
                 <button
-                  onClick={handleRandomTopic}
-                  className="flex items-center gap-3 mx-auto px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  onClick={handleCompleteRandomChoice}
+                  disabled={isLoading}
+                  className="flex items-center gap-3 mx-auto px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   <span className="text-2xl">🎲</span>
-                  <span className="text-lg">Choose for me</span>
+                  <span className="text-lg">{isLoading ? 'Choosing...' : 'Choose for me'}</span>
                 </button>
+                <p className="text-sm text-gray-500 mt-2">We'll pick a random activity and event for you!</p>
               </div>
             </div>
           )}
@@ -190,16 +354,7 @@ export default function Create() {
                 ))}
               </div>
               
-              {/* Random group size button */}
-              <div className="mt-6 text-center">
-                <button
-                  onClick={handleRandomGroupSize}
-                  className="flex items-center gap-3 mx-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                >
-                  <span className="text-xl">🎲</span>
-                  <span>Choose for me</span>
-                </button>
-              </div>
+
             </div>
           )}
 

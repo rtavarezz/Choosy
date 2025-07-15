@@ -107,7 +107,7 @@ export default function Home() {
         <footer className="text-center py-8 text-gray-600">
           <p>Built with ❤️ for better group decision making</p>
         </footer>
-      </div>
+    </div>
     </>
   );
 }
