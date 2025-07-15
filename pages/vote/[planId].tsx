@@ -641,15 +641,41 @@ export default function VotePage() {
     }
   };
 
-  // Check if already authenticated
+  // Check if already authenticated or if user is the creator
   useEffect(() => {
     const voterInfo = localStorage.getItem(`voter_${planId}`);
+    const creatorInfo = localStorage.getItem(`creator_${planId}`);
+    
+    // Check if user came from the create page (has referrer info)
+    const cameFromCreate = sessionStorage.getItem('cameFromCreate');
+    
     if (voterInfo) {
+      // User has already voted in this plan
       const voter = JSON.parse(voterInfo);
       setVoterName(voter.name);
       setVoterPhone(voter.phone);
       setIsAuthenticated(true);
       setShowLogin(false);
+    } else if (creatorInfo && cameFromCreate) {
+      // User is the creator AND came from create page
+      const creator = JSON.parse(creatorInfo);
+      setVoterName(creator.name);
+      setVoterPhone(creator.phone);
+      setIsAuthenticated(true);
+      setShowLogin(false);
+      // Also store as voter for consistency
+      localStorage.setItem(`voter_${planId}`, JSON.stringify({
+        name: creator.name,
+        phone: creator.phone,
+        timestamp: Date.now(),
+        isCreator: true
+      }));
+      // Clear the session flag
+      sessionStorage.removeItem('cameFromCreate');
+    } else {
+      // New user or direct link access - show login form
+      setShowLogin(true);
+      setIsAuthenticated(false);
     }
   }, [planId]);
 

@@ -436,6 +436,8 @@ export default function Create() {
 
   // Start swiping (go to voting page)
   const startSwiping = () => {
+    // Set flag to indicate user came from create page
+    sessionStorage.setItem('cameFromCreate', 'true');
     router.push(`/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`);
   };
 
@@ -461,6 +463,13 @@ export default function Create() {
       if (response.ok) {
         const { planId } = await response.json();
         setPlanId(planId);
+        
+        // Store creator info for automatic login
+        localStorage.setItem(`creator_${planId}`, JSON.stringify({
+          name: userName.trim(),
+          phone: phoneNumber.trim(),
+          timestamp: Date.now()
+        }));
         
         // Generate shareable URL
         const baseUrl = window.location.origin;
