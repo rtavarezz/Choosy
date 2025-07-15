@@ -14,6 +14,8 @@ export default function ResultsPage() {
   const { planId, topic, groupSize, zip, winningEvent } = router.query;
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReserving, setIsReserving] = useState(false);
+  const [reservationResult, setReservationResult] = useState(null);
 
   // Load results data
   useEffect(() => {
@@ -72,6 +74,46 @@ export default function ResultsPage() {
   // Handle phone call
   const handleCall = (phoneNumber) => {
     window.open(`tel:${phoneNumber}`, '_self');
+  };
+
+  // Handle reservation
+  const handleReservation = async () => {
+    if (!results?.winningEvent) return;
+    
+    // Check if this is a demo (no plan data means demo)
+    if (!results.plan?.userName || !results.plan?.phoneNumber) {
+      alert('This is a demo! Create a real plan to make reservations.');
+      return;
+    }
+    
+    setIsReserving(true);
+    try {
+      const response = await fetch('/api/makeReservation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activityType: results.topic,
+          eventName: results.winningEvent.name,
+          userName: results.plan?.userName || 'John Smith', // Get from plan data
+          phoneNumber: results.plan?.phoneNumber || results.winningEvent.contact.phone,
+          groupSize: results.groupSize,
+          eventTime: results.winningEvent.hours?.split(' - ')[0] || '7:00 PM',
+          eventDate: new Date().toISOString().split('T')[0]
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setReservationResult(data.reservation);
+      } else {
+        alert('Failed to make reservation. Please try again.');
+      }
+    } catch (error) {
+      console.error('Reservation error:', error);
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setIsReserving(false);
+    }
   };
 
   // Handle share functionality
@@ -185,14 +227,66 @@ export default function ResultsPage() {
                   </div>
                 </div>
 
-                {/* Call button */}
-                <button
-                  onClick={() => handleCall(results.winningEvent.contact.phone)}
-                  className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
-                >
-                  <span className="text-xl">📞</span>
-                  <span>Call Now</span>
-                </button>
+                {/* Action buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleCall(results.winningEvent.contact.phone)}
+                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                  >
+                    <span className="text-xl">📞</span>
+                    <span>Call Now</span>
+                  </button>
+                  
+                  <button
+                    onClick={handleReservation}
+                    disabled={isReserving}
+                    className={`flex-1 font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
+                      !results.plan?.userName || !results.plan?.phoneNumber
+                        ? 'bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white cursor-not-allowed'
+                        : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
+                    }`}
+                  >
+                    <span className="text-xl">
+                      {isReserving ? '⏳' : (!results.plan?.userName || !results.plan?.phoneNumber) ? '🔒' : '🎫'}
+                    </span>
+                    <span>
+                      {isReserving 
+                        ? 'Reserving...' 
+                        : (!results.plan?.userName || !results.plan?.phoneNumber) 
+                          ? 'Demo Mode' 
+                          : 'Reserve Now'
+                      }
+                    </span>
+                  </button>
+                </div>
+
+                {/* Reservation result */}
+                {reservationResult && (
+                  <>
+                    <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border-2 border-green-200">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-2xl">✅</span>
+                        <h4 className="font-semibold text-green-800">Reservation {reservationResult.status === 'confirmed' ? 'Confirmed!' : 'Submitted!'}</h4>
+                      </div>
+                      <p className="text-sm text-green-700 mb-2">{reservationResult.message}</p>
+                      <div className="text-xs text-green-600 space-y-1">
+                        <p>Confirmation #: {reservationResult.confirmationNumber}</p>
+                        <p>Provider: {reservationResult.provider}</p>
+                        {reservationResult.requiresConfirmation && (
+                          <p className="font-medium">📞 You'll receive a confirmation call soon!</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={() => router.push('/')}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 mt-2"
+                      >
+                        Return Home
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

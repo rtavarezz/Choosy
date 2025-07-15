@@ -51,10 +51,13 @@ export default function Home() {
                 <span>Create Your First Plan</span>
               </Link>
               
-              <button className="bg-white/80 backdrop-blur-sm hover:bg-white/90 text-gray-900 font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl border border-white/20 flex items-center justify-center gap-3">
+              <Link 
+                href="/vote/demo?topic=concerts&groupSize=group&zip=10001"
+                className="bg-white/80 backdrop-blur-sm hover:bg-white/90 text-gray-900 font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl border border-white/20 flex items-center justify-center gap-3"
+              >
                 <span className="text-2xl">📱</span>
                 <span>See How It Works</span>
-              </button>
+              </Link>
             </div>
 
             {/* Feature highlights */}

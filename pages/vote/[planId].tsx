@@ -418,7 +418,7 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
       {
         id: '1',
         name: 'Solo Go Kart Racing',
-        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
         hours: '10:00 AM - 6:00 PM',
         reviews: { stars: 4.4, count: 234 },
         contact: { phone: '(555) 123-4567', email: 'racing@gokart.com' },
@@ -429,7 +429,7 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
       {
         id: '1',
         name: 'Couples Go Kart Race',
-        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        image: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?w=400&h=300&fit=crop',
         hours: '2:00 PM - 8:00 PM',
         reviews: { stars: 4.6, count: 345 },
         contact: { phone: '(555) 234-5678', email: 'couples@gokart.com' },
@@ -440,7 +440,7 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
       {
         id: '1',
         name: 'Group Go Kart Championship',
-        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&h=300&fit=crop',
         hours: '1:00 PM - 9:00 PM',
         reviews: { stars: 4.8, count: 567 },
         contact: { phone: '(555) 345-6789', email: 'championship@gokart.com' },
@@ -541,9 +541,28 @@ export default function VotePage() {
     const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
     
     if (topicStr && groupSizeStr && MOCK_EVENTS[topicStr] && MOCK_EVENTS[topicStr][groupSizeStr]) {
-      setEvents(MOCK_EVENTS[topicStr][groupSizeStr]);
+      let eventsToShow = MOCK_EVENTS[topicStr][groupSizeStr];
+      
+      // For demo, limit to 2 events and blur details
+      if (planId === 'demo') {
+        eventsToShow = eventsToShow.slice(0, 2).map(event => ({
+          ...event,
+          isDemo: true,
+          // Blur contact info for demo
+          contact: {
+            phone: '***-***-****',
+            email: 'demo@example.com'
+          },
+          // Blur hours for demo
+          hours: 'Demo Hours',
+          // Blur reviews for demo
+          reviews: { stars: 0, count: 0 }
+        }));
+      }
+      
+      setEvents(eventsToShow);
     }
-  }, [topic, groupSize]);
+  }, [topic, groupSize, planId]);
 
   // Timer countdown - redirects to results when time expires
   useEffect(() => {
@@ -617,6 +636,16 @@ export default function VotePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-100 to-blue-100 flex flex-col items-center justify-center px-4 py-8">
+      {/* Demo banner */}
+      {planId === 'demo' && (
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-full shadow-lg">
+            <span className="text-lg">🎮</span>
+            <span className="font-semibold">Demo Mode - Create a real plan to unlock full features!</span>
+          </div>
+        </div>
+      )}
+
       {/* Header with timer */}
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Vote on Events</h1>
@@ -654,7 +683,7 @@ export default function VotePage() {
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">
-                      {events[currentIndex].hours}
+                      {events[currentIndex].isDemo ? 'Demo Hours' : events[currentIndex].hours}
                     </div>
                   </div>
 
@@ -664,20 +693,35 @@ export default function VotePage() {
                     
                     {/* Star rating */}
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="text-yellow-400">{renderStars(events[currentIndex].reviews.stars)}</span>
-                      <span className="text-sm text-gray-600">({events[currentIndex].reviews.count} reviews)</span>
+                      {events[currentIndex].isDemo ? (
+                        <span className="text-gray-400 text-sm">⭐ Demo Reviews</span>
+                      ) : (
+                        <>
+                          <span className="text-yellow-400">{renderStars(events[currentIndex].reviews.stars)}</span>
+                          <span className="text-sm text-gray-600">({events[currentIndex].reviews.count} reviews)</span>
+                        </>
+                      )}
                     </div>
 
                     {/* Contact information */}
                     <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <span className="w-4 h-4">📞</span>
-                        <span>{events[currentIndex].contact.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <span className="w-4 h-4">✉️</span>
-                        <span>{events[currentIndex].contact.email}</span>
-                      </div>
+                      {events[currentIndex].isDemo ? (
+                        <div className="text-center py-4">
+                          <div className="text-gray-400 text-sm mb-2">🔒 Demo Mode</div>
+                          <div className="text-xs text-gray-500">Create a real plan to see contact info</div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <span className="w-4 h-4">📞</span>
+                            <span>{events[currentIndex].contact.phone}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <span className="w-4 h-4">✉️</span>
+                            <span>{events[currentIndex].contact.email}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* Friend avatars with vote status */}
@@ -719,23 +763,55 @@ export default function VotePage() {
             className="text-center mt-8"
           >
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
-              <p className="text-gray-600 mb-4">Thanks for voting! Check back for results.</p>
-              <button
-                onClick={() => {
-                  const winningEvent = getWinningEvent();
-                  const params = new URLSearchParams({
-                    topic: Array.isArray(topic) ? topic[0] : topic || '',
-                    groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
-                    zip: Array.isArray(zip) ? zip[0] : zip || '',
-                    winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
-                  });
-                  window.location.href = `/results/${planId}?${params.toString()}`;
-                }}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
-              >
-                See Results
-              </button>
+              {planId === 'demo' ? (
+                <>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 Demo Complete!</h3>
+                  <p className="text-gray-600 mb-4">You've seen how Choosy works. Ready to create a real plan?</p>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => router.push('/create')}
+                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                    >
+                      Create Real Plan
+                    </button>
+                    <button
+                      onClick={() => {
+                        const winningEvent = getWinningEvent();
+                        const params = new URLSearchParams({
+                          topic: Array.isArray(topic) ? topic[0] : topic || '',
+                          groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
+                          zip: Array.isArray(zip) ? zip[0] : zip || '',
+                          winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
+                        });
+                        window.location.href = `/results/${planId}?${params.toString()}`;
+                      }}
+                      className="w-full bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-300 transition-all duration-200"
+                    >
+                      See Demo Results
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
+                  <p className="text-gray-600 mb-4">Thanks for voting! Check back for results.</p>
+                  <button
+                    onClick={() => {
+                      const winningEvent = getWinningEvent();
+                      const params = new URLSearchParams({
+                        topic: Array.isArray(topic) ? topic[0] : topic || '',
+                        groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
+                        zip: Array.isArray(zip) ? zip[0] : zip || '',
+                        winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
+                      });
+                      window.location.href = `/results/${planId}?${params.toString()}`;
+                    }}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                  >
+                    See Results
+                  </button>
+                </>
+              )}
             </div>
           </motion.div>
         )}

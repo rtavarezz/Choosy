@@ -19,6 +19,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Mock results data (replace with Supabase query in production)
     const mockResults = {
       planId,
+      plan: {
+        topic: 'concerts',
+        groupSize: 'solo',
+        zipCode: '10001',
+        userName: 'John Smith',
+        phoneNumber: '(555) 123-4567'
+      },
       totalVotes: 3,
       participants: ['friendA', 'friendB', 'friendC'],
       events: [

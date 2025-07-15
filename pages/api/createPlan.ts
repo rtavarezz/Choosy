@@ -10,12 +10,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { topic, groupSize, zipCode, phoneNumber, customEvents } = req.body;
+    const { topic, groupSize, zipCode, userName, phoneNumber, customEvents } = req.body;
 
     // Validate required fields
-    if (!topic || !groupSize || !zipCode || !phoneNumber) {
+    if (!topic || !groupSize || !zipCode || !userName || !phoneNumber) {
       return res.status(400).json({ 
-        error: 'Missing required fields: topic, groupSize, zipCode, phoneNumber' 
+        error: 'Missing required fields: topic, groupSize, zipCode, userName, phoneNumber' 
       });
     }
 
@@ -28,6 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       topic,
       groupSize,
       zipCode,
+      userName,
       phoneNumber,
       customEvents: customEvents || [],
       createdAt: new Date().toISOString(),
@@ -43,6 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       topic: plan.topic,
       groupSize: plan.groupSize,
       zipCode: plan.zipCode,
+      userName: plan.userName,
       phoneNumber: plan.phoneNumber,
       customEvents: plan.customEvents
     });

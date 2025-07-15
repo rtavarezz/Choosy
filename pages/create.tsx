@@ -29,6 +29,7 @@ export default function Create() {
   const [groupSize, setGroupSize] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [userName, setUserName] = useState('');
   const [customEvents, setCustomEvents] = useState(['']);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -227,6 +228,13 @@ export default function Create() {
     setStep(4);
   };
 
+  // Handle name submission
+  const handleNameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userName.trim()) return;
+    setStep(5);
+  };
+
   // Handle phone number submission
   const handlePhoneSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,7 +244,7 @@ export default function Create() {
     if (groupSize === 'solo') {
       handlePlanSubmit(e);
     } else {
-      setStep(5);
+      setStep(6);
     }
   };
 
@@ -270,6 +278,7 @@ export default function Create() {
           topic,
           groupSize,
           zipCode: zipCode.trim(),
+          userName: userName.trim(),
           phoneNumber: phoneNumber.trim(),
           customEvents: customEvents.filter(event => event.trim())
         })
@@ -382,8 +391,34 @@ export default function Create() {
             </div>
           )}
 
-          {/* Step 4: Phone number input */}
+          {/* Step 4: Name input */}
           {step === 4 && (
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 max-w-md mx-auto">
+              <h2 className="text-2xl font-bold text-center mb-4">What's your name?</h2>
+              <p className="text-center text-gray-600 mb-6">
+                We'll use this for reservations and confirmations
+              </p>
+              <form onSubmit={handleNameSubmit} className="space-y-6">
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="e.g., John Smith"
+                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300 text-lg"
+                  required
+                />
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                >
+                  Next
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Step 5: Phone number input */}
+          {step === 5 && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 max-w-md mx-auto">
               <h2 className="text-2xl font-bold text-center mb-4">Your phone number</h2>
               <p className="text-center text-gray-600 mb-6">
@@ -411,8 +446,8 @@ export default function Create() {
             </div>
           )}
 
-          {/* Step 5: Optional custom events */}
-          {step === 5 && (
+          {/* Step 6: Optional custom events */}
+          {step === 6 && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
               <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Almost done!</h2>
