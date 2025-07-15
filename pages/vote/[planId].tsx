@@ -42,6 +42,15 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.7, count: 1234 },
         contact: { phone: '(555) 456-7890', email: 'symphony@classical.com' },
         voters: ['friendC']
+      },
+      {
+        id: '5',
+        name: 'Indie Rock Show',
+        image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+        hours: '9:00 PM - 12:00 AM',
+        reviews: { stars: 4.4, count: 456 },
+        contact: { phone: '(555) 567-8901', email: 'indie@rock.com' },
+        voters: ['friendB']
       }
     ],
     date: [
@@ -80,6 +89,15 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.8, count: 789 },
         contact: { phone: '(555) 567-8901', email: 'jazz@smooth.com' },
         voters: ['friendC']
+      },
+      {
+        id: '5',
+        name: 'Romantic Guitar Duo',
+        image: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 10:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 678-9012', email: 'guitar@romantic.com' },
+        voters: ['friendA', 'friendB']
       }
     ],
     group: [
@@ -118,6 +136,15 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.5, count: 678 },
         contact: { phone: '(555) 678-9012', email: 'country@night.com' },
         voters: ['friendA', 'friendB']
+      },
+      {
+        id: '5',
+        name: 'Electronic Dance Music',
+        image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+        hours: '9:00 PM - 2:00 AM',
+        reviews: { stars: 4.7, count: 890 },
+        contact: { phone: '(555) 789-0123', email: 'edm@electronic.com' },
+        voters: ['friendB', 'friendC']
       }
     ]
   },
@@ -139,6 +166,33 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         hours: '2:00 PM - 5:00 PM',
         reviews: { stars: 4.6, count: 234 },
         contact: { phone: '(555) 234-5678', email: 'art@workshop.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Solo Wine Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '4:00 PM - 7:00 PM',
+        reviews: { stars: 4.5, count: 123 },
+        contact: { phone: '(555) 345-6789', email: 'wine@solo.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '4',
+        name: 'Solo Cooking Class',
+        image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 9:00 PM',
+        reviews: { stars: 4.7, count: 345 },
+        contact: { phone: '(555) 456-7890', email: 'cooking@solo.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '5',
+        name: 'Solo Movie Night',
+        image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=300&fit=crop',
+        hours: '7:30 PM - 10:30 PM',
+        reviews: { stars: 4.3, count: 567 },
+        contact: { phone: '(555) 567-8901', email: 'movie@solo.com' },
         voters: ['friendB']
       }
     ],
@@ -169,6 +223,24 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.8, count: 567 },
         contact: { phone: '(555) 567-8901', email: 'drinks@rooftop.com' },
         voters: ['friendA', 'friendB']
+      },
+      {
+        id: '4',
+        name: 'Romantic Movie Night',
+        image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=300&fit=crop',
+        hours: '7:30 PM - 10:30 PM',
+        reviews: { stars: 4.5, count: 234 },
+        contact: { phone: '(555) 678-9012', email: 'movie@romantic.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '5',
+        name: 'Couples Art Class',
+        image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop',
+        hours: '3:00 PM - 6:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 789-0123', email: 'art@couples.com' },
+        voters: ['friendA', 'friendC']
       }
     ],
     group: [
@@ -189,6 +261,33 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.7, count: 234 },
         contact: { phone: '(555) 789-0123', email: 'wine@tasting.com' },
         voters: ['friendA', 'friendC']
+      },
+      {
+        id: '3',
+        name: 'Group Game Night',
+        image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 10:00 PM',
+        reviews: { stars: 4.5, count: 345 },
+        contact: { phone: '(555) 890-1234', email: 'games@group.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Group Movie Night',
+        image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=300&fit=crop',
+        hours: '7:30 PM - 11:30 PM',
+        reviews: { stars: 4.6, count: 234 },
+        contact: { phone: '(555) 901-2345', email: 'movie@group.com' },
+        voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '5',
+        name: 'Group Art Workshop',
+        image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=300&fit=crop',
+        hours: '2:00 PM - 5:00 PM',
+        reviews: { stars: 4.8, count: 456 },
+        contact: { phone: '(555) 012-3456', email: 'art@group.com' },
+        voters: ['friendA', 'friendC']
       }
     ]
   },
@@ -202,6 +301,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.5, count: 1234 },
         contact: { phone: '(555) 123-4567', email: 'info@foodtruckfest.com' },
         voters: ['friendA']
+      },
+      {
+        id: '2',
+        name: 'Solo Ramen Adventure',
+        image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 9:00 PM',
+        reviews: { stars: 4.7, count: 567 },
+        contact: { phone: '(555) 234-5678', email: 'ramen@solo.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Solo Pizza Night',
+        image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 10:00 PM',
+        reviews: { stars: 4.4, count: 345 },
+        contact: { phone: '(555) 345-6789', email: 'pizza@solo.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '4',
+        name: 'Solo Ice Cream Tour',
+        image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+        hours: '2:00 PM - 5:00 PM',
+        reviews: { stars: 4.6, count: 234 },
+        contact: { phone: '(555) 456-7890', email: 'icecream@solo.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '5',
+        name: 'Solo Coffee Crawl',
+        image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=300&fit=crop',
+        hours: '9:00 AM - 12:00 PM',
+        reviews: { stars: 4.3, count: 123 },
+        contact: { phone: '(555) 567-8901', email: 'coffee@solo.com' },
+        voters: ['friendB']
       }
     ],
     date: [
@@ -222,6 +357,33 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.6, count: 892 },
         contact: { phone: '(555) 789-0123', email: 'hello@farmtable.com' },
         voters: ['friendA']
+      },
+      {
+        id: '3',
+        name: 'Romantic Italian Dinner',
+        image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+        hours: '6:30 PM - 10:30 PM',
+        reviews: { stars: 4.8, count: 567 },
+        contact: { phone: '(555) 890-1234', email: 'italian@romantic.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '4',
+        name: 'Couples Cooking Class',
+        image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=300&fit=crop',
+        hours: '4:00 PM - 7:00 PM',
+        reviews: { stars: 4.5, count: 234 },
+        contact: { phone: '(555) 901-2345', email: 'cooking@couples.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '5',
+        name: 'Dessert Date Night',
+        image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+        hours: '8:00 PM - 11:00 PM',
+        reviews: { stars: 4.7, count: 345 },
+        contact: { phone: '(555) 012-3456', email: 'dessert@date.com' },
+        voters: ['friendA']
       }
     ],
     group: [
@@ -232,6 +394,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         hours: '4:00 PM - 9:00 PM',
         reviews: { stars: 4.7, count: 567 },
         contact: { phone: '(555) 890-1234', email: 'bbq@group.com' },
+        voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '2',
+        name: 'Group Pizza Party',
+        image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 10:00 PM',
+        reviews: { stars: 4.5, count: 234 },
+        contact: { phone: '(555) 901-2345', email: 'pizza@group.com' },
+        voters: ['friendA', 'friendB']
+      },
+      {
+        id: '3',
+        name: 'Group Taco Night',
+        image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 11:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 012-3456', email: 'tacos@group.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Group Sushi Feast',
+        image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+        hours: '6:30 PM - 10:30 PM',
+        reviews: { stars: 4.8, count: 456 },
+        contact: { phone: '(555) 123-4567', email: 'sushi@group.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '5',
+        name: 'Group Burger Bash',
+        image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=300&fit=crop',
+        hours: '5:00 PM - 9:00 PM',
+        reviews: { stars: 4.4, count: 123 },
+        contact: { phone: '(555) 234-5678', email: 'burger@group.com' },
         voters: ['friendA', 'friendB', 'friendC']
       }
     ]
@@ -322,6 +520,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.3, count: 723 },
         contact: { phone: '(555) 567-8901', email: 'info@undergroundclub.com' },
         voters: ['friendA', 'friendB']
+      },
+      {
+        id: '2',
+        name: 'Group Karaoke Night',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '8:00 PM - 2:00 AM',
+        reviews: { stars: 4.5, count: 456 },
+        contact: { phone: '(555) 678-9012', email: 'karaoke@group.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '3',
+        name: 'Group Pub Crawl',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 1:00 AM',
+        reviews: { stars: 4.4, count: 345 },
+        contact: { phone: '(555) 789-0123', email: 'pubcrawl@group.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Group Comedy Night',
+        image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+        hours: '9:00 PM - 11:00 PM',
+        reviews: { stars: 4.6, count: 234 },
+        contact: { phone: '(555) 890-1234', email: 'comedy@group.com' },
+        voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '5',
+        name: 'Group Dance Party',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '10:00 PM - 3:00 AM',
+        reviews: { stars: 4.7, count: 567 },
+        contact: { phone: '(555) 901-2345', email: 'dance@group.com' },
+        voters: ['friendA', 'friendB']
       }
     ]
   },
@@ -344,6 +578,33 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.5, count: 234 },
         contact: { phone: '(555) 234-5678', email: 'info@gardenwalk.com' },
         voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Solo Bird Watching',
+        image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop',
+        hours: '7:00 AM - 11:00 AM',
+        reviews: { stars: 4.3, count: 123 },
+        contact: { phone: '(555) 345-6789', email: 'birdwatching@solo.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '4',
+        name: 'Solo Photography Walk',
+        image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop',
+        hours: '4:00 PM - 8:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 456-7890', email: 'photography@solo.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '5',
+        name: 'Solo Meditation Spot',
+        image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop',
+        hours: '6:00 AM - 10:00 AM',
+        reviews: { stars: 4.8, count: 234 },
+        contact: { phone: '(555) 567-8901', email: 'meditation@solo.com' },
+        voters: ['friendB']
       }
     ],
     date: [
@@ -364,6 +625,33 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.6, count: 345 },
         contact: { phone: '(555) 456-7890', email: 'trail@nature.com' },
         voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Romantic Sunset View',
+        image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop',
+        hours: '5:00 PM - 8:00 PM',
+        reviews: { stars: 4.9, count: 456 },
+        contact: { phone: '(555) 567-8901', email: 'sunset@romantic.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '4',
+        name: 'Couples Bike Ride',
+        image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop',
+        hours: '9:00 AM - 1:00 PM',
+        reviews: { stars: 4.5, count: 234 },
+        contact: { phone: '(555) 678-9012', email: 'bike@couples.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '5',
+        name: 'Romantic Lake Walk',
+        image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop',
+        hours: '3:00 PM - 6:00 PM',
+        reviews: { stars: 4.7, count: 345 },
+        contact: { phone: '(555) 789-0123', email: 'lake@romantic.com' },
+        voters: ['friendA', 'friendB']
       }
     ],
     group: [
@@ -374,6 +662,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         hours: '2:00 PM - 6:00 PM',
         reviews: { stars: 4.4, count: 234 },
         contact: { phone: '(555) 567-8901', email: 'games@park.com' },
+        voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '2',
+        name: 'Group Hiking Adventure',
+        image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop',
+        hours: '9:00 AM - 3:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 678-9012', email: 'hiking@group.com' },
+        voters: ['friendA', 'friendB']
+      },
+      {
+        id: '3',
+        name: 'Group Picnic Party',
+        image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop',
+        hours: '12:00 PM - 5:00 PM',
+        reviews: { stars: 4.5, count: 234 },
+        contact: { phone: '(555) 789-0123', email: 'picnic@group.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Group Sports Day',
+        image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop',
+        hours: '10:00 AM - 4:00 PM',
+        reviews: { stars: 4.7, count: 456 },
+        contact: { phone: '(555) 890-1234', email: 'sports@group.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '5',
+        name: 'Group Nature Photography',
+        image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop',
+        hours: '4:00 PM - 8:00 PM',
+        reviews: { stars: 4.8, count: 234 },
+        contact: { phone: '(555) 901-2345', email: 'photography@group.com' },
         voters: ['friendA', 'friendB', 'friendC']
       }
     ]
@@ -388,6 +712,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.6, count: 123 },
         contact: { phone: '(555) 123-4567', email: 'tennis@solo.com' },
         voters: ['friendA']
+      },
+      {
+        id: '2',
+        name: 'Solo Basketball Practice',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 8:00 PM',
+        reviews: { stars: 4.5, count: 234 },
+        contact: { phone: '(555) 234-5678', email: 'basketball@solo.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Solo Swimming Laps',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '7:00 AM - 9:00 AM',
+        reviews: { stars: 4.7, count: 345 },
+        contact: { phone: '(555) 345-6789', email: 'swimming@solo.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '4',
+        name: 'Solo Golf Round',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '8:00 AM - 12:00 PM',
+        reviews: { stars: 4.4, count: 123 },
+        contact: { phone: '(555) 456-7890', email: 'golf@solo.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '5',
+        name: 'Solo Rock Climbing',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '2:00 PM - 5:00 PM',
+        reviews: { stars: 4.8, count: 456 },
+        contact: { phone: '(555) 567-8901', email: 'climbing@solo.com' },
+        voters: ['friendB']
       }
     ],
     date: [
@@ -399,6 +759,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.7, count: 234 },
         contact: { phone: '(555) 234-5678', email: 'tennis@couples.com' },
         voters: ['friendA', 'friendB']
+      },
+      {
+        id: '2',
+        name: 'Couples Golf Date',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '9:00 AM - 1:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 345-6789', email: 'golf@couples.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '3',
+        name: 'Couples Rock Climbing',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '3:00 PM - 6:00 PM',
+        reviews: { stars: 4.8, count: 234 },
+        contact: { phone: '(555) 456-7890', email: 'climbing@couples.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Couples Swimming',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '4:00 PM - 7:00 PM',
+        reviews: { stars: 4.5, count: 123 },
+        contact: { phone: '(555) 567-8901', email: 'swimming@couples.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '5',
+        name: 'Couples Basketball',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 9:00 PM',
+        reviews: { stars: 4.7, count: 456 },
+        contact: { phone: '(555) 678-9012', email: 'basketball@couples.com' },
+        voters: ['friendA', 'friendB']
       }
     ],
     group: [
@@ -409,6 +805,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         hours: '3:00 PM - 7:00 PM',
         reviews: { stars: 4.5, count: 456 },
         contact: { phone: '(555) 345-6789', email: 'basketball@tournament.com' },
+        voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '2',
+        name: 'Group Tennis Tournament',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '10:00 AM - 4:00 PM',
+        reviews: { stars: 4.6, count: 234 },
+        contact: { phone: '(555) 456-7890', email: 'tennis@tournament.com' },
+        voters: ['friendA', 'friendB']
+      },
+      {
+        id: '3',
+        name: 'Group Golf Outing',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '8:00 AM - 2:00 PM',
+        reviews: { stars: 4.7, count: 345 },
+        contact: { phone: '(555) 567-8901', email: 'golf@group.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Group Rock Climbing',
+        image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+        hours: '2:00 PM - 6:00 PM',
+        reviews: { stars: 4.8, count: 234 },
+        contact: { phone: '(555) 678-9012', email: 'climbing@group.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '5',
+        name: 'Group Swimming Meet',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '5:00 PM - 8:00 PM',
+        reviews: { stars: 4.4, count: 123 },
+        contact: { phone: '(555) 789-0123', email: 'swimming@group.com' },
         voters: ['friendA', 'friendB', 'friendC']
       }
     ]
@@ -423,6 +855,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.4, count: 234 },
         contact: { phone: '(555) 123-4567', email: 'racing@gokart.com' },
         voters: ['friendA']
+      },
+      {
+        id: '2',
+        name: 'Solo Drift Racing',
+        image: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?w=400&h=300&fit=crop',
+        hours: '11:00 AM - 7:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 234-5678', email: 'drift@gokart.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Solo Speed Racing',
+        image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&h=300&fit=crop',
+        hours: '9:00 AM - 5:00 PM',
+        reviews: { stars: 4.5, count: 123 },
+        contact: { phone: '(555) 345-6789', email: 'speed@gokart.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '4',
+        name: 'Solo Endurance Race',
+        image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+        hours: '12:00 PM - 8:00 PM',
+        reviews: { stars: 4.7, count: 456 },
+        contact: { phone: '(555) 456-7890', email: 'endurance@gokart.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '5',
+        name: 'Solo Time Trial',
+        image: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?w=400&h=300&fit=crop',
+        hours: '2:00 PM - 6:00 PM',
+        reviews: { stars: 4.3, count: 234 },
+        contact: { phone: '(555) 567-8901', email: 'timetrial@gokart.com' },
+        voters: ['friendB']
       }
     ],
     date: [
@@ -434,6 +902,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.6, count: 345 },
         contact: { phone: '(555) 234-5678', email: 'couples@gokart.com' },
         voters: ['friendA', 'friendB']
+      },
+      {
+        id: '2',
+        name: 'Couples Drift Competition',
+        image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+        hours: '3:00 PM - 9:00 PM',
+        reviews: { stars: 4.7, count: 234 },
+        contact: { phone: '(555) 345-6789', email: 'drift@couples.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '3',
+        name: 'Couples Speed Challenge',
+        image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&h=300&fit=crop',
+        hours: '1:00 PM - 7:00 PM',
+        reviews: { stars: 4.5, count: 456 },
+        contact: { phone: '(555) 456-7890', email: 'speed@couples.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Couples Endurance Race',
+        image: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?w=400&h=300&fit=crop',
+        hours: '4:00 PM - 10:00 PM',
+        reviews: { stars: 4.8, count: 345 },
+        contact: { phone: '(555) 567-8901', email: 'endurance@couples.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '5',
+        name: 'Couples Time Trial',
+        image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+        hours: '5:00 PM - 9:00 PM',
+        reviews: { stars: 4.4, count: 123 },
+        contact: { phone: '(555) 678-9012', email: 'timetrial@couples.com' },
+        voters: ['friendA', 'friendB']
       }
     ],
     group: [
@@ -444,6 +948,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         hours: '1:00 PM - 9:00 PM',
         reviews: { stars: 4.8, count: 567 },
         contact: { phone: '(555) 345-6789', email: 'championship@gokart.com' },
+        voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '2',
+        name: 'Group Drift Championship',
+        image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+        hours: '2:00 PM - 10:00 PM',
+        reviews: { stars: 4.6, count: 234 },
+        contact: { phone: '(555) 456-7890', email: 'drift@championship.com' },
+        voters: ['friendA', 'friendB']
+      },
+      {
+        id: '3',
+        name: 'Group Speed Championship',
+        image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&h=300&fit=crop',
+        hours: '12:00 PM - 8:00 PM',
+        reviews: { stars: 4.7, count: 345 },
+        contact: { phone: '(555) 567-8901', email: 'speed@championship.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Group Endurance Championship',
+        image: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?w=400&h=300&fit=crop',
+        hours: '3:00 PM - 11:00 PM',
+        reviews: { stars: 4.9, count: 456 },
+        contact: { phone: '(555) 678-9012', email: 'endurance@championship.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '5',
+        name: 'Group Time Trial Championship',
+        image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+        hours: '4:00 PM - 10:00 PM',
+        reviews: { stars: 4.5, count: 123 },
+        contact: { phone: '(555) 789-0123', email: 'timetrial@championship.com' },
         voters: ['friendA', 'friendB', 'friendC']
       }
     ]
@@ -458,6 +998,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.5, count: 123 },
         contact: { phone: '(555) 123-4567', email: 'swim@solo.com' },
         voters: ['friendA']
+      },
+      {
+        id: '2',
+        name: 'Solo Lap Swimming',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '6:00 AM - 8:00 AM',
+        reviews: { stars: 4.6, count: 234 },
+        contact: { phone: '(555) 234-5678', email: 'laps@solo.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Solo Water Aerobics',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '10:00 AM - 11:00 AM',
+        reviews: { stars: 4.4, count: 345 },
+        contact: { phone: '(555) 345-6789', email: 'aerobics@solo.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '4',
+        name: 'Solo Diving Practice',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '2:00 PM - 4:00 PM',
+        reviews: { stars: 4.7, count: 123 },
+        contact: { phone: '(555) 456-7890', email: 'diving@solo.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '5',
+        name: 'Solo Water Polo',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '5:00 PM - 7:00 PM',
+        reviews: { stars: 4.3, count: 234 },
+        contact: { phone: '(555) 567-8901', email: 'polo@solo.com' },
+        voters: ['friendB']
       }
     ],
     date: [
@@ -469,6 +1045,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.7, count: 234 },
         contact: { phone: '(555) 234-5678', email: 'pool@couples.com' },
         voters: ['friendA', 'friendB']
+      },
+      {
+        id: '2',
+        name: 'Couples Lap Swimming',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 8:00 PM',
+        reviews: { stars: 4.6, count: 345 },
+        contact: { phone: '(555) 345-6789', email: 'laps@couples.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '3',
+        name: 'Couples Water Aerobics',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '9:00 AM - 10:00 AM',
+        reviews: { stars: 4.5, count: 123 },
+        contact: { phone: '(555) 456-7890', email: 'aerobics@couples.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Couples Diving',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '3:00 PM - 5:00 PM',
+        reviews: { stars: 4.8, count: 456 },
+        contact: { phone: '(555) 567-8901', email: 'diving@couples.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '5',
+        name: 'Couples Water Polo',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '4:00 PM - 6:00 PM',
+        reviews: { stars: 4.4, count: 234 },
+        contact: { phone: '(555) 678-9012', email: 'polo@couples.com' },
+        voters: ['friendA', 'friendB']
       }
     ],
     group: [
@@ -479,6 +1091,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         hours: '2:00 PM - 8:00 PM',
         reviews: { stars: 4.6, count: 345 },
         contact: { phone: '(555) 345-6789', email: 'party@pool.com' },
+        voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '2',
+        name: 'Group Lap Swimming',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '6:00 AM - 8:00 AM',
+        reviews: { stars: 4.5, count: 234 },
+        contact: { phone: '(555) 456-7890', email: 'laps@group.com' },
+        voters: ['friendA', 'friendB']
+      },
+      {
+        id: '3',
+        name: 'Group Water Aerobics',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '10:00 AM - 11:00 AM',
+        reviews: { stars: 4.7, count: 456 },
+        contact: { phone: '(555) 567-8901', email: 'aerobics@group.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Group Diving Competition',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '3:00 PM - 6:00 PM',
+        reviews: { stars: 4.8, count: 234 },
+        contact: { phone: '(555) 678-9012', email: 'diving@group.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '5',
+        name: 'Group Water Polo Match',
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+        hours: '5:00 PM - 8:00 PM',
+        reviews: { stars: 4.4, count: 123 },
+        contact: { phone: '(555) 789-0123', email: 'polo@group.com' },
         voters: ['friendA', 'friendB', 'friendC']
       }
     ]
@@ -493,6 +1141,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.4, count: 123 },
         contact: { phone: '(555) 123-4567', email: 'beer@solo.com' },
         voters: ['friendA']
+      },
+      {
+        id: '2',
+        name: 'Solo Wine Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 10:00 PM',
+        reviews: { stars: 4.6, count: 234 },
+        contact: { phone: '(555) 234-5678', email: 'wine@solo.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '3',
+        name: 'Solo Cocktail Making',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 11:00 PM',
+        reviews: { stars: 4.5, count: 345 },
+        contact: { phone: '(555) 345-6789', email: 'cocktails@solo.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '4',
+        name: 'Solo Whiskey Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '8:00 PM - 12:00 AM',
+        reviews: { stars: 4.7, count: 123 },
+        contact: { phone: '(555) 456-7890', email: 'whiskey@solo.com' },
+        voters: ['friendA']
+      },
+      {
+        id: '5',
+        name: 'Solo Tequila Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '6:30 PM - 10:30 PM',
+        reviews: { stars: 4.3, count: 234 },
+        contact: { phone: '(555) 567-8901', email: 'tequila@solo.com' },
+        voters: ['friendB']
       }
     ],
     date: [
@@ -504,6 +1188,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         reviews: { stars: 4.8, count: 456 },
         contact: { phone: '(555) 234-5678', email: 'wine@couples.com' },
         voters: ['friendA', 'friendB']
+      },
+      {
+        id: '2',
+        name: 'Couples Craft Beer Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '7:00 PM - 11:00 PM',
+        reviews: { stars: 4.6, count: 234 },
+        contact: { phone: '(555) 345-6789', email: 'beer@couples.com' },
+        voters: ['friendC']
+      },
+      {
+        id: '3',
+        name: 'Couples Cocktail Making',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '8:00 PM - 12:00 AM',
+        reviews: { stars: 4.7, count: 345 },
+        contact: { phone: '(555) 456-7890', email: 'cocktails@couples.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Couples Whiskey Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '6:30 PM - 10:30 PM',
+        reviews: { stars: 4.9, count: 123 },
+        contact: { phone: '(555) 567-8901', email: 'whiskey@couples.com' },
+        voters: ['friendB']
+      },
+      {
+        id: '5',
+        name: 'Couples Tequila Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '7:30 PM - 11:30 PM',
+        reviews: { stars: 4.5, count: 456 },
+        contact: { phone: '(555) 678-9012', email: 'tequila@couples.com' },
+        voters: ['friendA', 'friendB']
       }
     ],
     group: [
@@ -514,6 +1234,42 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         hours: '7:00 PM - 11:00 PM',
         reviews: { stars: 4.6, count: 234 },
         contact: { phone: '(555) 345-6789', email: 'cocktails@group.com' },
+        voters: ['friendA', 'friendB', 'friendC']
+      },
+      {
+        id: '2',
+        name: 'Group Wine Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '6:00 PM - 10:00 PM',
+        reviews: { stars: 4.7, count: 345 },
+        contact: { phone: '(555) 456-7890', email: 'wine@group.com' },
+        voters: ['friendA', 'friendB']
+      },
+      {
+        id: '3',
+        name: 'Group Craft Beer Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '8:00 PM - 12:00 AM',
+        reviews: { stars: 4.5, count: 123 },
+        contact: { phone: '(555) 567-8901', email: 'beer@group.com' },
+        voters: ['friendB', 'friendC']
+      },
+      {
+        id: '4',
+        name: 'Group Whiskey Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '6:30 PM - 10:30 PM',
+        reviews: { stars: 4.8, count: 456 },
+        contact: { phone: '(555) 678-9012', email: 'whiskey@group.com' },
+        voters: ['friendA', 'friendC']
+      },
+      {
+        id: '5',
+        name: 'Group Tequila Tasting',
+        image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+        hours: '7:30 PM - 11:30 PM',
+        reviews: { stars: 4.4, count: 234 },
+        contact: { phone: '(555) 789-0123', email: 'tequila@group.com' },
         voters: ['friendA', 'friendB', 'friendC']
       }
     ]
@@ -532,12 +1288,19 @@ export default function VotePage() {
   const { planId, topic, groupSize, zip } = router.query;
   const [events, setEvents] = useState([]);
   const [voted, setVoted] = useState({});
+  const [voteCounts, setVoteCounts] = useState<Record<string, number>>({}); // Track vote counts for each event
   const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [voterName, setVoterName] = useState('');
   const [voterPhone, setVoterPhone] = useState('');
   const [showLogin, setShowLogin] = useState(true);
+  
+  // New state for voter tracking
+  const [expectedVoters, setExpectedVoters] = useState(1);
+  const [completedVoters, setCompletedVoters] = useState(0);
+  const [voterId, setVoterId] = useState('');
+  const [allVotersCompleted, setAllVotersCompleted] = useState(false);
 
   // Load events based on topic and group size
   useEffect(() => {
@@ -565,8 +1328,57 @@ export default function VotePage() {
       }
       
       setEvents(eventsToShow);
+      
+      // Set expected voters based on group size
+      const voterCount = groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5;
+      setExpectedVoters(voterCount);
     }
   }, [topic, groupSize, planId]);
+
+  // Load vote counts from localStorage
+  useEffect(() => {
+    const storedVotes = localStorage.getItem(`votes_${planId}`);
+    if (storedVotes) {
+      setVoteCounts(JSON.parse(storedVotes));
+    }
+    
+    // Load completed voters count
+    const storedCompletedVoters = localStorage.getItem(`completed_voters_${planId}`);
+    if (storedCompletedVoters) {
+      setCompletedVoters(parseInt(storedCompletedVoters));
+    }
+  }, [planId]);
+
+  // Generate unique voter ID on mount
+  useEffect(() => {
+    if (!voterId) {
+      const newVoterId = `voter_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setVoterId(newVoterId);
+    }
+  }, [voterId]);
+
+  // Check if all voters have completed
+  useEffect(() => {
+    if (completedVoters >= expectedVoters) {
+      setAllVotersCompleted(true);
+    }
+  }, [completedVoters, expectedVoters]);
+
+  // Live refresh to check for new completed voters
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      // Check for updated completed voters count
+      const storedCompletedVoters = localStorage.getItem(`completed_voters_${planId}`);
+      if (storedCompletedVoters) {
+        const newCompletedCount = parseInt(storedCompletedVoters);
+        if (newCompletedCount !== completedVoters) {
+          setCompletedVoters(newCompletedCount);
+        }
+      }
+    }, 2000); // Check every 2 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [planId, completedVoters]);
 
   // Timer countdown - redirects to results when time expires
   useEffect(() => {
@@ -592,7 +1404,42 @@ export default function VotePage() {
   // Handle swipe gestures
   const swiped = (dir, eventId) => {
     setVoted(prev => ({ ...prev, [eventId]: dir === 'right' }));
+    
+    // Get current vote counts from localStorage
+    const storedVotes = localStorage.getItem(`votes_${planId}`);
+    const currentVotes = storedVotes ? JSON.parse(storedVotes) : {};
+    
+    // Update vote count for this event
+    const currentCount = currentVotes[eventId] || 0;
+    const newCount = dir === 'right' 
+      ? currentCount + 1  // Approve: +1
+      : Math.max(0, currentCount - 1); // Deny: -1, but minimum 0
+    
+    // Save updated votes to localStorage
+    const updatedVotes = {
+      ...currentVotes,
+      [eventId]: newCount
+    };
+    localStorage.setItem(`votes_${planId}`, JSON.stringify(updatedVotes));
+    
+    // Update local state
+    setVoteCounts(updatedVotes);
+    
     setCurrentIndex(prev => prev + 1);
+    
+    // Check if this voter has completed all events
+    if (currentIndex + 1 >= events.length) {
+      // Mark this voter as completed
+      const storedCompletedVoters = localStorage.getItem(`completed_voters_${planId}`);
+      const currentCompleted = storedCompletedVoters ? parseInt(storedCompletedVoters) : 0;
+      const newCompleted = currentCompleted + 1;
+      
+      localStorage.setItem(`completed_voters_${planId}`, newCompleted.toString());
+      setCompletedVoters(newCompleted);
+      
+      // Store this voter's completion status
+      localStorage.setItem(`voter_completed_${planId}_${voterId}`, 'true');
+    }
   };
 
   // Manual swipe controls
@@ -603,15 +1450,51 @@ export default function VotePage() {
     }
   };
 
-
-
   // Get winning event for results page
   const getWinningEvent = () => {
-    const votedEvents = events.filter(event => voted[event.id] === true);
-    if (votedEvents.length > 0) {
-      return votedEvents[0]; // Return first voted event
+    // Get all events with their vote counts
+    const eventsWithVotes = events.map(event => ({
+      ...event,
+      voteCount: voteCounts[event.id] || 0
+    }));
+    
+    // Sort by vote count (highest first)
+    eventsWithVotes.sort((a, b) => b.voteCount - a.voteCount);
+    
+    // Check for clear winner (more than 50% of total votes)
+    const totalVotes = Object.values(voteCounts).reduce((sum: number, count: any) => sum + (count as number), 0);
+    const highestVoteCount = eventsWithVotes[0]?.voteCount || 0;
+    
+    if (totalVotes > 0 && highestVoteCount > totalVotes / 2) {
+      // Clear winner exists
+      return eventsWithVotes[0];
     }
-    return events.length > 0 ? events[0] : null; // Fallback to first event
+    
+    // No clear winner - return top voted event (for now)
+    // In the future, this could trigger a new voting round with top 33%
+    return eventsWithVotes[0] || events[0] || null;
+  };
+
+  // Handle tie-breaking (for future implementation)
+  const handleTieBreak = () => {
+    // Get events sorted by vote count
+    const eventsWithVotes = events.map(event => ({
+      ...event,
+      voteCount: voteCounts[event.id] || 0
+    }));
+    
+    // Sort by vote count (highest first)
+    eventsWithVotes.sort((a, b) => b.voteCount - a.voteCount);
+    
+    // Get top 33% of events
+    const topThirdCount = Math.ceil(eventsWithVotes.length / 3);
+    const topEvents = eventsWithVotes.slice(0, topThirdCount);
+    
+    // In a real implementation, this would start a new voting round
+    // with just the top events
+    console.log('Tie detected - would start new round with:', topEvents);
+    
+    return topEvents[0]; // Return the highest voted event for now
   };
 
   // Format time display (MM:SS)
@@ -643,6 +1526,13 @@ export default function VotePage() {
 
   // Check if already authenticated or if user is the creator
   useEffect(() => {
+    // Skip authentication for demo
+    if (planId === 'demo') {
+      setIsAuthenticated(true);
+      setShowLogin(false);
+      return;
+    }
+    
     const voterInfo = localStorage.getItem(`voter_${planId}`);
     const creatorInfo = localStorage.getItem(`creator_${planId}`);
     
@@ -674,10 +1564,32 @@ export default function VotePage() {
       sessionStorage.removeItem('cameFromCreate');
     } else {
       // New user or direct link access - show login form
-      setShowLogin(true);
-      setIsAuthenticated(false);
+      // For group plans (3+ people), always require authentication
+      if (groupSize && groupSize !== 'solo' && groupSize !== 'date') {
+        setShowLogin(true);
+        setIsAuthenticated(false);
+      } else {
+        // For solo/date plans, allow skipping if they have creator info
+        if (creatorInfo) {
+          const creator = JSON.parse(creatorInfo);
+          setVoterName(creator.name);
+          setVoterPhone(creator.phone);
+          setIsAuthenticated(true);
+          setShowLogin(false);
+          // Store as voter for consistency
+          localStorage.setItem(`voter_${planId}`, JSON.stringify({
+            name: creator.name,
+            phone: creator.phone,
+            timestamp: Date.now(),
+            isCreator: true
+          }));
+        } else {
+          setShowLogin(true);
+          setIsAuthenticated(false);
+        }
+      }
     }
-  }, [planId]);
+  }, [planId, groupSize]);
 
   // Loading state
   if (events.length === 0) {
@@ -767,12 +1679,19 @@ export default function VotePage() {
         </div>
       )}
 
-      {/* Header with timer */}
+      {/* Header with timer and voter progress */}
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Vote on Events</h1>
         <p className="text-gray-600 mb-4">
           {(Array.isArray(topic) ? topic[0] : topic) === 'datenight' ? 'Date Night' : (Array.isArray(topic) ? topic[0] : topic)} • {(Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' ? 'Solo' : (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'date' ? 'Date or Friend Night' : 'Group'} • {Array.isArray(zip) ? zip[0] : zip}
         </p>
+        
+        {/* Voter progress counter */}
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg mb-4">
+          <span className="text-lg">👥</span>
+          <span className="font-semibold">{completedVoters}/{expectedVoters} finished voting</span>
+        </div>
+        
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg">
           <span className="text-lg">⏰</span>
           <span className="font-mono font-bold">{formatTime(timeLeft)} left</span>
@@ -845,30 +1764,6 @@ export default function VotePage() {
                       )}
                     </div>
 
-                    {/* Friend avatars with vote status */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">Voted by:</span>
-                      <div className="flex -space-x-2">
-                        {Object.keys(MOCK_FRIENDS).map((friendId) => {
-                          const hasVoted = events[currentIndex].voters.includes(friendId);
-                          return (
-                            <div
-                              key={friendId}
-                              className={`w-8 h-8 rounded-full border-2 border-white overflow-hidden ${
-                                hasVoted ? 'opacity-100' : 'opacity-30 blur-sm'
-                              }`}
-                              title={hasVoted ? MOCK_FRIENDS[friendId].name : 'Not voted'}
-                            >
-                              <img 
-                                src={MOCK_FRIENDS[friendId].avatar} 
-                                alt={MOCK_FRIENDS[friendId].name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </TinderCard>
@@ -912,10 +1807,10 @@ export default function VotePage() {
                     </button>
                   </div>
                 </>
-              ) : (
+              ) : allVotersCompleted ? (
                 <>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
-                  <p className="text-gray-600 mb-4">Thanks for voting! Check back for results.</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 All Votes In!</h3>
+                  <p className="text-gray-600 mb-4">Everyone has finished voting. Check the results!</p>
                   <button
                     onClick={() => {
                       const winningEvent = getWinningEvent();
@@ -931,6 +1826,15 @@ export default function VotePage() {
                   >
                     See Results
                   </button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
+                  <p className="text-gray-600 mb-4">Thanks for voting! Waiting for others to finish...</p>
+                  <div className="text-sm text-gray-500">
+                    <p>{completedVoters}/{expectedVoters} people have finished voting</p>
+                    <p className="mt-2">Results will be available when everyone is done!</p>
+                  </div>
                 </>
               )}
             </div>

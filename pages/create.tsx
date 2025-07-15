@@ -184,33 +184,16 @@ export default function Create() {
       const eventsForTopic = MOCK_EVENTS[randomTopic.key]?.solo || [];
       const randomEvent = eventsForTopic[Math.floor(Math.random() * eventsForTopic.length)];
       
-      // Create plan with random choices
-      const response = await fetch('/api/createPlan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: randomTopic.key,
-          groupSize: randomGroupSize,
-          zipCode: '10001', // Default zip code
-          phoneNumber: '555-123-4567', // Default phone
-          customEvents: []
-        })
-      });
+      // Set the random choices and go to contact step
+      setTopic(randomTopic.key);
+      setGroupSize(randomGroupSize);
+      setStep(3); // Go directly to contact info step
       
-      if (response.ok) {
-        const { planId } = await response.json();
-        // Go directly to results for solo users with the random event
-        const params = new URLSearchParams({
-          topic: randomTopic.key,
-          groupSize: randomGroupSize,
-          zip: '10001',
-          winningEvent: JSON.stringify(randomEvent)
-        });
-        router.push(`/results/${planId}?${params.toString()}`);
-      } else {
-        alert('Failed to create plan. Please try again.');
-      }
+      // Store the random event for later use
+      localStorage.setItem('randomChoiceEvent', JSON.stringify(randomEvent));
+      
     } catch (error) {
+      console.error('Error in random choice:', error);
       alert('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -383,7 +366,7 @@ export default function Create() {
   };
 
   // Handle contact info submission (name, phone, zip combined)
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userName.trim() || !phoneNumber.trim() || !zipCode.trim()) return;
     
@@ -392,7 +375,58 @@ export default function Create() {
     
     // For solo users, skip to voting directly
     if (groupSize === 'solo') {
-      handlePlanSubmit(e);
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/createPlan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic,
+            groupSize,
+            zipCode: zipCode.trim(),
+            userName: userName.trim(),
+            phoneNumber: phoneNumber.trim(),
+            customEvents: customEvents.filter(event => event.trim())
+          })
+        });
+        
+        if (response.ok) {
+          const { planId } = await response.json();
+          
+          // Store creator info for automatic login
+          localStorage.setItem(`creator_${planId}`, JSON.stringify({
+            name: userName.trim(),
+            phone: phoneNumber.trim(),
+            timestamp: Date.now()
+          }));
+          
+          // Check if this was a random choice
+          const randomEvent = localStorage.getItem('randomChoiceEvent');
+          if (randomEvent) {
+            // Clear the stored random event
+            localStorage.removeItem('randomChoiceEvent');
+            
+            // Go directly to results with the random event
+            const params = new URLSearchParams({
+              topic,
+              groupSize,
+              zip: zipCode.trim(),
+              winningEvent: randomEvent
+            });
+            router.push(`/results/${planId}?${params.toString()}`);
+          } else {
+            // Normal flow - go to voting
+            sessionStorage.setItem('cameFromCreate', 'true');
+            router.push(`/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`);
+          }
+        } else {
+          alert('Failed to create plan. Please try again.');
+        }
+      } catch (error) {
+        alert('Something went wrong. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     } else {
       setStep(4);
     }
@@ -471,13 +505,18 @@ export default function Create() {
           timestamp: Date.now()
         }));
         
-        // Generate shareable URL
-        const baseUrl = window.location.origin;
-        const shareUrl = `${baseUrl}/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`;
-        setShareUrl(shareUrl);
-        
-        // Go to sharing step
-        setStep(5);
+        // For solo users, go straight to voting
+        if (groupSize === 'solo') {
+          // Set flag to indicate user came from create page
+          sessionStorage.setItem('cameFromCreate', 'true');
+          router.push(`/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`);
+        } else {
+          // For groups, show sharing step
+          const baseUrl = window.location.origin;
+          const shareUrl = `${baseUrl}/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`;
+          setShareUrl(shareUrl);
+          setStep(5);
+        }
       } else {
         alert('Failed to create plan. Please try again.');
       }
