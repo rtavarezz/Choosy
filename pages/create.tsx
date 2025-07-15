@@ -30,6 +30,7 @@ export default function Create() {
   const [zipCode, setZipCode] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [userName, setUserName] = useState('');
+  const [cityArea, setCityArea] = useState('');
   const [customEvents, setCustomEvents] = useState(['']);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -221,30 +222,176 @@ export default function Create() {
 
 
 
-  // Handle zip code submission
-  const handleZipSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!zipCode.trim()) return;
-    setStep(4);
+  // Zip code to city mapping with international support
+  const getCityFromZip = (zip: string): string => {
+    // Handle international zip codes (non-US format)
+    if (zip.length > 5 || /[A-Z]/.test(zip)) {
+      return 'International Location';
+    }
+    
+    const zipPrefix = zip.substring(0, 3);
+    const zipMap: Record<string, string> = {
+      // New York
+      '100': 'New York, NY',
+      '101': 'New York, NY',
+      '102': 'New York, NY',
+      '103': 'Staten Island, NY',
+      '104': 'Bronx, NY',
+      '105': 'Westchester, NY',
+      '106': 'Westchester, NY',
+      '107': 'Westchester, NY',
+      '108': 'Westchester, NY',
+      '109': 'Rockland, NY',
+      '110': 'Queens, NY',
+      '111': 'Queens, NY',
+      '112': 'Brooklyn, NY',
+      '113': 'Queens, NY',
+      '114': 'Queens, NY',
+      '115': 'Nassau, NY',
+      '116': 'Queens, NY',
+      '117': 'Suffolk, NY',
+      '118': 'Nassau, NY',
+      '119': 'Suffolk, NY',
+      
+      // Washington DC
+      '200': 'Washington, DC',
+      '201': 'Virginia',
+      '202': 'Washington, DC',
+      '203': 'Connecticut',
+      '204': 'Washington, DC',
+      '205': 'Washington, DC',
+      
+      // Chicago
+      '600': 'Chicago, IL',
+      '601': 'Chicago Suburbs, IL',
+      '602': 'Evanston, IL',
+      '603': 'Oak Park, IL',
+      '604': 'Chicago Suburbs, IL',
+      '605': 'Chicago Suburbs, IL',
+      '606': 'Chicago, IL',
+      '607': 'Chicago, IL',
+      '608': 'Chicago, IL',
+      '609': 'Chicago Suburbs, IL',
+      
+      // Los Angeles
+      '900': 'Los Angeles, CA',
+      '901': 'Los Angeles, CA',
+      '902': 'Beverly Hills, CA',
+      '903': 'Inglewood, CA',
+      '904': 'Santa Monica, CA',
+      '905': 'Torrance, CA',
+      '906': 'Whittier, CA',
+      '907': 'Long Beach, CA',
+      '908': 'Long Beach, CA',
+      '909': 'San Bernardino, CA',
+      '910': 'Glendale, CA',
+      '911': 'Pasadena, CA',
+      '912': 'Glendale, CA',
+      '913': 'Van Nuys, CA',
+      '914': 'Westchester, NY',
+      '915': 'Burbank, CA',
+      '916': 'North Hollywood, CA',
+      '917': 'Rosemead, CA',
+      '918': 'Alhambra, CA',
+      '919': 'San Diego, CA',
+      '920': 'San Diego, CA',
+      '921': 'San Diego, CA',
+      '922': 'Palm Springs, CA',
+      '923': 'San Bernardino, CA',
+      '924': 'San Bernardino, CA',
+      '925': 'Riverside, CA',
+      '926': 'Irvine, CA',
+      '927': 'Santa Ana, CA',
+      '928': 'Anaheim, CA',
+      '929': 'New York, NY',
+      '930': 'Ventura, CA',
+      '931': 'Santa Barbara, CA',
+      '932': 'Bakersfield, CA',
+      '933': 'Bakersfield, CA',
+      '934': 'San Luis Obispo, CA',
+      '935': 'Lancaster, CA',
+      '936': 'Fresno, CA',
+      '937': 'Fresno, CA',
+      '938': 'Fresno, CA',
+      '939': 'Salinas, CA',
+      '940': 'San Mateo, CA',
+      '941': 'San Francisco, CA',
+      '942': 'Sacramento, CA',
+      '943': 'Palo Alto, CA',
+      '944': 'San Mateo, CA',
+      '945': 'Oakland, CA',
+      '946': 'Oakland, CA',
+      '947': 'Berkeley, CA',
+      '948': 'Richmond, CA',
+      '949': 'Irvine, CA',
+      '950': 'San Jose, CA',
+      '951': 'San Jose, CA',
+      '952': 'Stockton, CA',
+      '953': 'Modesto, CA',
+      '954': 'Santa Rosa, CA',
+      '955': 'Eureka, CA',
+      '956': 'Sacramento, CA',
+      '957': 'Sacramento, CA',
+      '958': 'Sacramento, CA',
+      '959': 'Chico, CA',
+      '960': 'Redding, CA',
+      '961': 'Reno, NV',
+      '962': 'Honolulu, HI',
+      '963': 'Honolulu, HI',
+      '964': 'Honolulu, HI',
+      '965': 'Honolulu, HI',
+      '966': 'Honolulu, HI',
+      '967': 'Hawaii',
+      '968': 'Honolulu, HI',
+      '969': 'Guam',
+      '970': 'Portland, OR',
+      '971': 'Portland, OR',
+      '972': 'Portland, OR',
+      '973': 'Salem, OR',
+      '974': 'Eugene, OR',
+      '975': 'Medford, OR',
+      '976': 'Klamath Falls, OR',
+      '977': 'Bend, OR',
+      '978': 'Pendleton, OR',
+      '979': 'College Station, TX',
+      '980': 'Seattle, WA',
+      '981': 'Seattle, WA',
+      '982': 'Everett, WA',
+      '983': 'Tacoma, WA',
+      '984': 'Tacoma, WA',
+      '985': 'Olympia, WA',
+      '986': 'Vancouver, WA',
+      '987': 'Spokane, WA',
+      '988': 'Wenatchee, WA',
+      '989': 'Yakima, WA',
+      '990': 'Spokane, WA',
+      '991': 'Spokane, WA',
+      '992': 'Spokane, WA',
+      '993': 'Tri-Cities, WA',
+      '994': 'Walla Walla, WA',
+      '995': 'Anchorage, AK',
+      '996': 'Anchorage, AK',
+      '997': 'Fairbanks, AK',
+      '998': 'Juneau, AK',
+      '999': 'Alaska'
+    };
+    
+    return zipMap[zipPrefix] || 'Unknown Area';
   };
 
-  // Handle name submission
-  const handleNameSubmit = (e: React.FormEvent) => {
+  // Handle contact info submission (name, phone, zip combined)
+  const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userName.trim()) return;
-    setStep(5);
-  };
-
-  // Handle phone number submission
-  const handlePhoneSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneNumber.trim()) return;
+    if (!userName.trim() || !phoneNumber.trim() || !zipCode.trim()) return;
+    
+    // Set city area based on zip code
+    setCityArea(getCityFromZip(zipCode.trim()));
     
     // For solo users, skip to voting directly
     if (groupSize === 'solo') {
       handlePlanSubmit(e);
     } else {
-      setStep(6);
+      setStep(5);
     }
   };
 
@@ -367,78 +514,69 @@ export default function Create() {
             </div>
           )}
 
-          {/* Step 3: Zip code input */}
+          {/* Step 3: Contact info input (name, phone, zip combined) */}
           {step === 3 && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 max-w-md mx-auto">
-              <h2 className="text-2xl font-bold text-center mb-4">Where are you?</h2>
-              <p className="text-center text-gray-600 mb-6">We'll find events near you</p>
-              <form onSubmit={handleZipSubmit} className="space-y-6">
-                <input
-                  type="text"
-                  value={zipCode}
-                  onChange={(e) => setZipCode(e.target.value)}
-                  placeholder="e.g., 10001"
-                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300 text-lg"
-                  required
-                />
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                >
-                  Next
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* Step 4: Name input */}
-          {step === 4 && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 max-w-md mx-auto">
-              <h2 className="text-2xl font-bold text-center mb-4">What's your name?</h2>
+              <h2 className="text-2xl font-bold text-center mb-4">Your Contact Info</h2>
               <p className="text-center text-gray-600 mb-6">
                 We'll use this for reservations and confirmations
               </p>
-              <form onSubmit={handleNameSubmit} className="space-y-6">
-                <input
-                  type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="e.g., John Smith"
-                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300 text-lg"
-                  required
-                />
+              <form onSubmit={handleContactSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                  <input
+                    type="text"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder="e.g., John Smith"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="e.g., (555) 123-4567"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300"
+                    required
+                  />
+                </div>
+                
+                                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Zip/Postal Code</label>
+                    <input
+                      type="text"
+                      value={zipCode}
+                      onChange={(e) => {
+                        setZipCode(e.target.value);
+                        // Auto-detect city when zip code changes
+                        if (e.target.value.length >= 3) {
+                          const city = getCityFromZip(e.target.value);
+                          setCityArea(city);
+                        }
+                      }}
+                      placeholder="e.g., 10001 or international code"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300"
+                      required
+                    />
+                    {cityArea && cityArea !== 'Unknown Area' && (
+                      <p className={`text-sm mt-1 ${
+                        cityArea === 'International Location' 
+                          ? 'text-blue-600' 
+                          : 'text-purple-600'
+                      }`}>
+                        📍 {cityArea}
+                      </p>
+                    )}
+                  </div>
+                
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                >
-                  Next
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* Step 5: Phone number input */}
-          {step === 5 && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 max-w-md mx-auto">
-              <h2 className="text-2xl font-bold text-center mb-4">Your phone number</h2>
-              <p className="text-center text-gray-600 mb-6">
-                {groupSize === 'solo' 
-                  ? "We'll save your preferences for future plans" 
-                  : "We'll send you a link to share with friends"
-                }
-              </p>
-              <form onSubmit={handlePhoneSubmit} className="space-y-6">
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="e.g., (555) 123-4567"
-                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300 text-lg"
-                  required
-                />
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mt-6"
                 >
                   {groupSize === 'solo' ? 'Start Swiping!' : 'Next'}
                 </button>
@@ -446,8 +584,8 @@ export default function Create() {
             </div>
           )}
 
-          {/* Step 6: Optional custom events */}
-          {step === 6 && (
+          {/* Step 4: Optional custom events */}
+          {step === 4 && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
               <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Almost done!</h2>

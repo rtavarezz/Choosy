@@ -31,6 +31,9 @@ export default function ResultsPage() {
           }
         }
 
+        // Check if this is a demo or real plan
+        const isDemo = Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo';
+        
         // Mock results data
         const mockResults = {
           planId: Array.isArray(planId) ? planId[0] : planId,
@@ -38,6 +41,14 @@ export default function ResultsPage() {
           groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize,
           zip: Array.isArray(zip) ? zip[0] : zip,
           winningEvent: parsedWinningEvent,
+          // For real plans, include plan data; for demo, omit it
+          plan: isDemo ? null : {
+            userName: 'John Smith', // This would come from the actual plan data
+            phoneNumber: '(555) 123-4567', // This would come from the actual plan data
+            topic: Array.isArray(topic) ? topic[0] : topic,
+            groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize,
+            zipCode: Array.isArray(zip) ? zip[0] : zip
+          },
           totalVotes: 3,
           participants: ['friendA', 'friendB', 'friendC'],
           allEvents: [
@@ -80,8 +91,10 @@ export default function ResultsPage() {
   const handleReservation = async () => {
     if (!results?.winningEvent) return;
     
-    // Check if this is a demo (no plan data means demo)
-    if (!results.plan?.userName || !results.plan?.phoneNumber) {
+    // Check if this is a demo
+    const isDemo = Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo';
+    
+    if (isDemo || !results.plan?.userName || !results.plan?.phoneNumber) {
       alert('This is a demo! Create a real plan to make reservations.');
       return;
     }
@@ -241,18 +254,18 @@ export default function ResultsPage() {
                     onClick={handleReservation}
                     disabled={isReserving}
                     className={`flex-1 font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-                      !results.plan?.userName || !results.plan?.phoneNumber
+                      (Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo') || !results.plan?.userName || !results.plan?.phoneNumber
                         ? 'bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white cursor-not-allowed'
                         : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
                     }`}
                   >
                     <span className="text-xl">
-                      {isReserving ? '⏳' : (!results.plan?.userName || !results.plan?.phoneNumber) ? '🔒' : '🎫'}
+                      {isReserving ? '⏳' : ((Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo') || !results.plan?.userName || !results.plan?.phoneNumber) ? '🔒' : '🎫'}
                     </span>
                     <span>
                       {isReserving 
                         ? 'Reserving...' 
-                        : (!results.plan?.userName || !results.plan?.phoneNumber) 
+                        : ((Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo') || !results.plan?.userName || !results.plan?.phoneNumber) 
                           ? 'Demo Mode' 
                           : 'Reserve Now'
                       }
