@@ -534,6 +534,10 @@ export default function VotePage() {
   const [voted, setVoted] = useState({});
   const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [voterName, setVoterName] = useState('');
+  const [voterPhone, setVoterPhone] = useState('');
+  const [showLogin, setShowLogin] = useState(true);
 
   // Load events based on topic and group size
   useEffect(() => {
@@ -622,6 +626,33 @@ export default function VotePage() {
     return '⭐'.repeat(Math.floor(stars)) + '☆'.repeat(5 - Math.floor(stars));
   };
 
+  // Handle login submission
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (voterName.trim() && voterPhone.trim()) {
+      setIsAuthenticated(true);
+      setShowLogin(false);
+      // Store voter info in localStorage for anonymous voting
+      localStorage.setItem(`voter_${planId}`, JSON.stringify({
+        name: voterName.trim(),
+        phone: voterPhone.trim(),
+        timestamp: Date.now()
+      }));
+    }
+  };
+
+  // Check if already authenticated
+  useEffect(() => {
+    const voterInfo = localStorage.getItem(`voter_${planId}`);
+    if (voterInfo) {
+      const voter = JSON.parse(voterInfo);
+      setVoterName(voter.name);
+      setVoterPhone(voter.phone);
+      setIsAuthenticated(true);
+      setShowLogin(false);
+    }
+  }, [planId]);
+
   // Loading state
   if (events.length === 0) {
     return (
@@ -629,6 +660,70 @@ export default function VotePage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading events...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Login form
+  if (showLogin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center px-4 py-8">
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 max-w-md mx-auto w-full">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Join the Vote!</h1>
+            <p className="text-gray-600 mb-6">
+              Enter your info to start voting on events
+            </p>
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-4 border-2 border-purple-200">
+              <p className="text-sm text-gray-600 mb-2">Plan Details:</p>
+              <p className="font-semibold text-gray-900">
+                {(Array.isArray(topic) ? topic[0] : topic) === 'datenight' ? 'Date Night' : (Array.isArray(topic) ? topic[0] : topic)} • {(Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' ? 'Solo' : (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'date' ? 'Date or Friend Night' : 'Group'}
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+              <input
+                type="text"
+                value={voterName}
+                onChange={(e) => setVoterName(e.target.value)}
+                placeholder="e.g., Sarah Johnson"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+              <input
+                type="tel"
+                value={voterPhone}
+                onChange={(e) => {
+                  // Only allow numbers, spaces, dashes, and parentheses
+                  const value = e.target.value.replace(/[^0-9\s\-\(\)]/g, '');
+                  setVoterPhone(value);
+                }}
+                placeholder="e.g., (555) 123-4567"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300"
+                required
+              />
+            </div>
+            
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mt-6"
+            >
+              🎯 Start Voting
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-gray-500">
+            <p>💡 Your vote will be anonymous to other participants</p>
+            <p>⏰ Voting session lasts 15 minutes</p>
+          </div>
         </div>
       </div>
     );

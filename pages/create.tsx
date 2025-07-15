@@ -17,14 +17,14 @@ const TOPICS = [
 
 // Group size options
 const GROUP_SIZES = [
-  { key: 'solo', label: 'Just Me', icon: '👤', description: 'Solo adventures' },
-  { key: 'date', label: 'Date or Friend Night', icon: '👫', description: '2 people' },
-  { key: 'group', label: 'Friend Group', icon: '👥', description: '3+ people' },
+  { key: 'solo', label: 'Just Myself', icon: '👤', description: 'Solo adventures' },
+  { key: 'date', label: '2 People Only', icon: '👥', description: 'friend/family/date' },
+  { key: 'group', label: '3+ People', icon: '👥👤👤👥', description: 'Group' },
 ];
 
 export default function Create() {
   const router = useRouter();
-  const [step, setStep] = useState(1); // 1: topic, 2: group size, 3: zip, 4: phone, 5: optional custom events
+  const [step, setStep] = useState(1); // 1: topic, 2: group size, 3: contact, 4: custom events, 5: share URL
   const [topic, setTopic] = useState('');
   const [groupSize, setGroupSize] = useState('');
   const [zipCode, setZipCode] = useState('');
@@ -33,6 +33,9 @@ export default function Create() {
   const [cityArea, setCityArea] = useState('');
   const [customEvents, setCustomEvents] = useState(['']);
   const [isLoading, setIsLoading] = useState(false);
+  const [planId, setPlanId] = useState('');
+  const [shareUrl, setShareUrl] = useState('');
+  const [copied, setCopied] = useState(false);
 
   // Handle topic selection
   const handleTopicSelect = (key: string) => {
@@ -391,7 +394,7 @@ export default function Create() {
     if (groupSize === 'solo') {
       handlePlanSubmit(e);
     } else {
-      setStep(5);
+      setStep(4);
     }
   };
 
@@ -410,6 +413,30 @@ export default function Create() {
     const newEvents = [...customEvents];
     newEvents[index] = value;
     setCustomEvents(newEvents);
+  };
+
+  // Copy URL to clipboard
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // Start swiping (go to voting page)
+  const startSwiping = () => {
+    router.push(`/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`);
   };
 
   // Submit plan creation
@@ -433,7 +460,15 @@ export default function Create() {
       
       if (response.ok) {
         const { planId } = await response.json();
-        router.push(`/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`);
+        setPlanId(planId);
+        
+        // Generate shareable URL
+        const baseUrl = window.location.origin;
+        const shareUrl = `${baseUrl}/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`;
+        setShareUrl(shareUrl);
+        
+        // Go to sharing step
+        setStep(5);
       } else {
         alert('Failed to create plan. Please try again.');
       }
@@ -539,7 +574,11 @@ export default function Create() {
                   <input
                     type="tel"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={(e) => {
+                      // Only allow numbers, spaces, dashes, and parentheses
+                      const value = e.target.value.replace(/[^0-9\s\-\(\)]/g, '');
+                      setPhoneNumber(value);
+                    }}
                     placeholder="e.g., (555) 123-4567"
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300"
                     required
@@ -646,6 +685,59 @@ export default function Create() {
 
               <div className="mt-6 text-center text-sm text-gray-500">
                 <p>💡 Choosy will automatically add 10-15 curated events for your group to vote on</p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Share URL */}
+          {step === 5 && (
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 max-w-2xl mx-auto">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">🎉 Plan Created!</h2>
+                <p className="text-gray-600 mb-6">
+                  Share this link with your friends to start voting together
+                </p>
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-6 border-2 border-purple-200">
+                  <p className="text-sm text-gray-600 mb-3">Shareable Link:</p>
+                  <div className="flex items-center gap-3 bg-white rounded-xl p-4 border-2 border-gray-200">
+                    <input
+                      type="text"
+                      value={shareUrl}
+                      readOnly
+                      className="flex-1 bg-transparent text-gray-700 font-mono text-sm"
+                    />
+                    <button
+                      onClick={copyToClipboard}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+                        copied 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-purple-600 hover:bg-purple-700 text-white'
+                      }`}
+                    >
+                      {copied ? '✓ Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={startSwiping}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                >
+                  🎯 Start Swiping Now
+                </button>
+                <button
+                  onClick={() => window.location.href = '/'}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 border-2 border-gray-200"
+                >
+                  🏠 Back to Home
+                </button>
+              </div>
+
+              <div className="mt-6 text-center text-sm text-gray-500">
+                <p>💡 Your friends can join anytime by clicking the link above</p>
+                <p>⏰ Voting session lasts 15 minutes once started</p>
               </div>
             </div>
           )}
