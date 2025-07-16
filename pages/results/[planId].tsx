@@ -479,7 +479,7 @@ export default function ResultsPage() {
             
             {/* Voter progress */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg mt-4">
-              <span className="text-lg">👥</span>
+              <span className="text-lg font-bold">👥</span>
               <span className="font-semibold">{results.completedVoters}/{results.expectedVoters} finished voting</span>
             </div>
           </div>
@@ -548,7 +548,7 @@ export default function ResultsPage() {
                     onClick={() => handleCall(results.winningEvent.contact.phone)}
                     className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
                   >
-                    <span className="text-xl">📞</span>
+                    <span className="text-xl font-bold">📞</span>
                     <span>Call Now</span>
                   </button>
                   
@@ -651,7 +651,7 @@ export default function ResultsPage() {
               onClick={handleShare}
               className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
             >
-              <span className="text-xl">📤</span>
+              <span className="text-xl font-bold">📤</span>
               <span>Share Results</span>
             </button>
             

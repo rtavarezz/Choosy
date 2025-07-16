@@ -1659,7 +1659,7 @@ export default function VotePage() {
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-500">
-            <p>💡 Your vote will be anonymous to other participants</p>
+            <p className="text-sm text-gray-500">💡 Your vote will be anonymous to other participants</p>
             <p>⏰ Voting session lasts 15 minutes</p>
           </div>
         </div>
@@ -1673,7 +1673,7 @@ export default function VotePage() {
       {planId === 'demo' && (
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-full shadow-lg">
-            <span className="text-lg">🎮</span>
+            <span className="text-lg font-bold">🎮</span>
             <span className="font-semibold">Demo Mode - Create a real plan to unlock full features!</span>
           </div>
         </div>
@@ -1688,7 +1688,7 @@ export default function VotePage() {
         
         {/* Voter progress counter */}
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg mb-4">
-          <span className="text-lg">👥</span>
+          <span className="text-lg font-bold">👥</span>
           <span className="font-semibold">{completedVoters}/{expectedVoters} finished voting</span>
         </div>
         

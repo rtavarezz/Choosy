@@ -1,8 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-// Mock vote storage (replace with Supabase in production)
-const MOCK_VOTES = new Map();
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests
   if (req.method !== 'POST') {
@@ -26,31 +23,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Create vote record
-    const voteRecord = {
-      id: `${planId}_${optionId}_${voterId}`,
-      planId,
-      optionId,
-      voterId,
-      vote,
-      createdAt: new Date().toISOString()
-    };
-
-    // Store vote (mock implementation)
-    MOCK_VOTES.set(voteRecord.id, voteRecord);
-
-    // Log vote for debugging
-    console.log('Vote recorded:', {
-      planId: voteRecord.planId,
-      optionId: voteRecord.optionId,
-      voterId: voteRecord.voterId,
-      vote: voteRecord.vote
+    // Call FastAPI backend
+    const response = await fetch('http://localhost:8000/api/votes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        plan_id: planId,
+        event_id: optionId,
+        voter_id: voterId,
+        vote_type: vote ? 'like' : 'dislike'
+      }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return res.status(response.status).json(errorData);
+    }
+
+    const data = await response.json();
 
     // Return success response
     res.status(200).json({ 
       message: 'Vote recorded successfully',
-      voteId: voteRecord.id
+      voteId: data.id
     });
 
   } catch (error) {

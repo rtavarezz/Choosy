@@ -560,7 +560,7 @@ export default function Create() {
                   disabled={isLoading}
                   className="flex items-center gap-3 mx-auto px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  <span className="text-2xl">🎲</span>
+                  <span className="text-2xl font-bold">🎲</span>
                   <span className="text-lg">{isLoading ? 'Choosing...' : 'Choose for me'}</span>
                 </button>
                 <p className="text-sm text-gray-500 mt-2">We'll pick a random activity and event for you!</p>
@@ -732,7 +732,7 @@ export default function Create() {
               </form>
 
               <div className="mt-6 text-center text-sm text-gray-500">
-                <p>💡 Choosy will automatically add 10-15 curated events for your group to vote on</p>
+                <p className="text-sm text-gray-500">💡 Choosy will automatically add 10-15 curated events for your group to vote on</p>
               </div>
             </div>
           )}

@@ -16,42 +16,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Mock results data (replace with Supabase query in production)
-    const mockResults = {
-      planId,
-      plan: {
-        topic: 'concerts',
-        groupSize: 'solo',
-        zipCode: '10001',
-        userName: 'John Smith',
-        phoneNumber: '(555) 123-4567'
+    // Call FastAPI backend
+    const response = await fetch(`http://localhost:8000/api/plans/${planId}/results`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      totalVotes: 3,
-      participants: ['friendA', 'friendB', 'friendC'],
-      events: [
-        {
-          id: '1',
-          name: 'Winning Event',
-          votes: 2,
-          percentage: 66.7
-        },
-        {
-          id: '2', 
-          name: 'Second Place Event',
-          votes: 1,
-          percentage: 33.3
-        },
-        {
-          id: '3',
-          name: 'Third Place Event', 
-          votes: 0,
-          percentage: 0
-        }
-      ].sort((a, b) => b.votes - a.votes)
-    };
+    });
 
-    // Return mock results
-    res.status(200).json(mockResults);
+    if (!response.ok) {
+      const errorData = await response.json();
+      return res.status(response.status).json(errorData);
+    }
+
+    const data = await response.json();
+
+    // Return results
+    res.status(200).json(data);
 
   } catch (error) {
     console.error('Error fetching results:', error);

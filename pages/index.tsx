@@ -47,7 +47,7 @@ export default function Home() {
                 href="/create"
                 className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
               >
-                <span className="text-2xl">✨</span>
+                <span className="text-2xl">→</span>
                 <span>Create Your First Plan</span>
               </Link>
               
@@ -55,7 +55,7 @@ export default function Home() {
                 href="/vote/demo?topic=concerts&groupSize=group&zip=10001"
                 className="bg-white/80 backdrop-blur-sm hover:bg-white/90 text-gray-900 font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl border border-white/20 flex items-center justify-center gap-3"
               >
-                <span className="text-2xl">📱</span>
+                <span className="text-2xl">👁</span>
                 <span>See How It Works</span>
               </Link>
             </div>
@@ -63,19 +63,19 @@ export default function Home() {
             {/* Feature highlights */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
               <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <div className="text-4xl mb-4">🎯</div>
+                <div className="text-4xl mb-4 font-bold">🎯</div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Smart Recommendations</h3>
                 <p className="text-gray-600">Location-based events, restaurants, and activities curated for your group size</p>
               </div>
               
               <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <div className="text-4xl mb-4">⏰</div>
+                <div className="text-4xl mb-4 font-bold">⏰</div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">15-Minute Timer</h3>
                 <p className="text-gray-600">Time pressure that forces quick, fun decisions - no more overthinking</p>
               </div>
               
               <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <div className="text-4xl mb-4">📱</div>
+                <div className="text-4xl mb-4 font-bold">📱</div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Swipe to Vote</h3>
                 <p className="text-gray-600">Tinder-style voting that's intuitive and fun for everyone</p>
               </div>
@@ -86,19 +86,19 @@ export default function Home() {
               <h3 className="text-2xl font-bold text-gray-900 mb-4">Perfect For</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div className="p-4">
-                  <div className="text-2xl mb-2">🍽️</div>
+                  <div className="text-2xl mb-2 font-bold">🍽️</div>
                   <p className="font-semibold text-gray-900">Dinner Plans</p>
                 </div>
                 <div className="p-4">
-                  <div className="text-2xl mb-2">🎉</div>
+                  <div className="text-2xl mb-2 font-bold">🎉</div>
                   <p className="font-semibold text-gray-900">Weekend Activities</p>
                 </div>
                 <div className="p-4">
-                  <div className="text-2xl mb-2">👥</div>
+                  <div className="text-2xl mb-2 font-bold">👥</div>
                   <p className="font-semibold text-gray-900">Group Meetups</p>
                 </div>
                 <div className="p-4">
-                  <div className="text-2xl mb-2">💕</div>
+                  <div className="text-2xl mb-2 font-bold">💕</div>
                   <p className="font-semibold text-gray-900">Date Nights</p>
                 </div>
               </div>

@@ -1,8 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-// Mock plan data storage (replace with Supabase in production)
-const MOCK_PLANS = new Map();
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests
   if (req.method !== 'POST') {
@@ -19,39 +16,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Generate unique plan ID
-    const planId = `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create plan object
-    const plan = {
-      id: planId,
-      topic,
-      groupSize,
-      zipCode,
-      userName,
-      phoneNumber,
-      customEvents: customEvents || [],
-      createdAt: new Date().toISOString(),
-      endTime: new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 minutes from now
-    };
-
-    // Store plan (mock implementation)
-    MOCK_PLANS.set(planId, plan);
-
-    // Log plan creation for debugging
-    console.log('Mock plan created:', {
-      planId: plan.id,
-      topic: plan.topic,
-      groupSize: plan.groupSize,
-      zipCode: plan.zipCode,
-      userName: plan.userName,
-      phoneNumber: plan.phoneNumber,
-      customEvents: plan.customEvents
+    // Call FastAPI backend
+    const response = await fetch('http://localhost:8000/api/plans', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        topic,
+        group_size: groupSize,
+        zip_code: zipCode,
+        host_name: userName,
+        host_phone: phoneNumber,
+        custom_events: customEvents || []
+      }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return res.status(response.status).json(errorData);
+    }
+
+    const data = await response.json();
 
     // Return success response
     res.status(200).json({ 
-      planId: plan.id,
+      planId: data.id,
       message: 'Plan created successfully'
     });
 
