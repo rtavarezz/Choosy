@@ -14,6 +14,9 @@ import secrets
 import uuid
 import json
 
+# Import our location service
+from location_services import location_service
+
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))

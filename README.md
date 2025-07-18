@@ -12,6 +12,26 @@ A social group decision-making app using Next.js, TypeScript, Tailwind CSS, Fast
 - [x] Automated database and API health checks
 - [x] Environment variables loaded from `.env`
 - [x] All core backend happy-path tests pass
+- [x] Location detection and auto-fill functionality
+- [x] Real location-based event recommendations
+
+---
+
+## 🗺️ Location Services Setup
+
+Choosy uses **completely free** location services - no API keys required!
+
+### Free Services Used
+- **OpenStreetMap Nominatim**: For geocoding (zip code ↔ coordinates)
+- **OpenStreetMap Overpass API**: For finding real places and points of interest
+- **Browser Geolocation API**: For detecting user's current location
+
+### Features Enabled
+- **Auto-location detection**: Users can click 📍 to auto-fill their zip code
+- **City display**: Shows "Miami, FL" or "London, UK" under zip code input  
+- **Real events**: Backend fetches actual places near the user's location
+- **International support**: Works with postal codes from any country
+- **No API costs**: Completely free to use with generous rate limits
 
 ---
 

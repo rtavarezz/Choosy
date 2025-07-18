@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { locationDetection, LocationData } from '../lib/locationDetection';
 
 // Available topics for plan creation
 const TOPICS = [
@@ -36,6 +37,11 @@ export default function Create() {
   const [planId, setPlanId] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [copied, setCopied] = useState(false);
+  
+  // Location detection states
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
 
   // Handle topic selection
   const handleTopicSelect = (key: string) => {
@@ -204,6 +210,55 @@ export default function Create() {
   const handleGroupSizeSelect = (key: string) => {
     setGroupSize(key);
     setStep(3);
+  };
+
+  // Detect user's current location
+  const detectLocation = async () => {
+    if (!locationDetection.isLocationSupported()) {
+      setLocationError('Location services not supported in this browser');
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    setLocationError('');
+
+    try {
+      const location = await locationDetection.getCurrentLocation();
+      
+      if (location) {
+        setZipCode(location.zipCode);
+        setCityArea(location.fullLocation);
+        setLocationData(location);
+        console.log('📍 Location detected:', location);
+      } else {
+        setLocationError('Could not detect your location. Please enter your zip code manually.');
+      }
+    } catch (error) {
+      console.error('Location detection error:', error);
+      setLocationError(error instanceof Error ? error.message : 'Failed to detect location');
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  };
+
+  // Get location from manually entered zip code
+  const getLocationFromZipCode = async (zip: string) => {
+    if (zip.length < 3) return;
+    
+    try {
+      const location = await locationDetection.getLocationFromZipCode(zip);
+      if (location) {
+        setCityArea(location.fullLocation);
+        setLocationData(location);
+      } else {
+        setCityArea('Unknown Area');
+        setLocationData(null);
+      }
+    } catch (error) {
+      console.error('Error getting location from zip code:', error);
+      setCityArea('Unknown Area');
+      setLocationData(null);
+    }
   };
 
 
@@ -1018,22 +1073,50 @@ export default function Create() {
                 
                                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Zip/Postal Code</label>
-                    <input
-                      type="text"
-                      value={zipCode}
-                      onChange={(e) => {
-                        setZipCode(e.target.value);
-                        // Auto-detect city when zip code changes
-                        if (e.target.value.length >= 3) {
-                          const city = getCityFromZip(e.target.value);
-                          setCityArea(city);
-                        }
-                      }}
-                      placeholder="e.g., 10001 or international code"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300"
-                      required
-                    />
-                    {cityArea && cityArea !== 'Unknown Area' && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={zipCode}
+                        onChange={(e) => {
+                          setZipCode(e.target.value);
+                          // Auto-detect city when zip code changes
+                          if (e.target.value.length >= 3) {
+                            getLocationFromZipCode(e.target.value);
+                          }
+                        }}
+                        placeholder="e.g., 10001 or international code"
+                        className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 transition-all duration-300"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={detectLocation}
+                        disabled={isDetectingLocation}
+                        className={`px-4 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                          isDetectingLocation
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-purple-600 hover:bg-purple-700 text-white hover:scale-105'
+                        }`}
+                        title="Detect my location"
+                      >
+                        {isDetectingLocation ? '📍' : '📍'}
+                      </button>
+                    </div>
+                    
+                    {/* Location status messages */}
+                    {isDetectingLocation && (
+                      <p className="text-sm mt-1 text-blue-600">
+                        🔍 Detecting your location...
+                      </p>
+                    )}
+                    
+                    {locationError && (
+                      <p className="text-sm mt-1 text-red-600">
+                        ⚠️ {locationError}
+                      </p>
+                    )}
+                    
+                    {cityArea && cityArea !== 'Unknown Area' && !isDetectingLocation && !locationError && (
                       <p className={`text-sm mt-1 ${
                         cityArea === 'International Location' 
                           ? 'text-blue-600' 
