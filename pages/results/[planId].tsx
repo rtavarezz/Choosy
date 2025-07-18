@@ -61,13 +61,12 @@ export default function ResultsPage() {
         // Check if this is a demo or real plan
         const isDemo = Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo';
         
-        // Get real vote counts from localStorage
-        const storedVotes = localStorage.getItem(`votes_${planId}`);
-        const voteCounts = storedVotes ? JSON.parse(storedVotes) : {};
-        
-        // Set expected voters based on group size
+        // Set expected voters based on group size - will be updated from API
+        let voterCount = 5; // Default fallback
         const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-        const voterCount = groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5;
+        if (groupSizeStr) {
+          voterCount = groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5;
+        }
         setExpectedVoters(voterCount);
         
         // Get completed voters count
@@ -86,6 +85,73 @@ export default function ResultsPage() {
         const hasWinningEventInUrl = parsedWinningEvent && Object.keys(parsedWinningEvent).length > 0;
         const allCompleted = hasWinningEventInUrl || completedVotersCount >= voterCount;
         setAllVotersCompleted(allCompleted);
+        
+        // For real plans, get results from backend API
+        if (!isDemo) {
+          try {
+            const planIdStr = Array.isArray(planId) ? planId[0] : planId;
+            const response = await fetch(`http://127.0.0.1:8000/api/plans/${planIdStr}/results`);
+            if (response.ok) {
+              const apiResults = await response.json();
+              
+              // Get expected voters from API group size
+              const apiGroupSize = apiResults.plan.groupSize;
+              const apiVoterCount = apiGroupSize === 'solo' ? 1 : (apiGroupSize === 'date' || apiGroupSize === 'friend') ? 2 : 5;
+              
+              // Transform API results to match frontend format
+              const transformedResults = {
+                planId: planIdStr,
+                topic: apiResults.plan.topic,
+                groupSize: apiResults.plan.groupSize,
+                zip: apiResults.plan.zipCode,
+                winningEvent: apiResults.events.length > 0 ? {
+                  id: apiResults.events[0].id,
+                  name: apiResults.events[0].name,
+                  votes: apiResults.events[0].votes,
+                  image: `https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop`,
+                  hours: "2 hours",
+                  contact: { phone: '(555) 123-4567', email: 'info@event.com' }
+                } : null,
+                plan: {
+                  userName: apiResults.plan.userName,
+                  phoneNumber: apiResults.plan.phoneNumber,
+                  topic: apiResults.plan.topic,
+                  groupSize: apiResults.plan.groupSize,
+                  zipCode: apiResults.plan.zipCode
+                },
+                totalVotes: apiResults.totalVotes,
+                participants: apiResults.participants,
+                allEvents: apiResults.events.map(event => ({
+                  id: event.id,
+                  name: event.name,
+                  votes: event.votes,
+                  total_votes: event.total_votes,
+                  percentage: event.percentage,
+                  image: `https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop`,
+                  hours: "2 hours",
+                  contact: { phone: '(555) 123-4567', email: 'info@event.com' }
+                })),
+                allVotersCompleted: allCompleted,
+                expectedVoters: apiVoterCount,
+                completedVoters: completedVotersCount
+              };
+              
+              // Update expected voters state with correct value from API
+              setExpectedVoters(apiVoterCount);
+              
+              setResults(transformedResults);
+              return;
+            }
+          } catch (error) {
+            console.error('Failed to load API results:', error);
+            // Fall back to mock data if API fails
+          }
+        }
+        
+        // For demo plans or if API fails, use mock data
+        // Get real vote counts from localStorage
+        const storedVotes = localStorage.getItem(`votes_${planId}`);
+        const voteCounts = storedVotes ? JSON.parse(storedVotes) : {};
         
         // Get all events for this topic and group size
         const topicStr = Array.isArray(topic) ? topic[0] : topic;

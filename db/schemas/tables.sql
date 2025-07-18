@@ -14,13 +14,23 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   topic TEXT NOT NULL CHECK (topic IN ('concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 'gokart', 'swimming', 'drinks')), -- Topic validation
-  group_size TEXT NOT NULL CHECK (group_size IN ('solo', 'date', 'group')), -- Group size validation
-  zip_code TEXT NOT NULL CHECK (zip_code ~ '^\d{5}(-\d{4})?$'), -- ZIP code validation
+  group_size TEXT NOT NULL CHECK (group_size IN ('solo', 'date', 'friend', 'group')), -- Group size validation
+  zip_code TEXT NOT NULL CHECK (zip_code ~ '^[A-Z0-9\s\-]{3,10}$'), -- International postal code validation (3-10 alphanumeric chars, spaces, hyphens)
   host_name TEXT NOT NULL CHECK (length(host_name) >= 1 AND length(host_name) <= 100), -- Name validation
   host_phone TEXT NOT NULL CHECK (host_phone ~ '^\+?[1-9]\d{1,14}$'), -- Phone validation
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '15 minutes'),
   is_active BOOLEAN DEFAULT TRUE
+);
+
+-- User Plans table (simple tracking of user involvement)
+CREATE TABLE IF NOT EXISTS user_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_phone TEXT NOT NULL, -- Use phone as identifier (simpler than UUID)
+  plan_id UUID REFERENCES plans(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('creator', 'voter')), -- User's role in the plan
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_phone, plan_id) -- Prevent duplicate entries
 );
 
 -- Events table (from external APIs + custom events)
@@ -31,7 +41,7 @@ CREATE TABLE IF NOT EXISTS events (
   image TEXT CHECK (image IS NULL OR image ~ '^https?://'), -- URL validation
   hours TEXT CHECK (length(hours) <= 100), -- Hours validation
   contact JSONB CHECK (contact IS NULL OR jsonb_typeof(contact) = 'object'), -- JSON validation
-  source_type TEXT NOT NULL CHECK (source_type IN ('yelp', 'ticketmaster', 'custom', 'google', 'eventbrite')), -- Source validation
+  source_type TEXT NOT NULL CHECK (source_type IN ('yelp', 'ticketmaster', 'custom', 'google', 'eventbrite', 'mock')), -- Source validation
   external_id TEXT, -- ID from external API
   votes_count INTEGER DEFAULT 0 CHECK (votes_count >= 0), -- Vote count validation
   metadata JSONB CHECK (metadata IS NULL OR jsonb_typeof(metadata) = 'object'), -- JSON validation
@@ -66,6 +76,8 @@ CREATE INDEX IF NOT EXISTS idx_plans_topic ON plans(topic);
 CREATE INDEX IF NOT EXISTS idx_plans_group_size ON plans(group_size);
 CREATE INDEX IF NOT EXISTS idx_plans_zip_code ON plans(zip_code);
 CREATE INDEX IF NOT EXISTS idx_plans_host_phone ON plans(host_phone);
+CREATE INDEX IF NOT EXISTS idx_user_plans_user_phone ON user_plans(user_phone);
+CREATE INDEX IF NOT EXISTS idx_user_plans_plan_id ON user_plans(plan_id);
 CREATE INDEX IF NOT EXISTS idx_events_plan_id ON events(plan_id);
 CREATE INDEX IF NOT EXISTS idx_events_source_type ON events(source_type);
 CREATE INDEX IF NOT EXISTS idx_votes_plan_id ON votes(plan_id);

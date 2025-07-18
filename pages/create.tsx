@@ -18,8 +18,8 @@ const TOPICS = [
 // Group size options
 const GROUP_SIZES = [
   { key: 'solo', label: 'Just Myself', icon: '👤', description: 'Solo adventures' },
-  { key: 'date', label: '2 People Only', icon: '👥', description: 'friend/family/date' },
-  { key: 'group', label: '3+ People', icon: '👥👤👤👥', description: 'Group' },
+  { key: 'date', label: '2 People Only', icon: '👥', description: 'Date, friend, or family' },
+  { key: 'group', label: '3+ People', icon: '👥👤👤👥', description: 'Group of 3 or more' },
 ];
 
 export default function Create() {
@@ -449,6 +449,365 @@ export default function Create() {
     setCustomEvents(newEvents);
   };
 
+  // Get events for topic and group size
+  const getEventsForTopicAndSize = (topic: string, groupSize: string) => {
+    // Import the events from the vote page
+    const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
+      concerts: {
+        solo: [
+          {
+            name: 'Taylor Swift Concert',
+            image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+            hours: '8:00 PM - 11:00 PM',
+            reviews: { stars: 4.8, count: 1247 },
+            contact: { phone: '(555) 123-4567', email: 'info@madisonsquaregarden.com' }
+          },
+          {
+            name: 'Jazz Night at Blue Note',
+            image: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=300&fit=crop',
+            hours: '7:00 PM - 10:00 PM',
+            reviews: { stars: 4.6, count: 892 },
+            contact: { phone: '(555) 234-5678', email: 'reservations@bluenote.com' }
+          },
+          {
+            name: 'Rock Concert at Central Park',
+            image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 9:00 PM',
+            reviews: { stars: 4.5, count: 567 },
+            contact: { phone: '(555) 345-6789', email: 'info@centralpark.com' }
+          },
+          {
+            name: 'Classical Symphony',
+            image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+            hours: '7:30 PM - 10:30 PM',
+            reviews: { stars: 4.7, count: 1234 },
+            contact: { phone: '(555) 456-7890', email: 'symphony@classical.com' }
+          },
+          {
+            name: 'Indie Rock Show',
+            image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+            hours: '9:00 PM - 12:00 AM',
+            reviews: { stars: 4.4, count: 456 },
+            contact: { phone: '(555) 567-8901', email: 'indie@rock.com' }
+          }
+        ],
+        friend: [
+          {
+            name: 'Romantic Jazz Duo',
+            image: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=300&fit=crop',
+            hours: '8:00 PM - 11:00 PM',
+            reviews: { stars: 4.7, count: 567 },
+            contact: { phone: '(555) 234-5678', email: 'reservations@romanticjazz.com' }
+          },
+          {
+            name: 'Acoustic Love Songs',
+            image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+            hours: '7:30 PM - 10:30 PM',
+            reviews: { stars: 4.5, count: 234 },
+            contact: { phone: '(555) 345-6789', email: 'info@acousticlove.com' }
+          },
+          {
+            name: 'Piano Bar Duet',
+            image: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 9:00 PM',
+            reviews: { stars: 4.6, count: 345 },
+            contact: { phone: '(555) 456-7890', email: 'piano@bar.com' }
+          },
+          {
+            name: 'Smooth Jazz Evening',
+            image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+            hours: '8:30 PM - 11:30 PM',
+            reviews: { stars: 4.8, count: 789 },
+            contact: { phone: '(555) 567-8901', email: 'jazz@smooth.com' }
+          },
+          {
+            name: 'Romantic Guitar Duo',
+            image: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=300&fit=crop',
+            hours: '7:00 PM - 10:00 PM',
+            reviews: { stars: 4.6, count: 345 },
+            contact: { phone: '(555) 678-9012', email: 'guitar@romantic.com' }
+          }
+        ],
+        group: [
+          {
+            name: 'Rock Festival in Central Park',
+            image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 11:00 PM',
+            reviews: { stars: 4.4, count: 567 },
+            contact: { phone: '(555) 345-6789', email: 'events@centralpark.com' }
+          },
+          {
+            name: 'Pop Concert at Stadium',
+            image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+            hours: '7:00 PM - 10:30 PM',
+            reviews: { stars: 4.6, count: 1234 },
+            contact: { phone: '(555) 456-7890', email: 'tickets@stadium.com' }
+          },
+          {
+            name: 'Indie Music Festival',
+            image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+            hours: '5:00 PM - 10:00 PM',
+            reviews: { stars: 4.3, count: 456 },
+            contact: { phone: '(555) 567-8901', email: 'indie@festival.com' }
+          },
+          {
+            name: 'Country Music Night',
+            image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+            hours: '8:00 PM - 11:00 PM',
+            reviews: { stars: 4.5, count: 678 },
+            contact: { phone: '(555) 678-9012', email: 'country@night.com' }
+          },
+          {
+            name: 'Electronic Dance Music',
+            image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+            hours: '9:00 PM - 2:00 AM',
+            reviews: { stars: 4.7, count: 890 },
+            contact: { phone: '(555) 789-0123', email: 'edm@electronic.com' }
+          }
+        ]
+      },
+      nightlife: {
+        solo: [
+          {
+            name: 'Solo Bar Hopping',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '8:00 PM - 2:00 AM',
+            reviews: { stars: 4.3, count: 234 },
+            contact: { phone: '(555) 123-4567', email: 'bar@hopping.com' }
+          },
+          {
+            name: 'Craft Cocktail Lounge',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 12:00 AM',
+            reviews: { stars: 4.6, count: 456 },
+            contact: { phone: '(555) 234-5678', email: 'cocktail@craft.com' }
+          },
+          {
+            name: 'Live DJ Night',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '10:00 PM - 3:00 AM',
+            reviews: { stars: 4.5, count: 789 },
+            contact: { phone: '(555) 345-6789', email: 'dj@live.com' }
+          },
+          {
+            name: 'Karaoke Night',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '8:00 PM - 1:00 AM',
+            reviews: { stars: 4.2, count: 345 },
+            contact: { phone: '(555) 456-7890', email: 'karaoke@night.com' }
+          },
+          {
+            name: 'Wine Tasting Bar',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '5:00 PM - 11:00 PM',
+            reviews: { stars: 4.7, count: 567 },
+            contact: { phone: '(555) 567-8901', email: 'wine@tasting.com' }
+          }
+        ],
+        date: [
+          {
+            name: 'Romantic Wine Bar',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '7:00 PM - 1:00 AM',
+            reviews: { stars: 4.8, count: 456 },
+            contact: { phone: '(555) 234-5678', email: 'wine@romantic.com' }
+          },
+          {
+            name: 'Couples Dance Night',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '8:00 PM - 12:00 AM',
+            reviews: { stars: 4.5, count: 234 },
+            contact: { phone: '(555) 345-6789', email: 'dance@couples.com' }
+          },
+          {
+            name: 'Jazz Lounge for Two',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 11:00 PM',
+            reviews: { stars: 4.6, count: 345 },
+            contact: { phone: '(555) 456-7890', email: 'jazz@lounge.com' }
+          },
+          {
+            name: 'Rooftop Bar Date',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '7:30 PM - 12:30 AM',
+            reviews: { stars: 4.7, count: 567 },
+            contact: { phone: '(555) 567-8901', email: 'rooftop@bar.com' }
+          },
+          {
+            name: 'Speakeasy Experience',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '8:00 PM - 1:00 AM',
+            reviews: { stars: 4.4, count: 234 },
+            contact: { phone: '(555) 678-9012', email: 'speakeasy@experience.com' }
+          }
+        ],
+        group: [
+          {
+            name: 'Group Karaoke Night',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '8:00 PM - 2:00 AM',
+            reviews: { stars: 4.3, count: 456 },
+            contact: { phone: '(555) 345-6789', email: 'karaoke@group.com' }
+          },
+          {
+            name: 'Club VIP Experience',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '10:00 PM - 3:00 AM',
+            reviews: { stars: 4.6, count: 789 },
+            contact: { phone: '(555) 456-7890', email: 'vip@club.com' }
+          },
+          {
+            name: 'Pub Crawl',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '7:00 PM - 1:00 AM',
+            reviews: { stars: 4.4, count: 567 },
+            contact: { phone: '(555) 567-8901', email: 'crawl@pub.com' }
+          },
+          {
+            name: 'Brewery Tour',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 10:00 PM',
+            reviews: { stars: 4.5, count: 345 },
+            contact: { phone: '(555) 678-9012', email: 'tour@brewery.com' }
+          },
+          {
+            name: 'Comedy Club Night',
+            image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop',
+            hours: '8:30 PM - 11:30 PM',
+            reviews: { stars: 4.7, count: 678 },
+            contact: { phone: '(555) 789-0123', email: 'comedy@club.com' }
+          }
+        ]
+      },
+      foodie: {
+        solo: [
+          {
+            name: 'Food Truck Festival',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '11:00 AM - 8:00 PM',
+            reviews: { stars: 4.6, count: 1234 },
+            contact: { phone: '(555) 123-4567', email: 'festival@foodtruck.com' }
+          },
+          {
+            name: 'Solo Sushi Experience',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 9:00 PM',
+            reviews: { stars: 4.8, count: 567 },
+            contact: { phone: '(555) 234-5678', email: 'sushi@solo.com' }
+          },
+          {
+            name: 'Cooking Class',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '2:00 PM - 5:00 PM',
+            reviews: { stars: 4.7, count: 345 },
+            contact: { phone: '(555) 345-6789', email: 'cooking@class.com' }
+          },
+          {
+            name: 'Farmer\'s Market Tour',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '9:00 AM - 12:00 PM',
+            reviews: { stars: 4.5, count: 234 },
+            contact: { phone: '(555) 456-7890', email: 'market@farmer.com' }
+          },
+          {
+            name: 'Gourmet Coffee Tasting',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '10:00 AM - 1:00 PM',
+            reviews: { stars: 4.6, count: 456 },
+            contact: { phone: '(555) 567-8901', email: 'coffee@gourmet.com' }
+          }
+        ],
+        date: [
+          {
+            name: 'Romantic Italian Dinner',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '7:00 PM - 9:30 PM',
+            reviews: { stars: 4.8, count: 789 },
+            contact: { phone: '(555) 234-5678', email: 'italian@romantic.com' }
+          },
+          {
+            name: 'Couples Cooking Class',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 8:00 PM',
+            reviews: { stars: 4.6, count: 345 },
+            contact: { phone: '(555) 345-6789', email: 'cooking@couples.com' }
+          },
+          {
+            name: 'Wine & Dine Experience',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '7:30 PM - 10:00 PM',
+            reviews: { stars: 4.7, count: 567 },
+            contact: { phone: '(555) 456-7890', email: 'wine@dine.com' }
+          },
+          {
+            name: 'Chocolate Tasting for Two',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '3:00 PM - 5:00 PM',
+            reviews: { stars: 4.5, count: 234 },
+            contact: { phone: '(555) 567-8901', email: 'chocolate@tasting.com' }
+          },
+          {
+            name: 'Sunset Rooftop Dining',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '6:30 PM - 9:00 PM',
+            reviews: { stars: 4.9, count: 678 },
+            contact: { phone: '(555) 678-9012', email: 'sunset@rooftop.com' }
+          }
+        ],
+        group: [
+          {
+            name: 'Group BBQ Restaurant',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '6:00 PM - 10:00 PM',
+            reviews: { stars: 4.4, count: 456 },
+            contact: { phone: '(555) 345-6789', email: 'bbq@group.com' }
+          },
+          {
+            name: 'Food Tour',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '3:00 PM - 6:00 PM',
+            reviews: { stars: 4.6, count: 567 },
+            contact: { phone: '(555) 456-7890', email: 'tour@food.com' }
+          },
+          {
+            name: 'Tapas & Sangria Night',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '7:00 PM - 10:00 PM',
+            reviews: { stars: 4.5, count: 345 },
+            contact: { phone: '(555) 567-8901', email: 'tapas@sangria.com' }
+          },
+          {
+            name: 'Pizza Making Party',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '5:00 PM - 8:00 PM',
+            reviews: { stars: 4.7, count: 678 },
+            contact: { phone: '(555) 678-9012', email: 'pizza@making.com' }
+          },
+          {
+            name: 'International Buffet',
+            image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=300&fit=crop',
+            hours: '6:30 PM - 9:30 PM',
+            reviews: { stars: 4.3, count: 234 },
+            contact: { phone: '(555) 789-0123', email: 'buffet@international.com' }
+          }
+        ]
+      }
+    };
+
+    const events = MOCK_EVENTS[topic]?.[groupSize] || MOCK_EVENTS[topic]?.['solo'] || [];
+    return events.map(event => ({
+      name: event.name,
+      image: event.image,
+      hours: event.hours,
+      source_type: 'mock',
+      metadata: {
+        reviews: event.reviews,
+        contact: event.contact,
+        voters: event.voters || []
+      }
+    }));
+  };
+
   // Copy URL to clipboard
   const copyToClipboard = async () => {
     try {
@@ -472,7 +831,9 @@ export default function Create() {
   const startSwiping = () => {
     // Set flag to indicate user came from create page
     sessionStorage.setItem('cameFromCreate', 'true');
-    router.push(`/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`);
+    const votingUrl = `/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`;
+    console.log('🔗 Navigating to voting URL:', votingUrl);
+    router.push(votingUrl);
   };
 
   // Submit plan creation
@@ -490,12 +851,15 @@ export default function Create() {
           zipCode: zipCode.trim(),
           userName: userName.trim(),
           phoneNumber: phoneNumber.trim(),
-          customEvents: customEvents.filter(event => event.trim())
+          customEvents: customEvents.filter(event => event.trim()).map(event => ({ name: event.trim() }))
         })
       });
       
       if (response.ok) {
-        const { planId } = await response.json();
+        const result = await response.json();
+        console.log('🔧 Plan creation result:', result);
+        const planId = result.planId || result.id;
+        console.log('🔧 Extracted planId:', planId);
         setPlanId(planId);
         
         // Store creator info for automatic login
@@ -505,15 +869,34 @@ export default function Create() {
           timestamp: Date.now()
         }));
         
+        // Create events for the plan
+        const events = getEventsForTopicAndSize(topic, groupSize);
+        try {
+          const eventsResponse = await fetch('/api/createEvents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ planId, events }),
+          });
+          
+          if (!eventsResponse.ok) {
+            console.error('Failed to create events, but plan was created');
+          }
+        } catch (error) {
+          console.error('Error creating events:', error);
+        }
+        
         // For solo users, go straight to voting
         if (groupSize === 'solo') {
           // Set flag to indicate user came from create page
           sessionStorage.setItem('cameFromCreate', 'true');
-          router.push(`/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`);
+          const votingUrl = `/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`;
+          console.log('🔗 Solo user navigating to voting URL:', votingUrl);
+          router.push(votingUrl);
         } else {
           // For groups, show sharing step
           const baseUrl = window.location.origin;
           const shareUrl = `${baseUrl}/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`;
+          console.log('🔗 Generated share URL:', shareUrl);
           setShareUrl(shareUrl);
           setStep(5);
         }

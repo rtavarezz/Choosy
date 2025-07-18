@@ -53,7 +53,7 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         voters: ['friendB']
       }
     ],
-    date: [
+    friend: [
       {
         id: '1',
         name: 'Romantic Jazz Duo',
@@ -196,7 +196,7 @@ const MOCK_EVENTS: Record<string, Record<string, any[]>> = {
         voters: ['friendB']
       }
     ],
-    date: [
+    friend: [
       {
         id: '1',
         name: 'Romantic Candlelit Dinner',
@@ -1286,6 +1286,69 @@ const MOCK_FRIENDS = {
 export default function VotePage() {
   const router = useRouter();
   const { planId, topic, groupSize, zip } = router.query;
+  
+  // Debug logging
+  console.log('🔍 Router query:', router.query);
+  console.log('🔍 PlanId:', planId);
+  console.log('🔍 Topic:', topic);
+  console.log('🔍 GroupSize:', groupSize);
+  console.log('🔍 Zip:', zip);
+  console.log('🔍 Router isReady:', router.isReady);
+  if (typeof window !== 'undefined') {
+    console.log('🔍 Full URL:', window.location.href);
+    console.log('🔍 Pathname:', window.location.pathname);
+    console.log('🔍 Search:', window.location.search);
+    
+    // Debug function to clear localStorage (for testing)
+    (window as any).clearVoteStorage = () => {
+      console.log('🧹 Clearing vote storage...');
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('voter_') || key.startsWith('creator_')) {
+          console.log('🧹 Removing:', key);
+          localStorage.removeItem(key);
+        }
+      });
+      sessionStorage.removeItem('cameFromCreate');
+      console.log('🧹 Storage cleared!');
+      window.location.reload();
+    };
+    
+    // Debug function to show current storage state
+    (window as any).showVoteStorage = () => {
+      console.log('📦 Current vote storage:');
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('voter_') || key.startsWith('creator_')) {
+          console.log('📦', key, ':', localStorage.getItem(key));
+        }
+      });
+      console.log('📦 cameFromCreate:', sessionStorage.getItem('cameFromCreate'));
+    };
+    
+    // Debug function to clear all voting data for this plan
+    (window as any).clearPlanData = () => {
+      console.log('🧹 Clearing all data for current plan...');
+      const planIdStr = Array.isArray(planId) ? planId[0] : planId;
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.includes(planIdStr)) {
+          console.log('🧹 Removing:', key);
+          localStorage.removeItem(key);
+        }
+      });
+      console.log('🧹 Plan data cleared!');
+      window.location.reload();
+    };
+  }
+  
+  // Log when router becomes ready
+  useEffect(() => {
+    if (router.isReady) {
+      console.log('🔍 Router is now ready!');
+      console.log('🔍 Final router query:', router.query);
+    }
+  }, [router.isReady, router.query]);
   const [events, setEvents] = useState([]);
   const [voted, setVoted] = useState({});
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({}); // Track vote counts for each event
@@ -1301,39 +1364,108 @@ export default function VotePage() {
   const [completedVoters, setCompletedVoters] = useState(0);
   const [voterId, setVoterId] = useState('');
   const [allVotersCompleted, setAllVotersCompleted] = useState(false);
+  const [votingLimitReached, setVotingLimitReached] = useState(false);
 
-  // Load events based on topic and group size
+  // Load events from database
   useEffect(() => {
-    const topicStr = Array.isArray(topic) ? topic[0] : topic;
-    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-    
-    if (topicStr && groupSizeStr && MOCK_EVENTS[topicStr] && MOCK_EVENTS[topicStr][groupSizeStr]) {
-      let eventsToShow = MOCK_EVENTS[topicStr][groupSizeStr];
-      
-      // For demo, limit to 2 events and blur details
-      if (planId === 'demo') {
-        eventsToShow = eventsToShow.slice(0, 2).map(event => ({
-          ...event,
-          isDemo: true,
-          // Blur contact info for demo
-          contact: {
-            phone: '***-***-****',
-            email: 'demo@example.com'
-          },
-          // Blur hours for demo
-          hours: 'Demo Hours',
-          // Blur reviews for demo
-          reviews: { stars: 0, count: 0 }
-        }));
+    const fetchEvents = async () => {
+      // Wait for router to be ready and planId to be available
+      if (!router.isReady) {
+        console.log('Waiting for router to be ready');
+        return;
       }
       
-      setEvents(eventsToShow);
+      // If planId is undefined but we have query params, treat as demo
+      if (!planId || planId === 'undefined') {
+        console.log('PlanId is undefined, treating as demo mode');
+        // Handle as demo mode
+        const topicStr = Array.isArray(topic) ? topic[0] : topic;
+        const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+        
+        if (topicStr && groupSizeStr && MOCK_EVENTS[topicStr] && MOCK_EVENTS[topicStr][groupSizeStr]) {
+          let eventsToShow = MOCK_EVENTS[topicStr][groupSizeStr].slice(0, 2).map(event => ({
+            ...event,
+            isDemo: true,
+            contact: { phone: '***-***-****', email: 'demo@example.com' },
+            hours: 'Demo Hours',
+            reviews: { stars: 0, count: 0 }
+          }));
+          setEvents(eventsToShow);
+          setExpectedVoters(groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5);
+        }
+        return;
+      }
       
-      // Set expected voters based on group size
-      const voterCount = groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5;
-      setExpectedVoters(voterCount);
-    }
-  }, [topic, groupSize, planId]);
+      if (planId === 'demo') {
+        // Handle demo mode with mock events
+        const topicStr = Array.isArray(topic) ? topic[0] : topic;
+        const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+        
+        if (topicStr && groupSizeStr && MOCK_EVENTS[topicStr] && MOCK_EVENTS[topicStr][groupSizeStr]) {
+          let eventsToShow = MOCK_EVENTS[topicStr][groupSizeStr].slice(0, 2).map(event => ({
+            ...event,
+            isDemo: true,
+            contact: { phone: '***-***-****', email: 'demo@example.com' },
+            hours: 'Demo Hours',
+            reviews: { stars: 0, count: 0 }
+          }));
+          setEvents(eventsToShow);
+          setExpectedVoters(groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5);
+        }
+        return;
+      }
+
+      try {
+        // Fetch real events from FastAPI backend
+        const response = await fetch(`http://127.0.0.1:8000/api/plans/${planId}/events`);
+        if (response.ok) {
+          const data = await response.json();
+          // Add default properties for events from database
+          const eventsWithDefaults = (data.events || []).map(event => ({
+            ...event,
+            reviews: event.reviews || { stars: 0, count: 0 },
+            contact: event.contact || { phone: 'N/A', email: 'N/A' }
+          }));
+          setEvents(eventsWithDefaults);
+          
+          // Set expected voters based on group size from plan
+          const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+          const voterCount = groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5;
+          setExpectedVoters(voterCount);
+        } else {
+          console.error('Failed to fetch events:', response.status);
+          // Fallback to mock events if API fails
+          const topicStr = Array.isArray(topic) ? topic[0] : topic;
+          const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+          if (topicStr && groupSizeStr && MOCK_EVENTS[topicStr] && MOCK_EVENTS[topicStr][groupSizeStr]) {
+            const mockEventsWithDefaults = MOCK_EVENTS[topicStr][groupSizeStr].map(event => ({
+              ...event,
+              reviews: event.reviews || { stars: 0, count: 0 },
+              contact: event.contact || { phone: 'N/A', email: 'N/A' }
+            }));
+            setEvents(mockEventsWithDefaults);
+            setExpectedVoters(groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching events:', error);
+        // Fallback to mock events
+        const topicStr = Array.isArray(topic) ? topic[0] : topic;
+        const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+        if (topicStr && groupSizeStr && MOCK_EVENTS[topicStr] && MOCK_EVENTS[topicStr][groupSizeStr]) {
+          const mockEventsWithDefaults = MOCK_EVENTS[topicStr][groupSizeStr].map(event => ({
+            ...event,
+            reviews: event.reviews || { stars: 0, count: 0 },
+            contact: event.contact || { phone: 'N/A', email: 'N/A' }
+          }));
+          setEvents(mockEventsWithDefaults);
+          setExpectedVoters(groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5);
+        }
+      }
+    };
+
+    fetchEvents();
+  }, [router.isReady, planId, topic, groupSize]);
 
   // Load vote counts from localStorage
   useEffect(() => {
@@ -1347,7 +1479,28 @@ export default function VotePage() {
     if (storedCompletedVoters) {
       setCompletedVoters(parseInt(storedCompletedVoters));
     }
-  }, [planId]);
+    
+    // Reset completion status for this voter if they return to vote
+    const voterInfo = localStorage.getItem(`voter_${planId}`);
+    if (voterInfo) {
+      const voter = JSON.parse(voterInfo);
+      const voterCompletedKey = `voter_completed_${planId}_${voter.userId || voterId}`;
+      const alreadyCompleted = localStorage.getItem(voterCompletedKey);
+      
+      if (alreadyCompleted) {
+        console.log('🔄 Voter returned to vote - resetting completion status');
+        localStorage.removeItem(voterCompletedKey);
+        
+        // Decrement completed voters count
+        const currentCompleted = storedCompletedVoters ? parseInt(storedCompletedVoters) : 0;
+        if (currentCompleted > 0) {
+          const newCompleted = currentCompleted - 1;
+          localStorage.setItem(`completed_voters_${planId}`, newCompleted.toString());
+          setCompletedVoters(newCompleted);
+        }
+      }
+    }
+  }, [planId, voterId]);
 
   // Generate unique voter ID on mount
   useEffect(() => {
@@ -1357,12 +1510,25 @@ export default function VotePage() {
     }
   }, [voterId]);
 
-  // Check if all voters have completed
+  // Clear completion data when starting fresh
   useEffect(() => {
-    if (completedVoters >= expectedVoters) {
+    // Clear any stale completion data when the page loads
+    const planIdStr = Array.isArray(planId) ? planId[0] : planId;
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith('voter_completed_') && key.includes(planIdStr)) {
+        console.log('🧹 Clearing stale completion data:', key);
+        localStorage.removeItem(key);
+      }
+    });
+  }, [planId]);
+
+  // Check if all voters have completed - only when authenticated
+  useEffect(() => {
+    if (isAuthenticated && !showLogin && completedVoters >= expectedVoters) {
       setAllVotersCompleted(true);
     }
-  }, [completedVoters, expectedVoters]);
+  }, [completedVoters, expectedVoters, isAuthenticated, showLogin]);
 
   // Live refresh to check for new completed voters
   useEffect(() => {
@@ -1380,10 +1546,10 @@ export default function VotePage() {
     return () => clearInterval(refreshInterval);
   }, [planId, completedVoters]);
 
-  // Timer countdown - redirects to results when time expires
+  // Timer countdown - redirects to results when time expires OR all voters complete
   useEffect(() => {
-    // Stop timer if voting is complete
-    if (currentIndex >= events.length) {
+    // Stop timer if this voter has completed all events or not authenticated
+    if (currentIndex >= events.length || !isAuthenticated || showLogin) {
       return;
     }
 
@@ -1391,21 +1557,62 @@ export default function VotePage() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          setTimeout(() => {
-            router.push(`/results/${planId}`);
-          }, 1000);
+          // Only redirect if not all voters have completed
+          if (!allVotersCompleted) {
+            setTimeout(() => {
+              router.push(`/results/${planId}`);
+            }, 1000);
+          }
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [planId, router, currentIndex, events.length]);
+  }, [planId, router, currentIndex, events.length, allVotersCompleted, isAuthenticated, showLogin]);
+
+  // Redirect to results when all voters have completed
+  useEffect(() => {
+    if (allVotersCompleted && isAuthenticated && !showLogin) {
+      console.log('🎉 All voters have completed! Redirecting to results...');
+      setTimeout(() => {
+        router.push(`/results/${planId}`);
+      }, 2000); // Give 2 seconds for users to see the completion message
+    }
+  }, [allVotersCompleted, planId, router, isAuthenticated, showLogin]);
 
   // Handle swipe gestures
-  const swiped = (dir, eventId) => {
+  const swiped = async (dir, eventId) => {
     setVoted(prev => ({ ...prev, [eventId]: dir === 'right' }));
     
-    // Get current vote counts from localStorage
+    // Save vote to database if not demo
+    if (planId !== 'demo') {
+      try {
+        // Get user info from localStorage
+        const voterInfo = localStorage.getItem(`voter_${planId}`);
+        const voter = voterInfo ? JSON.parse(voterInfo) : null;
+        
+        const voteData = {
+          plan_id: planId,
+          event_id: eventId,
+          voter_id: voter?.userId || voterId, // Use database user ID if available
+          vote_type: dir === 'right' ? 'like' : 'dislike'
+        };
+        
+        const response = await fetch('http://127.0.0.1:8000/api/votes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(voteData)
+        });
+        
+        if (!response.ok) {
+          console.error('Failed to save vote:', response.status);
+        }
+      } catch (error) {
+        console.error('Error saving vote:', error);
+      }
+    }
+    
+    // Get current vote counts from localStorage (for demo or fallback)
     const storedVotes = localStorage.getItem(`votes_${planId}`);
     const currentVotes = storedVotes ? JSON.parse(storedVotes) : {};
     
@@ -1428,17 +1635,27 @@ export default function VotePage() {
     setCurrentIndex(prev => prev + 1);
     
     // Check if this voter has completed all events
-    if (currentIndex + 1 >= events.length) {
-      // Mark this voter as completed
-      const storedCompletedVoters = localStorage.getItem(`completed_voters_${planId}`);
-      const currentCompleted = storedCompletedVoters ? parseInt(storedCompletedVoters) : 0;
-      const newCompleted = currentCompleted + 1;
+    if (currentIndex >= events.length - 1) {
+      // Check if this voter has already been marked as completed
+      const voterCompletedKey = `voter_completed_${planId}_${voterId}`;
+      const alreadyCompleted = localStorage.getItem(voterCompletedKey);
       
-      localStorage.setItem(`completed_voters_${planId}`, newCompleted.toString());
-      setCompletedVoters(newCompleted);
-      
-      // Store this voter's completion status
-      localStorage.setItem(`voter_completed_${planId}_${voterId}`, 'true');
+      if (!alreadyCompleted) {
+        // Mark this voter as completed
+        const storedCompletedVoters = localStorage.getItem(`completed_voters_${planId}`);
+        const currentCompleted = storedCompletedVoters ? parseInt(storedCompletedVoters) : 0;
+        const newCompleted = currentCompleted + 1;
+        
+        localStorage.setItem(`completed_voters_${planId}`, newCompleted.toString());
+        setCompletedVoters(newCompleted);
+        
+        // Store this voter's completion status
+        localStorage.setItem(voterCompletedKey, 'true');
+        
+        console.log(`✅ Voter ${voterId} completed all events. Total completed: ${newCompleted}`);
+      } else {
+        console.log(`⚠️ Voter ${voterId} already marked as completed`);
+      }
     }
   };
 
@@ -1510,94 +1727,371 @@ export default function VotePage() {
   };
 
   // Handle login submission
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (voterName.trim() && voterPhone.trim()) {
-      setIsAuthenticated(true);
-      setShowLogin(false);
-      // Store voter info in localStorage for anonymous voting
-      localStorage.setItem(`voter_${planId}`, JSON.stringify({
-        name: voterName.trim(),
-        phone: voterPhone.trim(),
-        timestamp: Date.now()
-      }));
+      // Check voting status from backend first
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/api/plans/${planId}/voting-status`);
+        if (response.ok) {
+          const status = await response.json();
+          console.log('🔐 Login check - voting status:', status);
+          
+          if (status.voting_limit_reached) {
+            alert(`Sorry! This plan is limited to ${status.max_voters} ${status.max_voters === 1 ? 'person' : 'people'}. All voting slots have been filled.`);
+            setVotingLimitReached(true);
+            return;
+          }
+        }
+      } catch (error) {
+        console.log('🔐 Error checking voting status, falling back to local logic:', error);
+      }
+      
+      // Fallback to local logic if backend check fails
+      const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+      const maxVoters = groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5;
+      
+      // Count unique voters for this plan
+      const uniqueVoters = new Set();
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith(`voter_completed_${planId}_`)) {
+          // This is a voter completion key, extract voter ID
+          const voterId = key.replace(`voter_completed_${planId}_`, '');
+          uniqueVoters.add(voterId);
+        }
+      });
+      
+      // Also count voters who have voter info stored but haven't completed yet
+      const voterInfo = localStorage.getItem(`voter_${planId}`);
+      if (voterInfo) {
+        const voter = JSON.parse(voterInfo);
+        const voterId = voter.userId || voter.phone;
+        // Only count if they haven't completed yet
+        if (!localStorage.getItem(`voter_completed_${planId}_${voterId}`)) {
+          uniqueVoters.add(voterId);
+        }
+      }
+      
+      console.log(`🔐 Current unique voters: ${uniqueVoters.size}/${maxVoters}`);
+      console.log(`🔐 Unique voter IDs:`, Array.from(uniqueVoters));
+      
+      if (uniqueVoters.size >= maxVoters) {
+        alert(`Sorry! This plan is limited to ${maxVoters} ${maxVoters === 1 ? 'person' : 'people'}. All voting slots have been filled.`);
+        return;
+      }
+      
+      try {
+        // Create user in database if not demo
+        if (planId !== 'demo') {
+          const userData = {
+            name: voterName.trim(),
+            phone: voterPhone.trim()
+          };
+          
+          const response = await fetch('http://127.0.0.1:8000/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+          
+          if (response.ok) {
+            const userResult = await response.json();
+            // Store user ID for voting
+            localStorage.setItem(`voter_${planId}`, JSON.stringify({
+              name: voterName.trim(),
+              phone: voterPhone.trim(),
+              userId: userResult.id,
+              timestamp: Date.now()
+            }));
+          } else {
+            console.error('Failed to create user:', response.status);
+          }
+        } else {
+          // Demo mode - just store in localStorage
+          localStorage.setItem(`voter_${planId}`, JSON.stringify({
+            name: voterName.trim(),
+            phone: voterPhone.trim(),
+            timestamp: Date.now()
+          }));
+        }
+        
+        setIsAuthenticated(true);
+        setShowLogin(false);
+      } catch (error) {
+        console.error('Error creating user:', error);
+        // Fallback to localStorage only
+        localStorage.setItem(`voter_${planId}`, JSON.stringify({
+          name: voterName.trim(),
+          phone: voterPhone.trim(),
+          timestamp: Date.now()
+        }));
+        setIsAuthenticated(true);
+        setShowLogin(false);
+      }
     }
   };
 
   // Check if already authenticated or if user is the creator
   useEffect(() => {
-    // Skip authentication for demo
-    if (planId === 'demo') {
+    // Wait for router to be ready before checking authentication
+    if (!router.isReady) {
+      console.log('🔐 Waiting for router to be ready...');
+      return;
+    }
+    
+    console.log('🔐 Auth check - planId:', planId, 'groupSize:', groupSize);
+    
+    // Skip authentication for demo or undefined planId
+    if (planId === 'demo' || !planId || planId === 'undefined') {
+      console.log('🔐 Skipping auth - demo or undefined planId');
       setIsAuthenticated(true);
       setShowLogin(false);
       return;
     }
     
-    const voterInfo = localStorage.getItem(`voter_${planId}`);
-    const creatorInfo = localStorage.getItem(`creator_${planId}`);
-    
-    // Check if user came from the create page (has referrer info)
-    const cameFromCreate = sessionStorage.getItem('cameFromCreate');
-    
-    if (voterInfo) {
-      // User has already voted in this plan
-      const voter = JSON.parse(voterInfo);
-      setVoterName(voter.name);
-      setVoterPhone(voter.phone);
-      setIsAuthenticated(true);
-      setShowLogin(false);
-    } else if (creatorInfo && cameFromCreate) {
-      // User is the creator AND came from create page
-      const creator = JSON.parse(creatorInfo);
-      setVoterName(creator.name);
-      setVoterPhone(creator.phone);
-      setIsAuthenticated(true);
-      setShowLogin(false);
-      // Also store as voter for consistency
-      localStorage.setItem(`voter_${planId}`, JSON.stringify({
-        name: creator.name,
-        phone: creator.phone,
-        timestamp: Date.now(),
-        isCreator: true
-      }));
-      // Clear the session flag
-      sessionStorage.removeItem('cameFromCreate');
-    } else {
-      // New user or direct link access - show login form
-      // For group plans (3+ people), always require authentication
-      if (groupSize && groupSize !== 'solo' && groupSize !== 'date') {
-        setShowLogin(true);
-        setIsAuthenticated(false);
-      } else {
-        // For solo/date plans, allow skipping if they have creator info
-        if (creatorInfo) {
-          const creator = JSON.parse(creatorInfo);
-          setVoterName(creator.name);
-          setVoterPhone(creator.phone);
-          setIsAuthenticated(true);
-          setShowLogin(false);
-          // Store as voter for consistency
-          localStorage.setItem(`voter_${planId}`, JSON.stringify({
-            name: creator.name,
-            phone: creator.phone,
-            timestamp: Date.now(),
-            isCreator: true
-          }));
+    const checkVotingStatus = async () => {
+      try {
+        // Check voting status from backend
+        const response = await fetch(`http://127.0.0.1:8000/api/plans/${planId}/voting-status`);
+        if (response.ok) {
+          const status = await response.json();
+          console.log('🔐 Voting status from backend:', status);
+          
+          // Update expected voters from backend
+          setExpectedVoters(status.max_voters);
+          
+          // If voting limit reached, show limit message
+          if (status.voting_limit_reached) {
+            console.log('🔐 Voting limit reached from backend');
+            setShowLogin(false);
+            setIsAuthenticated(false);
+            setVotingLimitReached(true);
+            return;
+          }
         } else {
+          console.log('🔐 Could not fetch voting status, falling back to local logic');
+        }
+      } catch (error) {
+        console.log('🔐 Error fetching voting status, falling back to local logic:', error);
+      }
+      
+      // Clear any old session data that might interfere
+      const currentPlanId = Array.isArray(planId) ? planId[0] : planId;
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('voter_') && currentPlanId && !key.includes(currentPlanId)) {
+          console.log('🔐 Clearing old voter data:', key);
+          localStorage.removeItem(key);
+        }
+      });
+      
+      const voterInfo = localStorage.getItem(`voter_${planId}`);
+      const creatorInfo = localStorage.getItem(`creator_${planId}`);
+      
+      // Check if user came from the create page (has referrer info)
+      const cameFromCreate = sessionStorage.getItem('cameFromCreate');
+      
+      console.log('🔐 Auth check - voterInfo:', !!voterInfo, 'creatorInfo:', !!creatorInfo, 'cameFromCreate:', cameFromCreate);
+      if (voterInfo) {
+        console.log('🔐 Voter info found:', JSON.parse(voterInfo));
+      }
+      if (creatorInfo) {
+        console.log('🔐 Creator info found:', JSON.parse(creatorInfo));
+      }
+      
+      if (voterInfo) {
+        // User has already voted in this plan
+        const voter = JSON.parse(voterInfo);
+        console.log('🔐 User already voted in this plan:', voter);
+        setVoterName(voter.name);
+        setVoterPhone(voter.phone);
+        setIsAuthenticated(true);
+        setShowLogin(false);
+      } else if (creatorInfo && cameFromCreate) {
+        // User is the creator AND came from create page
+        const creator = JSON.parse(creatorInfo);
+        setVoterName(creator.name);
+        setVoterPhone(creator.phone);
+        setIsAuthenticated(true);
+        setShowLogin(false);
+        // Also store as voter for consistency
+        localStorage.setItem(`voter_${planId}`, JSON.stringify({
+          name: creator.name,
+          phone: creator.phone,
+          timestamp: Date.now(),
+          isCreator: true
+        }));
+        // Clear the session flag
+        sessionStorage.removeItem('cameFromCreate');
+      } else {
+        // New user or direct link access - check if voting limit reached
+        const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+        const maxVoters = groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5;
+        
+        // Count unique voters for this plan
+        const uniqueVoters = new Set();
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith(`voter_completed_${planId}_`)) {
+            // This is a voter completion key, extract voter ID
+            const voterId = key.replace(`voter_completed_${planId}_`, '');
+            uniqueVoters.add(voterId);
+          }
+        });
+        
+        // Also count voters who have voter info stored but haven't completed yet
+        const voterInfo = localStorage.getItem(`voter_${planId}`);
+        if (voterInfo) {
+          const voter = JSON.parse(voterInfo);
+          const voterId = voter.userId || voter.phone;
+          // Only count if they haven't completed yet
+          if (!localStorage.getItem(`voter_completed_${planId}_${voterId}`)) {
+            uniqueVoters.add(voterId);
+          }
+        }
+        
+        console.log(`🔐 Auth check - unique voters: ${uniqueVoters.size}/${maxVoters}`);
+        console.log(`🔐 Auth check - unique voter IDs:`, Array.from(uniqueVoters));
+        
+        if (uniqueVoters.size >= maxVoters) {
+          console.log('🔐 Voting limit reached - showing limit message');
+          setShowLogin(false);
+          setIsAuthenticated(false);
+          setVotingLimitReached(true);
+          return;
+        }
+        
+        // For group plans (3+ people), always require authentication
+        console.log('🔐 Auth check - groupSizeStr:', groupSizeStr);
+        
+        if (groupSizeStr && groupSizeStr !== 'solo' && groupSizeStr !== 'friend' && groupSizeStr !== 'date') {
+          console.log('🔐 Requiring login - group plan');
           setShowLogin(true);
           setIsAuthenticated(false);
+        } else {
+          // For friend/date plans, check if user is creator or needs to login
+          if (creatorInfo) {
+            // User is the creator - check if they came from create page or if this is a fresh visit
+            const creator = JSON.parse(creatorInfo);
+            
+            if (cameFromCreate) {
+              // Creator just came from create page - skip login
+              console.log('🔐 Skipping login - creator from create page');
+              setVoterName(creator.name);
+              setVoterPhone(creator.phone);
+              setIsAuthenticated(true);
+              setShowLogin(false);
+              // Store as voter for consistency
+              localStorage.setItem(`voter_${planId}`, JSON.stringify({
+                name: creator.name,
+                phone: creator.phone,
+                timestamp: Date.now(),
+                isCreator: true
+              }));
+              // Clear the session flag
+              sessionStorage.removeItem('cameFromCreate');
+            } else {
+              // Creator is returning to vote (e.g., from shared link) - check if they already voted
+              const voterInfo = localStorage.getItem(`voter_${planId}`);
+              if (voterInfo) {
+                // Creator already voted - show voting interface
+                console.log('🔐 Creator already voted - showing voting interface');
+                const voter = JSON.parse(voterInfo);
+                setVoterName(voter.name);
+                setVoterPhone(voter.phone);
+                setIsAuthenticated(true);
+                setShowLogin(false);
+              } else {
+                // Creator hasn't voted yet - show login (they'll be auto-filled)
+                console.log('🔐 Creator returning to vote - showing login with auto-fill');
+                setVoterName(creator.name);
+                setVoterPhone(creator.phone);
+                setShowLogin(true);
+                setIsAuthenticated(false);
+              }
+            }
+          } else {
+            // New user accessing shared link - always require login
+            console.log('🔐 Requiring login - new user accessing shared link');
+            setShowLogin(true);
+            setIsAuthenticated(false);
+            
+            // Clear any existing session data to ensure fresh login
+            sessionStorage.removeItem('cameFromCreate');
+          }
         }
       }
+    };
+    
+    checkVotingStatus();
+  }, [planId, groupSize, router.isReady]);
+
+  // Create user in backend if not already created for this plan
+  useEffect(() => {
+    // Create user in backend if not already created for this plan
+    if (!planId || planId === 'demo') return;
+    const creatorInfo = localStorage.getItem(`creator_${planId}`);
+    if (creatorInfo) {
+      const { name, phone } = JSON.parse(creatorInfo);
+      fetch('http://127.0.0.1:8000/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone })
+      });
     }
-  }, [planId, groupSize]);
+  }, [planId]);
 
   // Loading state
-  if (events.length === 0) {
+  if ((events.length === 0 && !showLogin && isAuthenticated) || !router.isReady) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading events...</p>
+          <p className="text-sm text-gray-500 mt-2">If this takes too long, try refreshing the page</p>
+          {!router.isReady && (
+            <p className="text-xs text-gray-400 mt-2">Waiting for router to be ready...</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Voting limit reached message
+  if (votingLimitReached) {
+    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+    const maxVoters = groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5;
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center px-4 py-8">
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 max-w-md mx-auto w-full text-center">
+          <div className="text-6xl mb-4">🚫</div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Voting Limit Reached</h1>
+          <p className="text-gray-600 mb-6">
+            This plan is limited to {maxVoters} {maxVoters === 1 ? 'person' : 'people'}. All voting slots have been filled.
+          </p>
+          <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-2xl p-4 border-2 border-red-200 mb-6">
+            <p className="text-sm text-gray-600 mb-2">Plan Details:</p>
+            <p className="font-semibold text-gray-900">
+              {(Array.isArray(topic) ? topic[0] : topic)} • {(Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' ? 'Solo' : (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'date' ? 'Date or Friend Night' : 'Group'}
+            </p>
+          </div>
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => router.push('/create')}
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+            >
+              Create Your Own Plan
+            </button>
+            <button
+              onClick={() => router.push('/')}
+              className="w-full bg-gradient-to-r from-gray-600 to-gray-700 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+            >
+              Go Home
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1616,7 +2110,7 @@ export default function VotePage() {
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl p-4 border-2 border-purple-200">
               <p className="text-sm text-gray-600 mb-2">Plan Details:</p>
               <p className="font-semibold text-gray-900">
-                {(Array.isArray(topic) ? topic[0] : topic) === 'datenight' ? 'Date Night' : (Array.isArray(topic) ? topic[0] : topic)} • {(Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' ? 'Solo' : (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'date' ? 'Date or Friend Night' : 'Group'}
+                {(Array.isArray(topic) ? topic[0] : topic)} • {(Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' ? 'Solo' : (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'date' ? 'Date or Friend Night' : 'Group'}
               </p>
             </div>
           </div>
@@ -1683,13 +2177,16 @@ export default function VotePage() {
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Vote on Events</h1>
         <p className="text-gray-600 mb-4">
-          {(Array.isArray(topic) ? topic[0] : topic) === 'datenight' ? 'Date Night' : (Array.isArray(topic) ? topic[0] : topic)} • {(Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' ? 'Solo' : (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'date' ? 'Date or Friend Night' : 'Group'} • {Array.isArray(zip) ? zip[0] : zip}
+          {(Array.isArray(topic) ? topic[0] : topic)} • {(Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' ? 'Solo' : (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'date' ? 'Date or Friend Night' : 'Group'} • {Array.isArray(zip) ? zip[0] : zip}
         </p>
         
         {/* Voter progress counter */}
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg mb-4">
           <span className="text-lg font-bold">👥</span>
           <span className="font-semibold">{completedVoters}/{expectedVoters} finished voting</span>
+          {allVotersCompleted && (
+            <span className="text-green-600 font-bold ml-2">🎉 All Done!</span>
+          )}
         </div>
         
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg">
@@ -1771,8 +2268,8 @@ export default function VotePage() {
           )}
         </AnimatePresence>
 
-        {/* Completion state */}
-        {currentIndex >= events.length && (
+        {/* Completion state - only show after user has authenticated and completed voting */}
+        {currentIndex >= events.length && events.length > 0 && isAuthenticated && !showLogin && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

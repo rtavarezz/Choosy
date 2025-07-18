@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Call FastAPI backend
-    const response = await fetch('http://localhost:8000/api/votes', {
+    const response = await fetch('http://127.0.0.1:8000/api/votes', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

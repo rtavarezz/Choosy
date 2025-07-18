@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -11,19 +12,16 @@ from typing import List, Optional
 import os
 import secrets
 import uuid
+import json
 
-# Always load .env from project root
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
-# Security configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -35,7 +33,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 app = FastAPI(title="Choosy API", description="Secure API for Choosy app")
 
-# Pydantic models for request/response
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 class PlanCreate(BaseModel):
     topic: str
     group_size: str
@@ -59,7 +63,10 @@ class ReservationCreate(BaseModel):
     event_time: Optional[str] = "7:00 PM"
     event_date: Optional[str] = None
 
-# Security utilities
+class UserCreate(BaseModel):
+    name: str
+    phone: str
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -90,8 +97,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         return user_id
     except JWTError:
         raise credentials_exception
-
-# Public endpoints (no authentication required)
 @app.get("/")
 def health():
     return {"status": "ok", "message": "Choosy API is running"}
@@ -107,10 +112,86 @@ def test_db():
 
 @app.get("/test")
 def test():
-    """Alias for test-db endpoint"""
     return test_db()
 
-# Plans endpoints
+def generate_mock_events(topic: str, group_size: str) -> List[dict]:
+    topic_events = {
+        "concerts": [
+            {"name": "Taylor Swift Concert", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Stadium", "price": "$150"}},
+            {"name": "Rock Band Live", "image": None, "hours": "2.5 hours", "source_type": "mock", "metadata": {"venue": "Arena", "price": "$80"}},
+            {"name": "Jazz Night", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Club", "price": "$45"}},
+            {"name": "Classical Symphony", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Concert Hall", "price": "$75"}},
+            {"name": "Indie Music Festival", "image": None, "hours": "4 hours", "source_type": "mock", "metadata": {"venue": "Outdoor", "price": "$60"}}
+        ],
+        "nightlife": [
+            {"name": "Cocktail Bar", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Downtown", "price": "$30"}},
+            {"name": "Dance Club", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Nightclub", "price": "$25"}},
+            {"name": "Karaoke Night", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Bar", "price": "$20"}},
+            {"name": "Wine Tasting", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Winery", "price": "$40"}},
+            {"name": "Comedy Club", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Comedy Club", "price": "$35"}}
+        ],
+        "foodie": [
+            {"name": "Sushi Restaurant", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Restaurant", "price": "$50"}},
+            {"name": "Italian Bistro", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Bistro", "price": "$45"}},
+            {"name": "Food Truck Festival", "image": None, "hours": "2.5 hours", "source_type": "mock", "metadata": {"venue": "Outdoor", "price": "$25"}},
+            {"name": "Cooking Class", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Kitchen", "price": "$75"}},
+            {"name": "Farm-to-Table Dinner", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Restaurant", "price": "$65"}}
+        ],
+        "datenight": [
+            {"name": "Romantic Dinner", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Restaurant", "price": "$80"}},
+            {"name": "Movie Night", "image": None, "hours": "2.5 hours", "source_type": "mock", "metadata": {"venue": "Cinema", "price": "$30"}},
+            {"name": "Couples Massage", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Spa", "price": "$120"}},
+            {"name": "Sunset Walk", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Park", "price": "Free"}},
+            {"name": "Dance Lessons", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Studio", "price": "$60"}}
+        ],
+        "sports": [
+            {"name": "Basketball Game", "image": None, "hours": "2.5 hours", "source_type": "mock", "metadata": {"venue": "Arena", "price": "$75"}},
+            {"name": "Baseball Game", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Stadium", "price": "$45"}},
+            {"name": "Soccer Match", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Field", "price": "$35"}},
+            {"name": "Tennis Match", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Court", "price": "$25"}},
+            {"name": "Golf Tournament", "image": None, "hours": "4 hours", "source_type": "mock", "metadata": {"venue": "Course", "price": "$90"}}
+        ],
+        "parks": [
+            {"name": "Hiking Trail", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Trail", "price": "Free"}},
+            {"name": "Picnic in Park", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Park", "price": "Free"}},
+            {"name": "Bike Ride", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Trail", "price": "$15"}},
+            {"name": "Bird Watching", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Park", "price": "Free"}},
+            {"name": "Frisbee Golf", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Course", "price": "$10"}}
+        ],
+        "gokart": [
+            {"name": "Indoor Go-Kart Racing", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Track", "price": "$35"}},
+            {"name": "Outdoor Go-Kart Track", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Track", "price": "$40"}},
+            {"name": "Electric Go-Karts", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Track", "price": "$30"}},
+            {"name": "Go-Kart Tournament", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Track", "price": "$50"}},
+            {"name": "Family Go-Kart Day", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Track", "price": "$25"}}
+        ],
+        "swimming": [
+            {"name": "Public Pool", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Pool", "price": "$8"}},
+            {"name": "Water Park", "image": None, "hours": "4 hours", "source_type": "mock", "metadata": {"venue": "Water Park", "price": "$25"}},
+            {"name": "Swimming Lessons", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Pool", "price": "$20"}},
+            {"name": "Beach Day", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Beach", "price": "Free"}},
+            {"name": "Hot Springs", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Springs", "price": "$30"}}
+        ],
+        "drinks": [
+            {"name": "Craft Beer Tasting", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Brewery", "price": "$35"}},
+            {"name": "Wine Bar", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Bar", "price": "$40"}},
+            {"name": "Cocktail Lounge", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Lounge", "price": "$45"}},
+            {"name": "Coffee Shop", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Cafe", "price": "$15"}},
+            {"name": "Tea House", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Tea House", "price": "$25"}}
+        ]
+    }
+    
+    events = topic_events.get(topic, topic_events["drinks"])
+    
+    if group_size == "solo":
+        solo_events = [e for e in events if "Tournament" not in e["name"] and "Family" not in e["name"]]
+        return solo_events[:2]  # Only 2 events for solo
+    elif group_size in ["friend", "date", "2"]:
+        couple_events = [e for e in events if "Tournament" not in e["name"] and "Family" not in e["name"]]
+        return couple_events[:3]  # Only 3 events for couples
+    else:
+        return events[:4]  # Only 4 events for groups
+
 @app.post("/api/plans")
 def create_plan(plan: PlanCreate):
     """Create a new plan"""
@@ -133,8 +214,26 @@ def create_plan(plan: PlanCreate):
                 }
             )
             
-            # Insert custom events if any
-            for event in plan.custom_events:
+            mock_events = generate_mock_events(plan.topic, plan.group_size)
+            for event in mock_events:
+                event_id = str(uuid.uuid4())
+                conn.execute(
+                    text("""
+                        INSERT INTO events (id, plan_id, name, image, hours, source_type, votes_count, metadata)
+                        VALUES (:id, :plan_id, :name, :image, :hours, :source_type, 0, :metadata)
+                    """),
+                    {
+                        "id": event_id,
+                        "plan_id": plan_id,
+                        "name": event["name"],
+                        "image": event.get("image"),
+                        "hours": event.get("hours"),
+                        "source_type": "custom",
+                        "metadata": json.dumps(event.get("metadata", {}))
+                    }
+                )
+            
+            for event in plan.custom_events[:2]:  # Limit to 2 custom events max
                 event_id = str(uuid.uuid4())
                 conn.execute(
                     text("""
@@ -153,12 +252,142 @@ def create_plan(plan: PlanCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/plans/{plan_id}/results")
-def get_plan_results(plan_id: str):
-    """Get voting results for a plan"""
+@app.post("/api/plans/{plan_id}/events")
+def create_events_for_plan(plan_id: str, events: List[dict]):
+    try:
+        with engine.connect() as conn:
+            plan_result = conn.execute(
+                text("SELECT id FROM plans WHERE id = :id"),
+                {"id": plan_id}
+            )
+            if not plan_result.fetchone():
+                raise HTTPException(status_code=404, detail="Plan not found")
+            
+            for event in events:
+                event_id = str(uuid.uuid4())
+                conn.execute(
+                    text("""
+                        INSERT INTO events (id, plan_id, name, image, hours, source_type, votes_count, metadata)
+                        VALUES (:id, :plan_id, :name, :image, :hours, :source_type, 0, :metadata)
+                    """),
+                    {
+                        "id": event_id,
+                        "plan_id": plan_id,
+                        "name": event.get("name", "Event"),
+                        "image": event.get("image"),
+                        "hours": event.get("hours"),
+                        "source_type": event.get("source_type", "custom"),
+                        "metadata": json.dumps(event.get("metadata", {}))
+                    }
+                )
+            
+            conn.commit()
+            return {"message": f"Created {len(events)} events for plan {plan_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/plans/{plan_id}/events")
+def get_events_for_plan(plan_id: str):
+    try:
+        with engine.connect() as conn:
+            plan_result = conn.execute(
+                text("SELECT id FROM plans WHERE id = :id"),
+                {"id": plan_id}
+            )
+            if not plan_result.fetchone():
+                raise HTTPException(status_code=404, detail="Plan not found")
+            
+            events_result = conn.execute(
+                text("""
+                    SELECT id, name, image, hours, source_type, votes_count, metadata
+                    FROM events 
+                    WHERE plan_id = :plan_id
+                    ORDER BY votes_count DESC, name ASC
+                """),
+                {"plan_id": plan_id}
+            )
+            
+            events = []
+            for row in events_result:
+                metadata = {}
+                if row[6] and row[6] != 'null' and row[6] != 'None':
+                    try:
+                        metadata = json.loads(row[6])
+                    except (json.JSONDecodeError, TypeError):
+                        metadata = {}
+                
+                events.append({
+                    "id": row[0],
+                    "name": row[1],
+                    "image": row[2],
+                    "hours": row[3],
+                    "source_type": row[4],
+                    "votes_count": row[5] or 0,
+                    "metadata": metadata
+                })
+            
+            return {"events": events}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/plans/{plan_id}/voting-status")
+def get_voting_status(plan_id: str):
+    """Get current voting status and limits for a plan"""
     try:
         with engine.connect() as conn:
             # Get plan details
+            plan_result = conn.execute(
+                text("SELECT topic, group_size, host_name FROM plans WHERE id = :plan_id"),
+                {"plan_id": plan_id}
+            ).fetchone()
+            
+            if not plan_result:
+                raise HTTPException(status_code=404, detail="Plan not found")
+            
+            plan = {
+                "topic": plan_result[0],
+                "group_size": plan_result[1],
+                "host_name": plan_result[2]
+            }
+            
+            # Calculate max voters based on group size
+            max_voters = 1 if plan["group_size"] == "solo" else (2 if plan["group_size"] in ["date", "friend"] else 5)
+            
+            # Count unique voters who have completed voting
+            completed_voters_result = conn.execute(
+                text("""
+                    SELECT COUNT(DISTINCT voter_id) 
+                    FROM votes 
+                    WHERE plan_id = :plan_id
+                """),
+                {"plan_id": plan_id}
+            ).scalar()
+            
+            completed_voters = completed_voters_result or 0
+            
+            # Check if voting limit reached
+            voting_limit_reached = completed_voters >= max_voters
+            
+            return {
+                "plan_id": plan_id,
+                "topic": plan["topic"],
+                "group_size": plan["group_size"],
+                "host_name": plan["host_name"],
+                "max_voters": max_voters,
+                "completed_voters": completed_voters,
+                "voting_limit_reached": voting_limit_reached,
+                "can_vote": not voting_limit_reached
+            }
+            
+    except Exception as e:
+        print(f"Error getting voting status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/plans/{plan_id}/results")
+def get_plan_results(plan_id: str):
+    try:
+        print(f"🔍 Getting results for plan: {plan_id}")
+        with engine.connect() as conn:
             plan_result = conn.execute(
                 text("SELECT topic, group_size, zip_code, host_name, host_phone FROM plans WHERE id = :id"),
                 {"id": plan_id}
@@ -167,36 +396,36 @@ def get_plan_results(plan_id: str):
             if not plan:
                 raise HTTPException(status_code=404, detail="Plan not found")
             
-            # Get events and their vote counts
             events_result = conn.execute(
                 text("""
-                    SELECT e.id, e.name, e.votes_count,
+                    SELECT e.id, e.name,
                            COUNT(v.id) as total_votes,
                            COUNT(CASE WHEN v.vote_type = 'like' THEN 1 END) as likes,
                            COUNT(CASE WHEN v.vote_type = 'dislike' THEN 1 END) as dislikes
                     FROM events e
                     LEFT JOIN votes v ON e.id = v.event_id
                     WHERE e.plan_id = :plan_id
-                    GROUP BY e.id, e.name, e.votes_count
-                    ORDER BY likes DESC, e.votes_count DESC
+                    GROUP BY e.id, e.name
+                    ORDER BY likes DESC, e.name ASC
                 """),
                 {"plan_id": plan_id}
             )
             events = []
             for row in events_result:
-                total_votes = row[3] or 0
-                likes = row[4] or 0
-                dislikes = row[5] or 0
+                total_votes = row[2] or 0
+                likes = row[3] or 0
+                dislikes = row[4] or 0
                 percentage = (likes / total_votes * 100) if total_votes > 0 else 0
-                events.append({
+                event_data = {
                     "id": row[0],
                     "name": row[1],
                     "votes": likes,
                     "total_votes": total_votes,
                     "percentage": round(percentage, 1)
-                })
+                }
+                events.append(event_data)
+                print(f"📊 Event: {row[1]}, Votes: {likes}, Total: {total_votes}")
             
-            # Get unique voters
             voters_result = conn.execute(
                 text("SELECT DISTINCT voter_id FROM votes WHERE plan_id = :plan_id"),
                 {"plan_id": plan_id}
@@ -219,77 +448,102 @@ def get_plan_results(plan_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Votes endpoints
+
 @app.post("/api/votes")
 def create_vote(vote: VoteCreate):
-    """Create a new vote"""
+    """Create or update a vote using optimized voting system"""
     try:
-        vote_id = str(uuid.uuid4())
+        print(f"🔍 Creating vote: plan_id={vote.plan_id}, event_id={vote.event_id}, voter_id={vote.voter_id}, vote_type={vote.vote_type}")
+        
         with engine.connect() as conn:
-            # Check if vote already exists
-            existing_vote = conn.execute(
-                text("SELECT id FROM votes WHERE plan_id = :plan_id AND event_id = :event_id AND voter_id = :voter_id"),
-                {
-                    "plan_id": vote.plan_id,
-                    "event_id": vote.event_id,
-                    "voter_id": vote.voter_id
-                }
-            ).fetchone()
-            
-            if existing_vote:
-                # Update existing vote
-                conn.execute(
-                    text("UPDATE votes SET vote_type = :vote_type WHERE id = :id"),
-                    {
-                        "vote_type": vote.vote_type,
-                        "id": existing_vote[0]
-                    }
-                )
-                vote_id = existing_vote[0]
-            else:
-                # Create new vote
-                conn.execute(
+            with conn.begin():
+                # Check for existing vote
+                existing_vote = conn.execute(
                     text("""
-                        INSERT INTO votes (id, plan_id, event_id, voter_id, vote_type, created_at)
-                        VALUES (:id, :plan_id, :event_id, :voter_id, :vote_type, NOW())
+                        SELECT vote_type, created_at 
+                        FROM votes 
+                        WHERE plan_id = :plan_id AND event_id = :event_id AND voter_id = :voter_id
                     """),
                     {
-                        "id": vote_id,
                         "plan_id": vote.plan_id,
                         "event_id": vote.event_id,
-                        "voter_id": vote.voter_id,
-                        "vote_type": vote.vote_type
+                        "voter_id": vote.voter_id
+                    }
+                ).fetchone()
+                
+                if existing_vote:
+                    old_vote_type = existing_vote[0]
+                    # Fix timezone issue by using UTC for both
+                    vote_age = datetime.utcnow() - existing_vote[1].replace(tzinfo=None)
+                    
+                    # Update existing vote with audit trail
+                    conn.execute(
+                        text("""
+                            UPDATE votes 
+                            SET vote_type = :vote_type, updated_at = NOW()
+                            WHERE plan_id = :plan_id AND event_id = :event_id AND voter_id = :voter_id
+                        """),
+                        {
+                            "vote_type": vote.vote_type,
+                            "plan_id": vote.plan_id,
+                            "event_id": vote.event_id,
+                            "voter_id": vote.voter_id
+                        }
+                    )
+                    
+                    # Note: We no longer update votes_count field since we calculate from votes table
+                    # The votes_count field is kept for backward compatibility but not used in results
+                else:
+                    # Create new vote
+                    vote_id = str(uuid.uuid4())
+                    print(f"✅ Creating new vote: {vote_id} for event {vote.event_id} by voter {vote.voter_id}")
+                    conn.execute(
+                        text("""
+                            INSERT INTO votes (id, plan_id, event_id, voter_id, vote_type, created_at)
+                            VALUES (:id, :plan_id, :event_id, :voter_id, :vote_type, NOW())
+                        """),
+                        {
+                            "id": vote_id,
+                            "plan_id": vote.plan_id,
+                            "event_id": vote.event_id,
+                            "voter_id": vote.voter_id,
+                            "vote_type": vote.vote_type
+                        }
+                    )
+                    
+                    # Note: We no longer update votes_count field since we calculate from votes table
+                    # The votes_count field is kept for backward compatibility but not used in results
+                
+                # Update voter participation with audit timestamps
+                conn.execute(
+                    text("""
+                        INSERT INTO voter_participation (id, plan_id, voter_id, events_voted_on, first_vote_at, last_vote_at)
+                        VALUES (:id, :plan_id, :voter_id, 1, NOW(), NOW())
+                        ON CONFLICT (plan_id, voter_id) 
+                        DO UPDATE SET 
+                            events_voted_on = voter_participation.events_voted_on + 1,
+                            last_vote_at = NOW(),
+                            updated_at = NOW()
+                    """),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "plan_id": vote.plan_id,
+                        "voter_id": vote.voter_id
                     }
                 )
             
-            # Update event vote count
-            conn.execute(
-                text("""
-                    UPDATE events 
-                    SET votes_count = (
-                        SELECT COUNT(*) 
-                        FROM votes 
-                        WHERE event_id = :event_id AND vote_type = 'like'
-                    )
-                    WHERE id = :event_id
-                """),
-                {"event_id": vote.event_id}
-            )
-            
-            conn.commit()
-            return {"id": vote_id, "message": "Vote recorded successfully"}
+            return {"success": True, "message": "Vote recorded with audit trail"}
     except Exception as e:
+        print(f"❌ Error creating vote: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Reservations endpoints
+
 @app.post("/api/reservations")
 def create_reservation(reservation: ReservationCreate):
-    """Create a new reservation"""
     try:
         reservation_id = f"RES-{int(datetime.now().timestamp())}-{secrets.token_hex(4)}"
         confirmation_number = f"CNF-{secrets.token_hex(3).upper()}"
         
-        # Mock reservation providers
         providers = {
             "concerts": {"name": "TicketMaster", "requires_confirmation": True},
             "nightlife": {"name": "OpenTable", "requires_confirmation": False},
@@ -304,7 +558,6 @@ def create_reservation(reservation: ReservationCreate):
         
         provider = providers.get(reservation.activity_type, {"name": "Generic", "requires_confirmation": False})
         
-        # Simulate processing delay
         import time
         time.sleep(1)
         
@@ -329,12 +582,42 @@ def create_reservation(reservation: ReservationCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Authentication endpoint
+
+@app.post("/api/users")
+def create_user(user: UserCreate):
+    try:
+        user_id = str(uuid.uuid4())
+        with engine.connect() as conn:
+            existing_user = conn.execute(
+                text("SELECT id FROM users WHERE phone = :phone"),
+                {"phone": user.phone}
+            ).fetchone()
+            
+            if existing_user:
+                return {"id": existing_user[0], "message": "User already exists"}
+            
+            conn.execute(
+                text("""
+                    INSERT INTO users (id, name, phone, created_at)
+                    VALUES (:id, :name, :phone, NOW())
+                """),
+                {
+                    "id": user_id,
+                    "name": user.name,
+                    "phone": user.phone
+                }
+            )
+            
+            conn.commit()
+            return {"id": user_id, "message": "User created successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     try:
         with engine.connect() as conn:
-            # Check if user exists by phone number
             result = conn.execute(
                 text("SELECT id, phone, name FROM users WHERE phone = :phone"),
                 {"phone": form_data.username}
@@ -370,10 +653,9 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Protected endpoints (require authentication)
+
 @app.get("/users/me")
 def get_my_user(current_user_id: str = Depends(get_current_user)):
-    """Get current user's information (authenticated only)"""
     try:
         with engine.connect() as conn:
             result = conn.execute(
@@ -408,6 +690,143 @@ def get_all_users():
             users = [{"id": row[0], "name": row[1]} for row in result]
             return {"users": users, "warning": "This endpoint should be removed in production"}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/cleanup/old-votes")
+def cleanup_old_votes():
+    """Clean up votes older than 30 days (for audit optimization)"""
+    try:
+        with engine.connect() as conn:
+            # Archive old votes to audit_log before deletion
+            archived_count = conn.execute(
+                text("""
+                    INSERT INTO audit_log (table_name, record_id, action, old_values, new_values, created_at)
+                    SELECT 
+                        'votes' as table_name,
+                        v.id as record_id,
+                        'DELETE' as action,
+                        jsonb_build_object(
+                            'plan_id', v.plan_id,
+                            'event_id', v.event_id,
+                            'voter_id', v.voter_id,
+                            'vote_type', v.vote_type,
+                            'created_at', v.created_at
+                        ) as old_values,
+                        NULL as new_values,
+                        NOW() as created_at
+                    FROM votes v
+                    WHERE v.created_at < NOW() - INTERVAL '30 days'
+                """)
+            ).rowcount
+            
+            # Delete old votes
+            deleted_count = conn.execute(
+                text("DELETE FROM votes WHERE created_at < NOW() - INTERVAL '30 days'")
+            ).rowcount
+            
+            conn.commit()
+            
+            return {
+                "message": "Cleanup completed",
+                "archived_votes": archived_count,
+                "deleted_votes": deleted_count
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/analytics/vote-patterns")
+def get_vote_analytics():
+    """Get voting analytics for fraud detection and engagement"""
+    try:
+        with engine.connect() as conn:
+            # Recent vote activity
+            recent_votes = conn.execute(
+                text("""
+                    SELECT 
+                        DATE(created_at) as vote_date,
+                        COUNT(*) as total_votes,
+                        COUNT(CASE WHEN vote_type = 'like' THEN 1 END) as likes,
+                        COUNT(CASE WHEN vote_type = 'dislike' THEN 1 END) as dislikes
+                    FROM votes 
+                    WHERE created_at > NOW() - INTERVAL '7 days'
+                    GROUP BY DATE(created_at)
+                    ORDER BY vote_date DESC
+                """)
+            ).fetchall()
+            
+            # Voter participation rates
+            participation = conn.execute(
+                text("""
+                    SELECT 
+                        plan_id,
+                        COUNT(DISTINCT voter_id) as unique_voters,
+                        AVG(events_voted_on) as avg_engagement
+                    FROM voter_participation
+                    WHERE updated_at > NOW() - INTERVAL '7 days'
+                    GROUP BY plan_id
+                    ORDER BY avg_engagement DESC
+                """)
+            ).fetchall()
+            
+            return {
+                "recent_vote_activity": [
+                    {
+                        "date": str(row[0]),
+                        "total_votes": row[1],
+                        "likes": row[2],
+                        "dislikes": row[3]
+                    }
+                    for row in recent_votes
+                ],
+                "participation_rates": [
+                    {
+                        "plan_id": row[0],
+                        "unique_voters": row[1],
+                        "avg_engagement": float(row[2]) if row[2] else 0
+                    }
+                    for row in participation
+                ]
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/optimize/events")
+def optimize_events():
+    """Optimize event storage (deduplicate, cache, archive)"""
+    try:
+        # Import here to avoid circular imports
+        import sys
+        import os
+        sys.path.append(os.path.dirname(__file__))
+        from event_optimization import EventOptimizationSystem
+        
+        optimizer = EventOptimizationSystem()
+        results = optimizer.optimize_event_storage()
+        
+        return {
+            "message": "Event optimization completed",
+            "results": results
+        }
+    except Exception as e:
+        print(f"Error in optimize_events: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/analytics/event-stats")
+def get_event_statistics():
+    """Get event storage statistics"""
+    try:
+        # Import here to avoid circular imports
+        import sys
+        import os
+        sys.path.append(os.path.dirname(__file__))
+        from event_optimization import EventOptimizationSystem
+        
+        optimizer = EventOptimizationSystem()
+        stats = optimizer.get_event_statistics()
+        
+        return stats
+    except Exception as e:
+        print(f"Error in get_event_statistics: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
