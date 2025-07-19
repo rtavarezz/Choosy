@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Plans table
 CREATE TABLE IF NOT EXISTS plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  topic TEXT NOT NULL CHECK (topic IN ('concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 'gokart', 'swimming', 'drinks')), -- Topic validation
+  topic TEXT NOT NULL CHECK (topic IN ('concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 'racing', 'swimming', 'drinks', 'movies', 'comedy', 'art', 'shopping', 'wellness', 'adventure', 'family')), -- Topic validation
   group_size TEXT NOT NULL CHECK (group_size IN ('solo', 'date', 'friend', 'group')), -- Group size validation
   zip_code TEXT NOT NULL CHECK (zip_code ~ '^[A-Z0-9\s\-]{3,10}$'), -- International postal code validation (3-10 alphanumeric chars, spaces, hyphens)
   host_name TEXT NOT NULL CHECK (length(host_name) >= 1 AND length(host_name) <= 100), -- Name validation

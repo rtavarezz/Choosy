@@ -117,142 +117,137 @@ def test_db():
 def test():
     return test_db()
 
-def generate_mock_events(topic: str, group_size: str) -> List[dict]:
-    topic_events = {
-        "concerts": [
-            {"name": "Taylor Swift Concert", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Stadium", "price": "$150"}},
-            {"name": "Rock Band Live", "image": None, "hours": "2.5 hours", "source_type": "mock", "metadata": {"venue": "Arena", "price": "$80"}},
-            {"name": "Jazz Night", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Club", "price": "$45"}},
-            {"name": "Classical Symphony", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Concert Hall", "price": "$75"}},
-            {"name": "Indie Music Festival", "image": None, "hours": "4 hours", "source_type": "mock", "metadata": {"venue": "Outdoor", "price": "$60"}}
-        ],
-        "nightlife": [
-            {"name": "Cocktail Bar", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Downtown", "price": "$30"}},
-            {"name": "Dance Club", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Nightclub", "price": "$25"}},
-            {"name": "Karaoke Night", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Bar", "price": "$20"}},
-            {"name": "Wine Tasting", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Winery", "price": "$40"}},
-            {"name": "Comedy Club", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Comedy Club", "price": "$35"}}
-        ],
-        "foodie": [
-            {"name": "Sushi Restaurant", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Restaurant", "price": "$50"}},
-            {"name": "Italian Bistro", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Bistro", "price": "$45"}},
-            {"name": "Food Truck Festival", "image": None, "hours": "2.5 hours", "source_type": "mock", "metadata": {"venue": "Outdoor", "price": "$25"}},
-            {"name": "Cooking Class", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Kitchen", "price": "$75"}},
-            {"name": "Farm-to-Table Dinner", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Restaurant", "price": "$65"}}
-        ],
-        "datenight": [
-            {"name": "Romantic Dinner", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Restaurant", "price": "$80"}},
-            {"name": "Movie Night", "image": None, "hours": "2.5 hours", "source_type": "mock", "metadata": {"venue": "Cinema", "price": "$30"}},
-            {"name": "Couples Massage", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Spa", "price": "$120"}},
-            {"name": "Sunset Walk", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Park", "price": "Free"}},
-            {"name": "Dance Lessons", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Studio", "price": "$60"}}
-        ],
-        "sports": [
-            {"name": "Basketball Game", "image": None, "hours": "2.5 hours", "source_type": "mock", "metadata": {"venue": "Arena", "price": "$75"}},
-            {"name": "Baseball Game", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Stadium", "price": "$45"}},
-            {"name": "Soccer Match", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Field", "price": "$35"}},
-            {"name": "Tennis Match", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Court", "price": "$25"}},
-            {"name": "Golf Tournament", "image": None, "hours": "4 hours", "source_type": "mock", "metadata": {"venue": "Course", "price": "$90"}}
-        ],
-        "parks": [
-            {"name": "Hiking Trail", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Trail", "price": "Free"}},
-            {"name": "Picnic in Park", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Park", "price": "Free"}},
-            {"name": "Bike Ride", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Trail", "price": "$15"}},
-            {"name": "Bird Watching", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Park", "price": "Free"}},
-            {"name": "Frisbee Golf", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Course", "price": "$10"}}
-        ],
-        "gokart": [
-            {"name": "Indoor Go-Kart Racing", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Track", "price": "$35"}},
-            {"name": "Outdoor Go-Kart Track", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Track", "price": "$40"}},
-            {"name": "Electric Go-Karts", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Track", "price": "$30"}},
-            {"name": "Go-Kart Tournament", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Track", "price": "$50"}},
-            {"name": "Family Go-Kart Day", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Track", "price": "$25"}}
-        ],
-        "swimming": [
-            {"name": "Public Pool", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Pool", "price": "$8"}},
-            {"name": "Water Park", "image": None, "hours": "4 hours", "source_type": "mock", "metadata": {"venue": "Water Park", "price": "$25"}},
-            {"name": "Swimming Lessons", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Pool", "price": "$20"}},
-            {"name": "Beach Day", "image": None, "hours": "3 hours", "source_type": "mock", "metadata": {"venue": "Beach", "price": "Free"}},
-            {"name": "Hot Springs", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Springs", "price": "$30"}}
-        ],
-        "drinks": [
-            {"name": "Craft Beer Tasting", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Brewery", "price": "$35"}},
-            {"name": "Wine Bar", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Bar", "price": "$40"}},
-            {"name": "Cocktail Lounge", "image": None, "hours": "2 hours", "source_type": "mock", "metadata": {"venue": "Lounge", "price": "$45"}},
-            {"name": "Coffee Shop", "image": None, "hours": "1 hour", "source_type": "mock", "metadata": {"venue": "Cafe", "price": "$15"}},
-            {"name": "Tea House", "image": None, "hours": "1.5 hours", "source_type": "mock", "metadata": {"venue": "Tea House", "price": "$25"}}
-        ]
-    }
-    
-    events = topic_events.get(topic, topic_events["drinks"])
-    
-    if group_size == "solo":
-        solo_events = [e for e in events if "Tournament" not in e["name"] and "Family" not in e["name"]]
-        return solo_events[:2]  # Only 2 events for solo
-    elif group_size in ["friend", "date", "2"]:
-        couple_events = [e for e in events if "Tournament" not in e["name"] and "Family" not in e["name"]]
-        return couple_events[:3]  # Only 3 events for couples
-    else:
-        return events[:4]  # Only 4 events for groups
-
 @app.post("/api/plans")
-def create_plan(plan: PlanCreate):
+async def create_plan(plan: PlanCreate):
     """Create a new plan"""
     try:
         plan_id = str(uuid.uuid4())
+        print(f"🔍 Creating plan {plan_id} for {plan.topic} in {plan.zip_code}")
+        
         with engine.connect() as conn:
-            # Insert plan
-            conn.execute(
-                text("""
-                    INSERT INTO plans (id, topic, group_size, zip_code, host_name, host_phone, created_at, expires_at)
-                    VALUES (:id, :topic, :group_size, :zip_code, :host_name, :host_phone, NOW(), NOW() + INTERVAL '15 minutes')
-                """),
-                {
-                    "id": plan_id,
-                    "topic": plan.topic,
-                    "group_size": plan.group_size,
-                    "zip_code": plan.zip_code,
-                    "host_name": plan.host_name,
-                    "host_phone": plan.host_phone
-                }
-            )
-            
-            mock_events = generate_mock_events(plan.topic, plan.group_size)
-            for event in mock_events:
-                event_id = str(uuid.uuid4())
+            try:
+                # Insert plan
                 conn.execute(
                     text("""
-                        INSERT INTO events (id, plan_id, name, image, hours, source_type, votes_count, metadata)
-                        VALUES (:id, :plan_id, :name, :image, :hours, :source_type, 0, :metadata)
+                        INSERT INTO plans (id, topic, group_size, zip_code, host_name, host_phone, created_at, expires_at)
+                        VALUES (:id, :topic, :group_size, :zip_code, :host_name, :host_phone, NOW(), NOW() + INTERVAL '15 minutes')
                     """),
                     {
-                        "id": event_id,
-                        "plan_id": plan_id,
-                        "name": event["name"],
-                        "image": event.get("image"),
-                        "hours": event.get("hours"),
-                        "source_type": "custom",
-                        "metadata": json.dumps(event.get("metadata", {}))
+                        "id": plan_id,
+                        "topic": plan.topic,
+                        "group_size": plan.group_size,
+                        "zip_code": plan.zip_code,
+                        "host_name": plan.host_name,
+                        "host_phone": plan.host_phone
                     }
                 )
-            
-            for event in plan.custom_events[:2]:  # Limit to 2 custom events max
-                event_id = str(uuid.uuid4())
-                conn.execute(
-                    text("""
-                        INSERT INTO events (id, plan_id, name, source_type, votes_count)
-                        VALUES (:id, :plan_id, :name, 'custom', 0)
-                    """),
-                    {
-                        "id": event_id,
-                        "plan_id": plan_id,
-                        "name": event.get("name", "Custom Event")
-                    }
-                )
-            
-            conn.commit()
-            return {"id": plan_id, "message": "Plan created successfully"}
+                print(f"✅ Plan inserted successfully")
+                
+                # Get real events from global APIs
+                print(f"🔍 Fetching events for {plan.topic} in {plan.zip_code}")
+                real_events = await location_service.get_places_by_zipcode(plan.zip_code, plan.topic)
+                print(f"📊 Found {len(real_events)} real events")
+                
+                # If no real events found, fall back to venue-based suggestions
+                if not real_events:
+                    print(f"No real events found for {plan.topic} in {plan.zip_code}, using venue suggestions")
+                    real_events = await location_service.get_places_by_zipcode(plan.zip_code, plan.topic)
+                    print(f"📊 After fallback: {len(real_events)} events")
+                
+                # 15 minutes is plenty of time to swipe through 20+ events
+                # All group sizes get 20+ events for maximum choice and variety
+                if len(real_events) >= 25:
+                    # Take top 20 events for optimal variety
+                    real_events = real_events[:25]
+                elif len(real_events) >= 20:
+                    # If we have 20-24 events, take all
+                    real_events = real_events[:20]
+                elif len(real_events) >= 15:
+                    # If we have 15-19 events, take all
+                    real_events = real_events[:15]
+                else:
+                    # If very few events, take all available
+                    real_events = real_events[:len(real_events)]
+                
+                print(f"📊 Final event count: {len(real_events)}")
+                
+                for event in real_events:
+                    try:
+                        event_id = str(uuid.uuid4())
+                        print(f"💾 Saving event: {event.get('name', 'Unknown')}")
+                        
+                        # Create metadata with all the event details
+                        metadata = {
+                            'venue': event.get('venue', ''),
+                            'address': event.get('address', ''),
+                            'city': event.get('city', ''),
+                            'state': event.get('state', ''),
+                            'zip_code': event.get('zip_code', ''),
+                            'price': event.get('price', ''),
+                            'category': event.get('category', ''),
+                            'source': event.get('source', ''),
+                            'external_id': event.get('external_id', ''),
+                            'external_url': event.get('external_url', ''),
+                            'organizer': event.get('organizer', ''),
+                            'attendees_count': event.get('attendees_count'),
+                            'max_attendees': event.get('max_attendees'),
+                            'is_free': event.get('is_free', False),
+                            'is_featured': event.get('is_featured', False),
+                            'phone': event.get('phone'),
+                            'email': event.get('email'),
+                            'hours': event.get('hours'),
+                            'description': event.get('description', ''),
+                            'image_url': event.get('image_url')
+                        }
+                        
+                        print(f"📝 Event data: {event.get('name')} - {event.get('source', 'unknown')}")
+                        
+                        conn.execute(
+                            text("""
+                                INSERT INTO events (id, plan_id, name, image, hours, source_type, votes_count, metadata)
+                                VALUES (:id, :plan_id, :name, :image, :hours, :source_type, 0, :metadata)
+                            """),
+                            {
+                                "id": event_id,
+                                "plan_id": plan_id,
+                                "name": event["name"],
+                                "image": event.get("image_url") or event.get("image"),
+                                "hours": (event.get("hours", "Hours not available"))[:100],  # Truncate to 100 chars
+                                "source_type": event.get("source_type") or event.get("source", "custom"),
+                                "metadata": json.dumps(metadata)
+                            }
+                        )
+                        print(f"✅ Event saved: {event.get('name')}")
+                    except Exception as e:
+                        print(f"❌ Error saving event {event.get('name', 'Unknown')}: {e}")
+                        raise e
+                
+                for event in plan.custom_events[:2]:  # Limit to 2 custom events max
+                    event_id = str(uuid.uuid4())
+                    conn.execute(
+                        text("""
+                            INSERT INTO events (id, plan_id, name, source_type, votes_count)
+                            VALUES (:id, :plan_id, :name, 'custom', 0)
+                        """),
+                        {
+                            "id": event_id,
+                            "plan_id": plan_id,
+                            "name": event.get("name", "Custom Event")
+                        }
+                    )
+                
+                print(f"💾 Committing transaction...")
+                conn.commit()
+                print(f"✅ Transaction committed successfully")
+                return {"id": plan_id, "message": "Plan created successfully"}
+                
+            except Exception as e:
+                print(f"❌ Error in transaction: {e}")
+                conn.rollback()
+                raise e
+                
     except Exception as e:
+        print(f"❌ Error creating plan: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/plans/{plan_id}/events")
@@ -313,21 +308,46 @@ def get_events_for_plan(plan_id: str):
             events = []
             for row in events_result:
                 metadata = {}
-                if row[6] and row[6] != 'null' and row[6] != 'None':
+                print(f"🔍 Row data: {row}")
+                print(f"🔍 Row metadata: {row[6]} (type: {type(row[6])})")
+                if row[6] and row[6] != '{}':
                     try:
-                        metadata = json.loads(row[6])
-                    except (json.JSONDecodeError, TypeError):
+                        if isinstance(row[6], str):
+                            metadata = json.loads(row[6])
+                        else:
+                            metadata = row[6]  # Already a dict if it's JSONB
+                        print(f"✅ Parsed metadata: {metadata}")
+                    except (json.JSONDecodeError, TypeError) as e:
                         metadata = {}
+                        print(f"❌ JSON error: {e}")
+                else:
+                    print(f"⚠️ Empty metadata")
                 
-                events.append({
+                # Format the event data for frontend
+                event_data = {
                     "id": row[0],
                     "name": row[1],
-                    "image": row[2],
-                    "hours": row[3],
+                    "image": row[2] or metadata.get('image_url'),
+                    "hours": row[3] or metadata.get('hours', 'Hours not available'),
                     "source_type": row[4],
                     "votes_count": row[5] or 0,
-                    "metadata": metadata
-                })
+                    "metadata": metadata,
+                    # Include contact info and other details for frontend
+                    "venue": metadata.get('venue', ''),
+                    "address": metadata.get('address', ''),
+                    "city": metadata.get('city', ''),
+                    "state": metadata.get('state', ''),
+                    "zip_code": metadata.get('zip_code', ''),
+                    "price": metadata.get('price', ''),
+                    "category": metadata.get('category', ''),
+                    "phone": metadata.get('phone'),
+                    "email": metadata.get('email'),
+                    "description": metadata.get('description', ''),
+                    "organizer": metadata.get('organizer', ''),
+                    "external_url": metadata.get('external_url')
+                }
+                
+                events.append(event_data)
             
             return {"events": events}
     except Exception as e:
