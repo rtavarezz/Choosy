@@ -4,9 +4,10 @@ Authentication, personalized recommendations, and gamification features
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import Optional, List, Dict
 import json
+import re
 
 from core.auth_system import AuthSystem
 from engines.ai_recommendation_engine import AIRecommendationEngine
@@ -19,15 +20,54 @@ auth_system = AuthSystem()
 ai_engine = AIRecommendationEngine()
 gamification_engine = GamificationEngine()
 
-# Pydantic models
+# Pydantic models with validation
 class UserRegistration(BaseModel):
     phone: str
     name: str
-    email: Optional[str] = None
+    email: str
     avatar_url: Optional[str] = None
+
+    @validator('phone')
+    def validate_phone(cls, v):
+        # Remove all non-digit characters
+        digits_only = re.sub(r'\D', '', v)
+        if len(digits_only) < 10:
+            raise ValueError('Phone number must have at least 10 digits')
+        return digits_only
+
+    @validator('name')
+    def validate_name(cls, v):
+        if len(v.strip()) < 2:
+            raise ValueError('Name must be at least 2 characters long')
+        return v.strip()
+
+    @validator('email')
+    def validate_email(cls, v):
+        # Simple email validation regex
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, v):
+            raise ValueError('Please enter a valid email address')
+        return v.lower().strip()
 
 class UserLogin(BaseModel):
     phone: str
+    email: str
+
+    @validator('phone')
+    def validate_phone(cls, v):
+        # Remove all non-digit characters
+        digits_only = re.sub(r'\D', '', v)
+        if len(digits_only) < 10:
+            raise ValueError('Phone number must have at least 10 digits')
+        return digits_only
+
+    @validator('email')
+    def validate_email(cls, v):
+        # Simple email validation regex
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, v):
+            raise ValueError('Please enter a valid email address')
+        return v.lower().strip()
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -53,6 +93,24 @@ async def get_current_user(authorization: str = Header(None)):
     
     return user_id
 
+@router.get("/check-availability")
+async def check_availability(phone: Optional[str] = None, email: Optional[str] = None):
+    """Check if phone number or email is available for registration"""
+    if not phone and not email:
+        raise HTTPException(status_code=400, detail="Please provide either phone or email to check")
+    
+    result = await auth_system.check_availability(phone=phone, email=email)
+    
+    if result['success']:
+        return {
+            "success": True,
+            "phone_available": result.get('phone_available', True),
+            "email_available": result.get('email_available', True),
+            "message": result['message']
+        }
+    else:
+        raise HTTPException(status_code=500, detail=result['message'])
+
 @router.post("/register")
 async def register_user(user_data: UserRegistration):
     """Register a new user account"""
@@ -74,8 +132,8 @@ async def register_user(user_data: UserRegistration):
 
 @router.post("/login")
 async def login_user(login_data: UserLogin):
-    """Login user with phone number"""
-    result = await auth_system.login_user(login_data.phone)
+    """Login user with phone number and email verification"""
+    result = await auth_system.login_user_with_email(login_data.phone, login_data.email)
     
     if result['success']:
         return {

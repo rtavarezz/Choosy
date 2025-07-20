@@ -471,7 +471,7 @@ class LocationService:
             
             # Use the global event API to get real events
             try:
-                from global_event_apis import GlobalEventAPI
+                from services.global_event_apis import GlobalEventAPI
                 global_event_api = GlobalEventAPI()
                 events = await global_event_api.get_events_for_location(
                     lat=lat, 

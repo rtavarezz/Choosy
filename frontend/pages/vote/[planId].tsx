@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import TinderCard from 'react-tinder-card';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useDarkMode } from '../../lib/darkMode';
 
 // Topic-specific image collections
 const TOPIC_IMAGES = {
@@ -100,6 +101,7 @@ const DEFAULT_IMAGES = [
 
 export default function VotePage() {
   const router = useRouter();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { planId, topic, groupSize, zip } = router.query;
   
   // Get planId from URL path if not in query
@@ -319,10 +321,18 @@ export default function VotePage() {
 
   // Check if all voters have completed - only when authenticated
   useEffect(() => {
+    // For solo sessions, immediately mark as completed when the user finishes
+    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+    if (groupSizeStr === 'solo' && isAuthenticated && !showLogin && currentIndex >= events.length && events.length > 0) {
+      setAllVotersCompleted(true);
+      return;
+    }
+    
+    // For group sessions, wait for all expected voters
     if (isAuthenticated && !showLogin && completedVoters >= expectedVoters) {
       setAllVotersCompleted(true);
     }
-  }, [completedVoters, expectedVoters, isAuthenticated, showLogin]);
+  }, [completedVoters, expectedVoters, isAuthenticated, showLogin, currentIndex, events.length, groupSize]);
 
   // Live refresh to check for new completed voters
   useEffect(() => {
@@ -447,6 +457,12 @@ export default function VotePage() {
         localStorage.setItem(voterCompletedKey, 'true');
         
         console.log(`✅ Voter ${voterId} completed all events. Total completed: ${newCompleted}`);
+        
+        // For solo sessions, immediately mark as all voters completed
+        const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+        if (groupSizeStr === 'solo') {
+          setAllVotersCompleted(true);
+        }
       } else {
         console.log(`⚠️ Voter ${voterId} already marked as completed`);
       }
@@ -953,7 +969,39 @@ export default function VotePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-100 to-blue-100 flex flex-col items-center justify-center px-4 py-8">
+    <div className="relative min-h-screen bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
+      {/* Header */}
+      <header className="flex justify-between items-center p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.push('/')}
+            className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+          >
+            ← Back
+          </button>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Vote on Events</h1>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            {formatTime(timeLeft)}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            {completedVoters}/{expectedVoters} voted
+          </div>
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-lg bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm hover:bg-white/30 dark:hover:bg-gray-600/50 transition-colors"
+          >
+            {isDarkMode ? (
+              <span className="text-yellow-400 text-xl">☀️</span>
+            ) : (
+              <span className="text-gray-700 text-xl">🌙</span>
+            )}
+          </button>
+        </div>
+      </header>
+
       {/* Demo banner */}
       {actualPlanId === 'demo' && (
         <div className="text-center mb-6">
@@ -964,141 +1012,125 @@ export default function VotePage() {
         </div>
       )}
 
-      {/* Header with timer and voter progress */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Vote on Events</h1>
-        <p className="text-gray-600 mb-4">
-          {(Array.isArray(topic) ? topic[0] : topic)} • {(Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' ? 'Solo' : (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'date' ? 'Date or Friend Night' : 'Group'} • {Array.isArray(zip) ? zip[0] : zip}
-        </p>
-        
-        {/* Voter progress counter */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg mb-4">
-          <span className="text-lg font-bold">👥</span>
-          <span className="font-semibold">{completedVoters}/{expectedVoters} finished voting</span>
-          {allVotersCompleted && (
-            <span className="text-green-600 font-bold ml-2">🎉 All Done!</span>
-          )}
+      {/* Swipeable event cards */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+        <div className="relative w-full max-w-sm h-[500px]">
+          <AnimatePresence>
+            {currentIndex < events.length && (
+              <motion.div
+                key={events[currentIndex].id}
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -60 }}
+                transition={{ duration: 0.3 }}
+                className="absolute w-full"
+              >
+                <TinderCard
+                  onSwipe={(dir) => swiped(dir, events[currentIndex].id)}
+                  preventSwipe={['up', 'down']}
+                >
+                  <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden">
+                    {/* Event image with hours overlay */}
+                    <div className="relative h-48 bg-gradient-to-br from-purple-400 to-blue-500">
+                      <img 
+                        src={getTopicImage(currentIndex, events[currentIndex].topic)} 
+                        alt={events[currentIndex].name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-4 right-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold text-gray-900 dark:text-white">
+                        {events[currentIndex].isDemo ? 'Demo Hours' : events[currentIndex].hours}
+                      </div>
+                    </div>
+
+                    {/* Event details */}
+                    <div className="p-6">
+                      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{events[currentIndex].name}</h2>
+                      
+                      {/* Star rating */}
+                      <div className="flex items-center gap-2 mb-4">
+                        {events[currentIndex].isDemo ? (
+                          <span className="text-gray-400 dark:text-gray-500 text-sm">⭐ Demo Reviews</span>
+                        ) : (
+                          <>
+                            <span className="text-yellow-400">{renderStars(events[currentIndex].reviews.stars)}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">({events[currentIndex].reviews.count} reviews)</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Contact information */}
+                      <div className="space-y-2 mb-4">
+                        {events[currentIndex].isDemo ? (
+                          <div className="text-center py-4">
+                            <div className="text-gray-400 dark:text-gray-500 text-sm mb-2">🔒 Demo Mode</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Create a real plan to see contact info</div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                              <span className="w-4 h-4">📞</span>
+                              <span>{events[currentIndex].contact.phone}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                              <span className="w-4 h-4">✉️</span>
+                              <span>{events[currentIndex].contact.email}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+                </TinderCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Manual swipe buttons */}
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-4">
+            <button
+              onClick={() => handleManualSwipe('left')}
+              className="w-16 h-16 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all duration-200 transform hover:scale-110"
+            >
+              ❌
+            </button>
+            <button
+              onClick={() => handleManualSwipe('right')}
+              className="w-16 h-16 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all duration-200 transform hover:scale-110"
+            >
+              ✅
+            </button>
+          </div>
         </div>
-        
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg">
-          <span className="text-lg">⏰</span>
-          <span className="font-mono font-bold">{formatTime(timeLeft)} left</span>
+
+        {/* Instructions */}
+        <div className="text-center mt-6">
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
+            Swipe right to vote ✅ or left to skip ❌<br/>
+            Or use the buttons below!
+          </p>
         </div>
       </div>
 
-      {/* Swipeable event cards */}
-      <div className="relative w-full max-w-sm h-[500px]">
-        <AnimatePresence>
-          {currentIndex < events.length && (
-            <motion.div
-              key={events[currentIndex].id}
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -60 }}
-              transition={{ duration: 0.3 }}
-              className="absolute w-full"
-            >
-              <TinderCard
-                onSwipe={(dir) => swiped(dir, events[currentIndex].id)}
-                preventSwipe={['up', 'down']}
-              >
-                <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-                  {/* Event image with hours overlay */}
-                  <div className="relative h-48 bg-gradient-to-br from-purple-400 to-blue-500">
-                    <img 
-                      src={getTopicImage(currentIndex, events[currentIndex].topic)} 
-                      alt={events[currentIndex].name}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold">
-                      {events[currentIndex].isDemo ? 'Demo Hours' : events[currentIndex].hours}
-                    </div>
-                  </div>
-
-                  {/* Event details */}
-                  <div className="p-6">
-                    <h2 className="text-xl font-bold text-gray-900 mb-3">{events[currentIndex].name}</h2>
-                    
-                    {/* Star rating */}
-                    <div className="flex items-center gap-2 mb-4">
-                      {events[currentIndex].isDemo ? (
-                        <span className="text-gray-400 text-sm">⭐ Demo Reviews</span>
-                      ) : (
-                        <>
-                          <span className="text-yellow-400">{renderStars(events[currentIndex].reviews.stars)}</span>
-                          <span className="text-sm text-gray-600">({events[currentIndex].reviews.count} reviews)</span>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Contact information */}
-                    <div className="space-y-2 mb-4">
-                      {events[currentIndex].isDemo ? (
-                        <div className="text-center py-4">
-                          <div className="text-gray-400 text-sm mb-2">🔒 Demo Mode</div>
-                          <div className="text-xs text-gray-500">Create a real plan to see contact info</div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span className="w-4 h-4">📞</span>
-                            <span>{events[currentIndex].contact.phone}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span className="w-4 h-4">✉️</span>
-                            <span>{events[currentIndex].contact.email}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                  </div>
-                </div>
-              </TinderCard>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Completion state - only show after user has authenticated and completed voting */}
-        {currentIndex >= events.length && events.length > 0 && isAuthenticated && !showLogin && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mt-8"
-          >
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
-              {actualPlanId === 'demo' ? (
-                <>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 Demo Complete!</h3>
-                  <p className="text-gray-600 mb-4">You've seen how Choosy works. Ready to create a real plan?</p>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => router.push('/create')}
-                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
-                    >
-                      Create Real Plan
-                    </button>
-                    <button
-                      onClick={() => {
-                        const winningEvent = getWinningEvent();
-                        const params = new URLSearchParams({
-                          topic: Array.isArray(topic) ? topic[0] : topic || '',
-                          groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
-                          zip: Array.isArray(zip) ? zip[0] : zip || '',
-                          winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
-                        });
-                        window.location.href = `/results/${actualPlanId}?${params.toString()}`;
-                      }}
-                      className="w-full bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-300 transition-all duration-200"
-                    >
-                      See Demo Results
-                    </button>
-                  </div>
-                </>
-              ) : allVotersCompleted ? (
-                <>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 All Votes In!</h3>
-                  <p className="text-gray-600 mb-4">Everyone has finished voting. Check the results!</p>
+      {/* Completion state - only show after user has authenticated and completed voting */}
+      {currentIndex >= events.length && events.length > 0 && isAuthenticated && !showLogin && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mt-8"
+        >
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
+            {actualPlanId === 'demo' ? (
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 Demo Complete!</h3>
+                <p className="text-gray-600 mb-4">You've seen how Choosy works. Ready to create a real plan?</p>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => router.push('/create')}
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                  >
+                    Create Real Plan
+                  </button>
                   <button
                     onClick={() => {
                       const winningEvent = getWinningEvent();
@@ -1110,50 +1142,79 @@ export default function VotePage() {
                       });
                       window.location.href = `/results/${actualPlanId}?${params.toString()}`;
                     }}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                    className="w-full bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-300 transition-all duration-200"
                   >
-                    See Results
+                    See Demo Results
                   </button>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
-                  <p className="text-gray-600 mb-4">Thanks for voting! Waiting for others to finish...</p>
-                  <div className="text-sm text-gray-500">
-                    <p>{completedVoters}/{expectedVoters} people have finished voting</p>
-                    <p className="mt-2">Results will be available when everyone is done!</p>
-                  </div>
-                </>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </div>
-
-      {/* Manual control buttons */}
-      {currentIndex < events.length && (
-        <div className="mt-8 flex items-center justify-center gap-4">
-          {/* Manual swipe buttons */}
-          <button
-            onClick={() => handleManualSwipe('left')}
-            className="w-16 h-16 bg-red-500 hover:bg-red-600 text-white text-3xl font-bold rounded-full shadow-lg hover:scale-110 transition-all duration-200 flex items-center justify-center"
-          >
-            ✕
-          </button>
-          <button
-            onClick={() => handleManualSwipe('right')}
-            className="w-16 h-16 bg-green-500 hover:bg-green-600 text-white text-3xl font-bold rounded-full shadow-lg hover:scale-110 transition-all duration-200 flex items-center justify-center"
-          >
-            ✓
-          </button>
-        </div>
+                </div>
+              </>
+            ) : allVotersCompleted ? (
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 All Votes In!</h3>
+                <p className="text-gray-600 mb-4">Everyone has finished voting. Check the results!</p>
+                <button
+                  onClick={() => {
+                    const winningEvent = getWinningEvent();
+                    const params = new URLSearchParams({
+                      topic: Array.isArray(topic) ? topic[0] : topic || '',
+                      groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
+                      zip: Array.isArray(zip) ? zip[0] : zip || '',
+                      winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
+                    });
+                    window.location.href = `/results/${actualPlanId}?${params.toString()}`;
+                  }}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                >
+                  See Results
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
+                <p className="text-gray-600 mb-4">
+                  {(() => {
+                    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+                    if (groupSizeStr === 'solo') {
+                      return "Thanks for voting! Here are your results:";
+                    }
+                    return "Thanks for voting! Waiting for others to finish...";
+                  })()}
+                </p>
+                <div className="text-sm text-gray-500">
+                  {(() => {
+                    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+                    if (groupSizeStr === 'solo') {
+                      return (
+                        <button
+                          onClick={() => {
+                            const winningEvent = getWinningEvent();
+                            const params = new URLSearchParams({
+                              topic: Array.isArray(topic) ? topic[0] : topic || '',
+                              groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
+                              zip: Array.isArray(zip) ? zip[0] : zip || '',
+                              winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
+                            });
+                            window.location.href = `/results/${actualPlanId}?${params.toString()}`;
+                          }}
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                        >
+                          See Results
+                        </button>
+                      );
+                    }
+                    return (
+                      <>
+                        <p>{completedVoters}/{expectedVoters} people have finished voting</p>
+                        <p className="mt-2">Results will be available when everyone is done!</p>
+                      </>
+                    );
+                  })()}
+                </div>
+              </>
+            )}
+          </div>
+        </motion.div>
       )}
-
-      {/* Instructions */}
-      <div className="mt-6 text-center text-sm text-gray-500">
-        <p>Swipe right to vote ✅ or left to skip ❌</p>
-        <p className="mt-1">Or use the buttons below!</p>
-      </div>
     </div>
   );
 } 

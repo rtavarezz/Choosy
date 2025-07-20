@@ -306,26 +306,16 @@ async def create_plan(plan: PlanCreate):
                 real_events = await location_service.get_places_by_zipcode(plan.zip_code, plan.topic)
                 print(f"📊 Found {len(real_events)} real events")
                 
-                # If no real events found, fall back to venue-based suggestions
+                # If no real events found, try venue-based suggestions as fallback
                 if not real_events:
-                    print(f"No real events found for {plan.topic} in {plan.zip_code}, using venue suggestions")
-                    real_events = await location_service.get_places_by_zipcode(plan.zip_code, plan.topic)
-                    print(f"📊 After fallback: {len(real_events)} events")
-                
-                # 15 minutes is plenty of time to swipe through 20+ events
-                # All group sizes get 20+ events for maximum choice and variety
-                if len(real_events) >= 25:
-                    # Take top 20 events for optimal variety
-                    real_events = real_events[:25]
-                elif len(real_events) >= 20:
-                    # If we have 20-24 events, take all
-                    real_events = real_events[:20]
-                elif len(real_events) >= 15:
-                    # If we have 15-19 events, take all
-                    real_events = real_events[:15]
-                else:
-                    # If very few events, take all available
-                    real_events = real_events[:len(real_events)]
+                    print(f"No real events found for {plan.topic} in {plan.zip_code}, using venue suggestions as fallback")
+                    # Try with a broader category or different approach
+                    fallback_events = await location_service.get_places_by_zipcode(plan.zip_code, 'foodie')  # Use foodie as fallback
+                    if fallback_events:
+                        real_events = fallback_events
+                        print(f"📊 After fallback: {len(real_events)} events")
+                    else:
+                        print(f"📊 No fallback events found either")
                 
                 print(f"📊 Final event count: {len(real_events)}")
                 

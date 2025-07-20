@@ -38,12 +38,20 @@ class AuthSystem:
             conn = self.get_connection()
             cur = conn.cursor()
             
-            # Check if user already exists
+            # Check if user already exists with this phone number
             cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
             if cur.fetchone():
                 cur.close()
                 conn.close()
-                return {'success': False, 'message': 'User already exists with this phone number'}
+                return {'success': False, 'message': 'A user with this phone number already exists. Please use a different phone number or try logging in.'}
+            
+            # Check if user already exists with this email (if email provided)
+            if email:
+                cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+                if cur.fetchone():
+                    cur.close()
+                    conn.close()
+                    return {'success': False, 'message': 'A user with this email address already exists. Please use a different email or try logging in.'}
             
             # Create new user
             cur.execute("""
@@ -83,9 +91,18 @@ class AuthSystem:
                 'message': 'User registered successfully'
             }
             
+        except psycopg2.IntegrityError as e:
+            # Handle database constraint violations
+            error_msg = str(e)
+            if "users_phone_key" in error_msg:
+                return {'success': False, 'message': 'A user with this phone number already exists. Please use a different phone number or try logging in.'}
+            elif "users_email_key" in error_msg:
+                return {'success': False, 'message': 'A user with this email address already exists. Please use a different email or try logging in.'}
+            else:
+                return {'success': False, 'message': 'Registration failed due to invalid data'}
         except Exception as e:
             print(f"Error registering user: {e}")
-            return {'success': False, 'message': 'Registration failed'}
+            return {'success': False, 'message': 'Registration failed. Please try again.'}
     
     async def login_user(self, phone: str) -> Dict:
         """
@@ -150,6 +167,70 @@ class AuthSystem:
         except Exception as e:
             print(f"Error logging in user: {e}")
             return {'success': False, 'message': 'Login failed'}
+
+    async def login_user_with_email(self, phone: str, email: str) -> Dict:
+        """
+        Login a user with phone number and email verification
+        Returns: {'success': bool, 'session_token': str, 'user_data': Dict, 'message': str}
+        """
+        try:
+            conn = self.get_connection()
+            cur = conn.cursor()
+            
+            # Get user data with both phone and email verification
+            cur.execute("""
+                SELECT id, name, email, avatar_url, preferences, gamification, last_active
+                FROM users WHERE phone = %s AND email = %s
+            """, (phone, email))
+            
+            result = cur.fetchone()
+            if not result:
+                cur.close()
+                conn.close()
+                return {'success': False, 'message': 'Invalid phone number or email. Please check your credentials and try again.'}
+            
+            user_id, name, user_email, avatar_url, preferences, gamification, last_active = result
+            
+            # Generate session token
+            session_token = self._generate_session_token()
+            expires_at = datetime.now() + self.session_duration
+            
+            # Create session
+            cur.execute("""
+                INSERT INTO user_sessions (user_id, session_token, expires_at)
+                VALUES (%s, %s, %s)
+            """, (user_id, session_token, expires_at))
+            
+            # Update last active
+            cur.execute("""
+                UPDATE users SET last_active = NOW() WHERE id = %s
+            """, (user_id,))
+            
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            user_data = {
+                'id': str(user_id),
+                'name': name,
+                'phone': phone,
+                'email': user_email,
+                'avatar_url': avatar_url,
+                'preferences': preferences or {},
+                'gamification': gamification or {},
+                'last_active': last_active.isoformat() if last_active else None
+            }
+            
+            return {
+                'success': True,
+                'session_token': session_token,
+                'user_data': user_data,
+                'message': 'Login successful'
+            }
+            
+        except Exception as e:
+            print(f"Error logging in user: {e}")
+            return {'success': False, 'message': 'Login failed. Please try again.'}
     
     async def validate_session(self, session_token: str) -> Optional[str]:
         """
@@ -313,6 +394,44 @@ class AuthSystem:
             print(f"Error deleting user: {e}")
             return False
     
+    async def check_availability(self, phone: str = None, email: str = None) -> Dict:
+        """
+        Check if phone number or email is available for registration
+        Returns: {'success': bool, 'phone_available': bool, 'email_available': bool, 'message': str}
+        """
+        try:
+            conn = self.get_connection()
+            cur = conn.cursor()
+            
+            phone_available = True
+            email_available = True
+            
+            # Check phone availability
+            if phone:
+                cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
+                if cur.fetchone():
+                    phone_available = False
+            
+            # Check email availability
+            if email:
+                cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+                if cur.fetchone():
+                    email_available = False
+            
+            cur.close()
+            conn.close()
+            
+            return {
+                'success': True,
+                'phone_available': phone_available,
+                'email_available': email_available,
+                'message': 'Availability check completed'
+            }
+            
+        except Exception as e:
+            print(f"Error checking availability: {e}")
+            return {'success': False, 'message': 'Availability check failed'}
+
     def _generate_session_token(self) -> str:
         """Generate a secure session token"""
         return secrets.token_urlsafe(32)

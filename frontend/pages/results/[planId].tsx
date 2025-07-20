@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { useDarkMode } from '../../lib/darkMode';
 
 // Topic-specific image collections (same as vote page)
 const TOPIC_IMAGES = {
@@ -106,6 +107,7 @@ const MOCK_FRIENDS = {
 
 export default function ResultsPage() {
   const router = useRouter();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { planId, topic, groupSize, zip, winningEvent: winningEventParam } = router.query;
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -136,8 +138,8 @@ export default function ResultsPage() {
           const voterCount = groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5;
           if (newCompletedCount >= voterCount) {
             setAllVotersCompleted(true);
-            // Reload results when all voters complete
-            window.location.reload();
+            // Don't reload the page - just update the state
+            // The results will be displayed automatically
           }
         }
       }
@@ -185,7 +187,11 @@ export default function ResultsPage() {
         // Check if all voters have completed
         // For "Choose for me" flow, if we have a winning event in URL, bypass the voting check
         const hasWinningEventInUrl = parsedWinningEvent && Object.keys(parsedWinningEvent).length > 0;
-        const allCompleted = hasWinningEventInUrl || completedVotersCount >= voterCount;
+        
+        // For solo sessions, always mark as completed
+        const isSoloSession = groupSizeStr === 'solo';
+        
+        const allCompleted = hasWinningEventInUrl || isSoloSession || completedVotersCount >= voterCount;
         setAllVotersCompleted(allCompleted);
         
         // For real plans, get results from backend API
@@ -425,22 +431,40 @@ export default function ResultsPage() {
         <title>Voting Results - Choosy</title>
         <meta name="description" content="See the results of your group voting" />
       </Head>
-      <div className="min-h-screen bg-gradient-to-br from-violet-100 to-blue-100 flex flex-col items-center justify-center px-4 py-8">
+      
+      {/* Header */}
+      <header className="flex justify-between items-center p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.push('/')}
+            className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+          >
+            ← Back to Home
+          </button>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Voting Results</h1>
+        </div>
+        
+        <button
+          onClick={toggleDarkMode}
+          className="p-2 rounded-lg bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm hover:bg-white/30 dark:hover:bg-gray-600/50 transition-colors"
+        >
+          {isDarkMode ? (
+            <span className="text-yellow-400 text-xl">☀️</span>
+          ) : (
+            <span className="text-gray-700 text-xl">🌙</span>
+          )}
+        </button>
+      </header>
+      
+      <div className="relative min-h-screen bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {results.allVotersCompleted ? '🎉 Voting Complete!' : '⏳ Still Waiting...'}
-            </h1>
-            <p className="text-gray-600">
-              {results.topic === 'datenight' ? 'Date Night' : results.topic} • {results.groupSize === 'solo' ? 'Solo' : results.groupSize === 'date' ? 'Date or Friend Night' : 'Group'} • {results.zip}
-            </p>
-            
-            {/* Voter progress */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg mt-4">
-              <span className="text-lg font-bold">👥</span>
-              <span className="font-semibold">{results.completedVoters}/{results.expectedVoters} finished voting</span>
-            </div>
+          {/* Voter progress */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full shadow-lg mb-4">
+            <span className="text-lg font-bold">👥</span>
+            <span className="font-semibold text-gray-900 dark:text-white">{completedVoters}/{expectedVoters} finished voting</span>
+            {allVotersCompleted && (
+              <span className="text-green-600 dark:text-green-400 font-bold ml-2">🎉 All Done!</span>
+            )}
           </div>
 
           {/* Waiting for all voters */}
@@ -453,7 +477,13 @@ export default function ResultsPage() {
                   {results.completedVoters} out of {results.expectedVoters} people have finished voting.
                 </p>
                 <p className="text-sm text-gray-500">
-                  Results will be available when everyone is done!
+                  {(() => {
+                    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+                    if (groupSizeStr === 'solo') {
+                      return "This is a solo session - you should see results immediately!";
+                    }
+                    return "Results will be available when everyone is done!";
+                  })()}
                 </p>
                 <button
                   onClick={() => router.push(`/vote/${planId}?topic=${results.topic}&groupSize=${results.groupSize}&zip=${results.zip}`)}
