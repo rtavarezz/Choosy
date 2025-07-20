@@ -1,13 +1,71 @@
 -- Choosy Database Schema
 -- This file contains all table definitions for the application
 
--- Users table
+-- Users table (Enhanced for multi-million dollar features)
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phone TEXT UNIQUE NOT NULL CHECK (phone ~ '^\+?[1-9]\d{1,14}$'), -- Phone number validation
   name TEXT NOT NULL CHECK (length(name) >= 1 AND length(name) <= 100), -- Name validation
+  email TEXT UNIQUE CHECK (email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'), -- Email validation
+  avatar_url TEXT CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'), -- Avatar URL validation
+  preferences JSONB DEFAULT '{}', -- User preferences (categories, price ranges, etc.)
+  ai_profile JSONB DEFAULT '{}', -- AI learning profile (event patterns, preferences)
+  gamification JSONB DEFAULT '{"points": 0, "level": 1, "streak": 0, "achievements": []}', -- Gamification data
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User Preferences table (for AI learning)
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (category IN ('concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 'racing', 'swimming', 'drinks', 'movies', 'comedy', 'art', 'shopping', 'wellness', 'adventure', 'family')),
+  preference_score FLOAT DEFAULT 0.5 CHECK (preference_score >= 0 AND preference_score <= 1), -- 0 = dislike, 1 = love
+  interaction_count INTEGER DEFAULT 0 CHECK (interaction_count >= 0), -- How many times they've interacted with this category
+  last_interaction TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, category)
+);
+
+-- User Event History (for AI learning)
+CREATE TABLE IF NOT EXISTS user_event_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+  interaction_type TEXT NOT NULL CHECK (interaction_type IN ('viewed', 'liked', 'disliked', 'voted', 'attended', 'shared')),
+  interaction_data JSONB DEFAULT '{}', -- Additional interaction data
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- AI Learning Profiles (for personalized recommendations)
+CREATE TABLE IF NOT EXISTS ai_user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  profile_data JSONB NOT NULL DEFAULT '{}', -- AI learning data
+  last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- Gamification Achievements
+CREATE TABLE IF NOT EXISTS user_achievements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  achievement_type TEXT NOT NULL CHECK (achievement_type IN ('first_plan', 'voter_streak', 'category_explorer', 'social_butterfly', 'adventure_seeker', 'foodie_master', 'nightlife_king', 'culture_vulture')),
+  achievement_data JSONB DEFAULT '{}', -- Achievement specific data
+  earned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, achievement_type)
+);
+
+-- User Sessions (for tracking engagement)
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  session_token TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Plans table
@@ -72,6 +130,17 @@ CREATE TABLE IF NOT EXISTS custom_events (
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_preferences_category ON user_preferences(category);
+CREATE INDEX IF NOT EXISTS idx_user_event_history_user_id ON user_event_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_event_history_event_id ON user_event_history(event_id);
+CREATE INDEX IF NOT EXISTS idx_user_event_history_interaction_type ON user_event_history(interaction_type);
+CREATE INDEX IF NOT EXISTS idx_ai_user_profiles_user_id ON ai_user_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_achievements_user_id ON user_achievements(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
 CREATE INDEX IF NOT EXISTS idx_plans_topic ON plans(topic);
 CREATE INDEX IF NOT EXISTS idx_plans_group_size ON plans(group_size);
 CREATE INDEX IF NOT EXISTS idx_plans_zip_code ON plans(zip_code);
@@ -95,4 +164,7 @@ END;
 $$ language 'plpgsql';
 
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 

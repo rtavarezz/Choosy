@@ -1,21 +1,35 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 import os
 import secrets
 import uuid
 import json
+import traceback
 
-# Import our location service
-from location_services import location_service
+# Import location service
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from services.location_services import location_service
+
+# Import user management features
+from core.user_endpoints import router as user_router
+
+# Import rate limiter
+from core.rate_limiter import rate_limiter, get_client_id
+
+# Import logger
+from utils.logger import logger, log_api_request, log_error
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
@@ -34,7 +48,7 @@ if not DATABASE_URL:
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-app = FastAPI(title="Choosy API", description="Secure API for Choosy app")
+app = FastAPI(title="Choosy API", description="API for Choosy group decision making app")
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,6 +57,95 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Request logging and rate limiting middleware
+@app.middleware("http")
+async def request_middleware(request: Request, call_next):
+    """Log requests and apply rate limiting"""
+    import time
+    
+    start_time = time.time()
+    
+    # Rate limiting
+    client_id = get_client_id(request)
+    allowed, info = rate_limiter.is_allowed(client_id)
+    
+    if not allowed:
+        logger.warning(f"Rate limit exceeded for {client_id}")
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": info["error"],
+                "message": info["message"],
+                "retry_after": info["retry_after"]
+            }
+        )
+    
+    # Process request
+    try:
+        response = await call_next(request)
+        duration = time.time() - start_time
+        
+        # Log successful request
+        log_api_request(
+            method=request.method,
+            url=str(request.url),
+            status_code=response.status_code,
+            duration=duration
+        )
+        
+        # Add rate limit headers
+        response.headers["X-RateLimit-Remaining-Minute"] = str(info["remaining_minute"])
+        response.headers["X-RateLimit-Remaining-Hour"] = str(info["remaining_hour"])
+        
+        return response
+        
+    except Exception as e:
+        duration = time.time() - start_time
+        log_error(e, f"Request {request.method} {request.url}", client_id)
+        raise
+
+# Include user endpoints
+app.include_router(user_router)
+
+# Global error handler - handles all unhandled exceptions
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Handle all unhandled exceptions gracefully"""
+    error_id = str(uuid.uuid4())
+    
+    # Log the error for debugging
+    print(f"❌ Error {error_id}: {str(exc)}")
+    print(f"📍 URL: {request.url}")
+    print(f"🔍 Method: {request.method}")
+    print(f"📄 Traceback: {traceback.format_exc()}")
+    
+    # Return user-friendly error
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Something went wrong",
+            "error_id": error_id,
+            "message": "We're working on fixing this. Please try again.",
+            "status": "error"
+        }
+    )
+
+# Database connection error handler
+@app.exception_handler(Exception)
+async def database_exception_handler(request: Request, exc: Exception):
+    """Handle database connection errors"""
+    if "connection" in str(exc).lower() or "database" in str(exc).lower():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "Database temporarily unavailable",
+                "message": "Please try again in a moment",
+                "status": "error"
+            }
+        )
+    raise exc
+
 class PlanCreate(BaseModel):
     topic: str
     group_size: str
@@ -50,6 +153,40 @@ class PlanCreate(BaseModel):
     host_name: str
     host_phone: str
     custom_events: Optional[List[dict]] = []
+    
+    # Input validation
+    @validator('topic')
+    def validate_topic(cls, v):
+        valid_topics = ['concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 'racing', 'swimming', 'drinks', 'movies', 'comedy', 'art', 'shopping', 'wellness', 'adventure', 'family']
+        if v not in valid_topics:
+            raise ValueError(f'Topic must be one of: {valid_topics}')
+        return v
+    
+    @validator('group_size')
+    def validate_group_size(cls, v):
+        valid_sizes = ['solo', 'date', 'friend', 'group']
+        if v not in valid_sizes:
+            raise ValueError(f'Group size must be one of: {valid_sizes}')
+        return v
+    
+    @validator('zip_code')
+    def validate_zip_code(cls, v):
+        if not v or len(v) < 3 or len(v) > 10:
+            raise ValueError('ZIP code must be 3-10 characters')
+        return v
+    
+    @validator('host_name')
+    def validate_host_name(cls, v):
+        if not v or len(v) < 1 or len(v) > 100:
+            raise ValueError('Host name must be 1-100 characters')
+        return v
+    
+    @validator('host_phone')
+    def validate_host_phone(cls, v):
+        import re
+        if not re.match(r'^\+?[1-9]\d{1,14}$', v):
+            raise ValueError('Invalid phone number format')
+        return v
 
 class VoteCreate(BaseModel):
     plan_id: str
@@ -102,7 +239,28 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 @app.get("/")
 def health():
-    return {"status": "ok", "message": "Choosy API is running"}
+    """Health check endpoint for monitoring"""
+    try:
+        # Test database connection
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        
+        return {
+            "status": "healthy",
+            "message": "Choosy API is running",
+            "timestamp": datetime.now().isoformat(),
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "message": "Database connection failed",
+                "timestamp": datetime.now().isoformat()
+            }
+        )
 
 @app.get("/test-db")
 def test_db():

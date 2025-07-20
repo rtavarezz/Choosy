@@ -4,7 +4,7 @@ import requests
 import os
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
-from geocoding_service import geocoding_service  # Import the new geocoding service
+from services.geocoding_service import geocoding_service 
 
 load_dotenv()
 
