@@ -25,7 +25,7 @@ class EventSource(Enum):
     PARTNER = "partner"
     LOCAL = "local" # Added for location-specific events
     TICKETMASTER = "ticketmaster"  # Added for Ticketmaster Discovery API (FREE)
-    OPENSTREETMAP = "osm"  # Changed from "openstreetmap" to "osm" to match DB constraint
+    OPENSTREETMAP = "google"  # Changed to "google" to match DB constraint
 
 @dataclass
 class GlobalEvent:
@@ -155,6 +155,12 @@ class GlobalEventAPI:
                 print(f"🎫 Ticketmaster (QUATERNARY): found {len(ticketmaster_events)} real events")
             except Exception as e:
                 print(f"Ticketmaster API error: {e}")
+        
+        # For adventure category, always include local adventure templates
+        if category == 'adventure':
+            local_adventure_events = self._create_location_specific_events(lat, lng, category)
+            events.extend(local_adventure_events)
+            print(f"🎯 Adventure: Added {len(local_adventure_events)} local adventure templates")
         
         # LAST RESORT: Only create location-specific events if NO real events found
         if not events:
@@ -588,94 +594,52 @@ class GlobalEventAPI:
         return unique_events
     
     def _rank_events_by_relevance(self, events: List[GlobalEvent], category: str) -> List[GlobalEvent]:
-        """Rank events by relevance score with balance of popular and niche for 20+ events"""
+        """Rank events by relevance to category and today's availability"""
+        
         def relevance_score(event: GlobalEvent) -> float:
             score = 0.0
             
-            # Partner events get priority
-            if event.source == EventSource.PARTNER:
-                score += 100
+            # Base score for category match
+            if category.lower() in event.name.lower():
+                score += 10.0
+            if category.lower() in event.description.lower():
+                score += 5.0
             
-            # Featured events get bonus
-            if event.is_featured:
-                score += 50
-            
-            # Balance popular vs niche events
-            if event.attendees_count:
-                # Popular events (high attendance) get moderate bonus
-                # But not too much to avoid overwhelming with only popular options
-                attendance_bonus = min(event.attendees_count / 200, 25)  # Cap at 25 points
-                score += attendance_bonus
-            
-            # Free events get slight bonus
-            if event.is_free:
-                score += 10
-            
-            # Events starting soon get bonus
+            # Bonus for events happening today (if we have time info)
             if event.start_time:
-                try:
-                    # Handle both string and datetime start_time
-                    if isinstance(event.start_time, str):
-                        from datetime import datetime
-                        start_dt = datetime.fromisoformat(event.start_time.replace('Z', '+00:00'))
-                    else:
-                        start_dt = event.start_time
-                    
-                    time_until = (start_dt - datetime.now()).total_seconds()
-                    if time_until > 0 and time_until < 86400:  # Next 24 hours
-                        score += 20
-                except Exception as e:
-                    # If we can't parse the time, just skip this bonus
-                    pass
+                today = datetime.now().date()
+                event_date = event.start_time.date() if hasattr(event.start_time, 'date') else event.start_time
+                if event_date == today:
+                    score += 20.0  # Big bonus for today's events!
+                elif event_date == today + timedelta(days=1):
+                    score += 10.0  # Bonus for tomorrow's events
+                elif event_date == today + timedelta(days=2):
+                    score += 5.0   # Small bonus for day after tomorrow
             
-            # Events with good descriptions get bonus
-            if event.description and len(event.description) > 50:
-                score += 5
+            # Bonus for free events
+            if event.is_free:
+                score += 3.0
             
-            # Events with images get bonus
+            # Bonus for featured events
+            if event.is_featured:
+                score += 5.0
+            
+            # Bonus for events with contact info (more actionable)
+            if event.metadata and event.metadata.get('phone'):
+                score += 2.0
+            
+            # Bonus for events with images
             if event.image_url:
-                score += 5
+                score += 1.0
             
-            # Events with complete venue info get bonus
-            if event.venue and event.address:
-                score += 5
+            # Penalty for events without descriptions
+            if not event.description or len(event.description) < 10:
+                score -= 2.0
             
             return score
         
-        # Sort by relevance score
-        sorted_events = sorted(events, key=relevance_score, reverse=True)
-        
-        # For 20+ events, ensure maximum variety
-        if len(sorted_events) > 20:
-            # Take top 15 by relevance score
-            top_events = sorted_events[:15]
-            
-            # Add diverse options from the rest to ensure variety
-            remaining_events = sorted_events[15:]
-            diverse_events = []
-            
-            # Add free events for variety
-            free_events = [e for e in remaining_events if e.is_free]
-            diverse_events.extend(free_events[:3])  # Up to 3 free events
-            
-            # Add events with good descriptions
-            descriptive_events = [e for e in remaining_events if e.description and len(e.description) > 100]
-            diverse_events.extend(descriptive_events[:2])  # Up to 2 descriptive events
-            
-            # Add events from different sources for variety
-            sources_used = {e.source for e in top_events}
-            different_source_events = [e for e in remaining_events if e.source not in sources_used]
-            diverse_events.extend(different_source_events[:3])  # Up to 3 different sources
-            
-            # Add some lower-ranked but unique events
-            unique_events = [e for e in remaining_events if e not in diverse_events]
-            diverse_events.extend(unique_events[:5])  # Up to 5 more unique events
-            
-            # Combine and return up to 25 events for maximum variety
-            final_events = top_events + diverse_events
-            return final_events[:25]  # Return up to 25 events
-        
-        return sorted_events
+        # Sort by relevance score (highest first)
+        return sorted(events, key=relevance_score, reverse=True)
     
     # Category mapping methods
     def _map_category_to_eventbrite_category(self, category: str) -> str:
@@ -694,7 +658,7 @@ class GlobalEventAPI:
             'art': '105',  # Performing & Visual Arts
             'shopping': '111',  # Fashion & Beauty
             'wellness': '108',  # Sports & Fitness
-            'adventure': '113',  # Outdoor & Adventure
+            'adventure': '105',  # Performing & Visual Arts (for escape rooms, VR, etc.)
             'family': '115',  # Family & Education
         }
         return mapping.get(category, '110')
@@ -1114,7 +1078,8 @@ class GlobalEventAPI:
             'swimming': ['swimming_pool', 'aquarium'],
             'drinks': ['bar', 'liquor_store'],
             'datenight': ['restaurant', 'entertainment'],
-            'racing': ['amusement_park', 'entertainment']
+            'racing': ['amusement_park', 'entertainment'],
+            'adventure': ['amusement_park', 'entertainment', 'museum', 'art_gallery', 'tourist_attraction', 'point_of_interest']
         }
         return mappings.get(category, ['establishment'])
     
@@ -1132,7 +1097,8 @@ class GlobalEventAPI:
             'swimming': [('leisure', 'swimming_pool'), ('amenity', 'aquarium')],
             'drinks': [('amenity', 'bar'), ('amenity', 'pub')],
             'datenight': [('amenity', 'restaurant'), ('amenity', 'entertainment')],
-            'racing': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment')]
+            'racing': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment')],
+            'adventure': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment'), ('tourism', 'museum'), ('tourism', 'gallery'), ('tourism', 'attraction'), ('amenity', 'escape_room')]
         }
         return mappings.get(category, [('amenity', 'entertainment')])
     
@@ -1223,6 +1189,58 @@ class GlobalEventAPI:
     def _get_local_event_templates(self, category: str, city_name: str) -> List[dict]:
         """Get realistic local event templates based on category and city"""
         templates = {
+            'adventure': [
+                {
+                    'name': f'{city_name} Escape Room Adventure',
+                    'venue': f'{city_name} Escape Rooms',
+                    'description': f'Test your wits in an immersive escape room experience! Solve puzzles, find clues, and escape before time runs out.',
+                    'image_url': 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
+                    'phone': '+1 (555) 123-4567',
+                    'email': f'book@{city_name.lower().replace(" ", "")}escape.com',
+                    'hours': '10:00 AM - 10:00 PM',
+                    'price': '$25-35'
+                },
+                {
+                    'name': f'{city_name} VR Gaming Center',
+                    'venue': f'{city_name} Virtual Reality Zone',
+                    'description': f'Step into another world with cutting-edge VR technology. Experience immersive games and adventures.',
+                    'image_url': 'https://images.unsplash.com/photo-1593508512255-86ab42a8e620?w=400&h=300&fit=crop',
+                    'phone': '+1 (555) 234-5678',
+                    'email': f'play@{city_name.lower().replace(" ", "")}vr.com',
+                    'hours': '11:00 AM - 11:00 PM',
+                    'price': '$20-40'
+                },
+                {
+                    'name': f'{city_name} Axe Throwing',
+                    'venue': f'{city_name} Axe House',
+                    'description': f'Channel your inner lumberjack! Learn to throw axes in a safe, controlled environment with expert instructors.',
+                    'image_url': 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
+                    'phone': '+1 (555) 345-6789',
+                    'email': f'throw@{city_name.lower().replace(" ", "")}axe.com',
+                    'hours': '12:00 PM - 10:00 PM',
+                    'price': '$30-45'
+                },
+                {
+                    'name': f'{city_name} Pop-Up Art Gallery',
+                    'venue': f'{city_name} Creative Space',
+                    'description': f'Discover emerging artists and unique installations at this pop-up gallery featuring local talent.',
+                    'image_url': 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=300&fit=crop',
+                    'phone': '+1 (555) 456-7890',
+                    'email': f'art@{city_name.lower().replace(" ", "")}gallery.com',
+                    'hours': '1:00 PM - 8:00 PM',
+                    'price': 'Free-$15'
+                },
+                {
+                    'name': f'{city_name} Street Fair & Food Trucks',
+                    'venue': f'{city_name} Downtown Streets',
+                    'description': f'Explore local vendors, food trucks, and live entertainment at this vibrant street fair happening today!',
+                    'image_url': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=300&fit=crop',
+                    'phone': '+1 (555) 567-8901',
+                    'email': f'fair@{city_name.lower().replace(" ", "")}events.com',
+                    'hours': '11:00 AM - 7:00 PM',
+                    'price': 'Free-$25'
+                }
+            ],
             'foodie': [
                 {
                     'name': f'{city_name} Food Festival',

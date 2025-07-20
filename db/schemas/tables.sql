@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS events (
   image TEXT CHECK (image IS NULL OR image ~ '^https?://'), -- URL validation
   hours TEXT CHECK (length(hours) <= 100), -- Hours validation
   contact JSONB CHECK (contact IS NULL OR jsonb_typeof(contact) = 'object'), -- JSON validation
-  source_type TEXT NOT NULL CHECK (source_type IN ('yelp', 'ticketmaster', 'custom', 'google', 'eventbrite', 'mock')), -- Source validation
+  source_type TEXT NOT NULL CHECK (source_type IN ('yelp', 'ticketmaster', 'custom', 'google', 'eventbrite', 'mock', 'local')), -- Source validation
   external_id TEXT, -- ID from external API
   votes_count INTEGER DEFAULT 0 CHECK (votes_count >= 0), -- Vote count validation
   metadata JSONB CHECK (metadata IS NULL OR jsonb_typeof(metadata) = 'object'), -- JSON validation

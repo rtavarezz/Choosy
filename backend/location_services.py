@@ -405,8 +405,8 @@ class LocationService:
                     'zip_code': zip_code,
                     'phone': phone,
                     'hours': hours,
-                    'source': 'osm',  # Changed from 'openstreetmap' to 'osm'
-                    'source_type': 'osm',  # Changed from 'openstreetmap' to 'osm'
+                    'source': 'google',  # Using google as the source type
+                    'source_type': 'google',  # Using google as the source type
                     'category': category,
                     'image_url': self._get_place_image(category),
                     'price': 'Varies',
@@ -450,7 +450,7 @@ class LocationService:
                 'hours': place.get('hours', 'Hours not available'),
                 'contact': place.get('contact', {}),
                 'reviews': place.get('reviews', {'stars': 4.0, 'count': 0}),
-                'source_type': place.get('source_type', 'osm'),
+                'source_type': place.get('source_type', 'google'),
                 'metadata': place.get('metadata', {})
             }
             events.append(event)
