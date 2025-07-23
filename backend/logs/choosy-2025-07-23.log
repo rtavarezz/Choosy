@@ -1,0 +1,11 @@
+2025-07-23 03:19:26,702 - choosy - INFO - API GET http://localhost:8000/api/geocode?zipcode=10001 - 200 - 0.436s - User: anonymous
+2025-07-23 03:20:00,375 - choosy - INFO - API GET http://localhost:8000/api/geocode?lat=40.7484391&lng=-73.9940211 - 422 - 0.002s - User: anonymous
+2025-07-23 03:23:48,338 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?lat=40.76765284538041&lng=-73.98704799414155 - 200 - 0.692s - User: anonymous
+2025-07-23 03:25:16,652 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?zipcode=10019 - 200 - 0.311s - User: anonymous
+2025-07-23 03:26:24,372 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?lat=40.76764869070536&lng=-73.98713340867532 - 200 - 0.501s - User: anonymous
+2025-07-23 03:45:24,768 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?lat=40.76765455965286&lng=-73.98705271749006 - 200 - 0.602s - User: anonymous
+2025-07-23 03:52:32,616 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?lat=40.76764885363112&lng=-73.9870319098519 - 200 - 0.576s - User: anonymous
+2025-07-23 03:52:51,366 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?lat=40.7676555453182&lng=-73.98706063527052 - 200 - 0.449s - User: anonymous
+2025-07-23 03:53:25,645 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?zipcode=10019 - 200 - 0.339s - User: anonymous
+2025-07-23 03:55:26,666 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?lat=40.76765554648401&lng=-73.98706063947992 - 200 - 0.502s - User: anonymous
+2025-07-23 03:55:33,425 - choosy - INFO - API GET http://127.0.0.1:8000/api/geocode?zipcode=10019 - 200 - 0.386s - User: anonymous

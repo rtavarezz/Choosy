@@ -8,25 +8,28 @@ export default async function handler(
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { zipcode } = req.query;
-
-  if (!zipcode) {
-    return res.status(400).json({ message: 'Zipcode is required' });
-  }
+  const { zipcode, lat, lng } = req.query;
 
   try {
-    // Call the backend geocoding service
-    const response = await fetch(`http://localhost:8000/api/geocode?zipcode=${zipcode}`);
-    
+    let backendUrl = '';
+    if (lat && lng) {
+      // If lat/lng provided, call backend to get zipcode
+      backendUrl = `http://127.0.0.1:8000/api/geocode?lat=${lat}&lng=${lng}`;
+    } else if (zipcode) {
+      // If zipcode provided, call backend as before
+      backendUrl = `http://127.0.0.1:8000/api/geocode?zipcode=${zipcode}`;
+    } else {
+      return res.status(400).json({ message: 'Zipcode or lat/lng required' });
+    }
+
+    const response = await fetch(backendUrl);
     if (!response.ok) {
       throw new Error(`Backend geocoding failed: ${response.status}`);
     }
-
     const data = await response.json();
     res.status(200).json(data);
-    
   } catch (error) {
     console.error('Geocoding error:', error);
-    res.status(500).json({ message: 'Failed to geocode zipcode' });
+    res.status(500).json({ message: 'Failed to geocode' });
   }
 } 

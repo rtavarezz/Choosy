@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Depends, status, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
@@ -277,15 +277,24 @@ def test():
     return test_db()
 
 @app.get("/api/geocode")
-async def geocode_zipcode(zipcode: str):
-    """Convert zipcode to coordinates"""
+async def geocode_zipcode(zipcode: str = Query(None), lat: float = Query(None), lng: float = Query(None)):
+    """Convert zipcode to coordinates, or lat/lng to zipcode"""
     try:
-        coordinates = await geocoding_service.get_coordinates_from_zipcode(zipcode)
-        if coordinates:
-            lat, lng = coordinates
-            return {"lat": lat, "lng": lng}
+        if zipcode:
+            coordinates = await geocoding_service.get_coordinates_from_zipcode(zipcode)
+            if coordinates:
+                lat_val, lng_val = coordinates
+                return {"lat": lat_val, "lng": lng_val}
+            else:
+                raise HTTPException(status_code=404, detail="Could not geocode zipcode")
+        elif lat is not None and lng is not None:
+            zipcode_val = await geocoding_service.get_zipcode_from_coordinates(lat, lng)
+            if zipcode_val:
+                return {"zipcode": zipcode_val}
+            else:
+                raise HTTPException(status_code=404, detail="Could not reverse geocode coordinates")
         else:
-            raise HTTPException(status_code=404, detail="Could not geocode zipcode")
+            raise HTTPException(status_code=400, detail="Must provide either zipcode or lat/lng")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

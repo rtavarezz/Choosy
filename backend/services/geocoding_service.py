@@ -140,6 +140,33 @@ class GeocodingService:
             print(f"Google geocoding error: {e}")
             return None
     
+    async def get_zipcode_from_coordinates(self, lat: float, lng: float) -> Optional[str]:
+        """Reverse geocode lat/lng to zipcode using Nominatim (OpenStreetMap)"""
+        try:
+            url = "https://nominatim.openstreetmap.org/reverse"
+            params = {
+                'lat': lat,
+                'lon': lng,
+                'format': 'json',
+                'addressdetails': 1
+            }
+            headers = {
+                'User-Agent': 'ChoosyApp/1.0'
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        address = data.get('address', {})
+                        zipcode = address.get('postcode')
+                        if zipcode:
+                            print(f"📦 Reverse geocoded {lat},{lng} to {zipcode}")
+                            return zipcode
+            return None
+        except Exception as e:
+            print(f"Reverse geocoding error: {e}")
+            return None
+    
     def get_city_from_coordinates(self, lat: float, lng: float) -> str:
         """Get city name from coordinates (simplified)"""
         # This is a simplified version - in production you'd use reverse geocoding

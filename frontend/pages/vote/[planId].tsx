@@ -99,6 +99,13 @@ const DEFAULT_IMAGES = [
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop'
 ];
 
+// Dopamine/UX helpers
+const HOT_CARD_INDEX = 3; // Show Hot in Your Area after 3 swipes
+const SECRET_CARD_INDEX = 5; // Show Secret Card after 5 swipes
+const STREAK_KEY = 'choosy_swipe_streak';
+const LAST_SWIPE_DATE_KEY = 'choosy_last_swipe_date';
+const SECRET_UNLOCKED_KEY = 'choosy_secret_unlocked';
+
 export default function VotePage() {
   const router = useRouter();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
@@ -188,6 +195,26 @@ export default function VotePage() {
   const [voterId, setVoterId] = useState('');
   const [allVotersCompleted, setAllVotersCompleted] = useState(false);
   const [votingLimitReached, setVotingLimitReached] = useState(false);
+  const [deck, setDeck] = useState([]); // The swipe deck, including special cards
+  const [hotCardData, setHotCardData] = useState(null);
+  const [secretUnlocked, setSecretUnlocked] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [showSecretCard, setShowSecretCard] = useState(false);
+
+  // Handle secret card unlock
+  const handleUnlockSecret = () => {
+    setSecretUnlocked(true);
+    localStorage.setItem(SECRET_UNLOCKED_KEY, 'true');
+    setShowSecretCard(true);
+  };
+
+  // Feeling Lucky button handler
+  const handleFeelingLucky = () => {
+    if (deck.length > 0) {
+      const randomIdx = Math.floor(Math.random() * deck.length);
+      setCurrentIndex(randomIdx);
+    }
+  };
 
   // Function to get topic-specific image
   const getTopicImage = (eventIndex: number, eventTopic?: string) => {
@@ -196,28 +223,38 @@ export default function VotePage() {
     return images[eventIndex % images.length];
   };
 
-  // Load events from database
+  // Track daily streaks in localStorage
   useEffect(() => {
-    const fetchEvents = async () => {
-      // Wait for router to be ready and planId to be available
-      if (!router.isReady) {
-        console.log('Waiting for router to be ready');
-        return;
+    const today = new Date().toISOString().split('T')[0];
+    const lastSwipe = localStorage.getItem(LAST_SWIPE_DATE_KEY);
+    let newStreak = 1;
+    if (lastSwipe === today) {
+      newStreak = parseInt(localStorage.getItem(STREAK_KEY) || '1');
+    } else if (lastSwipe) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      if (lastSwipe === yesterday) {
+        newStreak = parseInt(localStorage.getItem(STREAK_KEY) || '1') + 1;
       }
-      
-      // If planId is undefined but we have query params, treat as demo
-      if (!actualPlanId || actualPlanId === 'undefined') {
-        console.log('PlanId is undefined, treating as demo mode');
-        // Handle as demo mode - show empty state
-        setEvents([]);
-        setExpectedVoters(1);
+    }
+    localStorage.setItem(LAST_SWIPE_DATE_KEY, today);
+    localStorage.setItem(STREAK_KEY, newStreak.toString());
+    setStreak(newStreak);
+  }, []);
+
+  // Load events and inject special cards
+  useEffect(() => {
+    if (!router.isReady) return;
+    const loadDeck = async () => {
+      let baseEvents = [];
+      // Wait for router to be ready and planId to be available
+      if (!actualPlanId || actualPlanId === 'undefined' || actualPlanId === 'demo') {
+        setDeck([]);
         return;
       }
       
       if (actualPlanId === 'demo') {
         // Handle demo mode - show empty state
-        setEvents([]);
-        setExpectedVoters(1);
+        setDeck([]);
         return;
       }
 
@@ -236,16 +273,11 @@ export default function VotePage() {
               email: event.email || 'N/A'
             }
           }));
-          setEvents(eventsWithDefaults);
-          
-          // Set expected voters based on group size from plan
-          const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-          const voterCount = groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5;
-          setExpectedVoters(voterCount);
+          baseEvents = eventsWithDefaults.map(event => ({ ...event, type: 'event' }));
         } else {
           console.error('Failed to fetch events:', response.status);
           // No fallback to mock events - show empty state
-          setEvents([]);
+          setDeck([]);
           const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
           const voterCount = groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5;
           setExpectedVoters(voterCount);
@@ -253,15 +285,37 @@ export default function VotePage() {
       } catch (error) {
         console.error('Error fetching events:', error);
         // No fallback to mock events - show empty state
-        setEvents([]);
+        setDeck([]);
         const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
         const voterCount = groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5;
         setExpectedVoters(voterCount);
       }
+      // Inject Hot in Your Area card after HOT_CARD_INDEX
+      let deckWithHot = [...baseEvents];
+      if (baseEvents.length > HOT_CARD_INDEX) {
+        // Fetch hot card data
+        let hotData = null;
+        try {
+          const zipStr = Array.isArray(zip) ? zip[0] : zip;
+          const hotRes = await fetch(`/api/hot-in-area?zip=${zipStr}`);
+          if (hotRes.ok) {
+            hotData = await hotRes.json();
+            setHotCardData(hotData);
+          }
+        } catch {}
+        deckWithHot.splice(HOT_CARD_INDEX, 0, { type: 'hot', ...hotData });
+      }
+      // Inject Secret Card after SECRET_CARD_INDEX
+      let deckWithSecret = [...deckWithHot];
+      const secretUnlocked = localStorage.getItem(SECRET_UNLOCKED_KEY) === 'true';
+      if (deckWithSecret.length > SECRET_CARD_INDEX && !secretUnlocked) {
+        deckWithSecret.splice(SECRET_CARD_INDEX, 0, { type: 'secret' });
+      }
+      setDeck(deckWithSecret);
     };
 
-    fetchEvents();
-  }, [router.isReady, actualPlanId, topic, groupSize]);
+    loadDeck();
+  }, [router.isReady, actualPlanId, topic, groupSize, zip]);
 
   // Load vote counts from localStorage
   useEffect(() => {
@@ -323,7 +377,7 @@ export default function VotePage() {
   useEffect(() => {
     // For solo sessions, immediately mark as completed when the user finishes
     const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-    if (groupSizeStr === 'solo' && isAuthenticated && !showLogin && currentIndex >= events.length && events.length > 0) {
+    if (groupSizeStr === 'solo' && isAuthenticated && !showLogin && currentIndex >= deck.length && deck.length > 0) {
       setAllVotersCompleted(true);
       return;
     }
@@ -332,7 +386,7 @@ export default function VotePage() {
     if (isAuthenticated && !showLogin && completedVoters >= expectedVoters) {
       setAllVotersCompleted(true);
     }
-  }, [completedVoters, expectedVoters, isAuthenticated, showLogin, currentIndex, events.length, groupSize]);
+  }, [completedVoters, expectedVoters, isAuthenticated, showLogin, currentIndex, deck.length, groupSize]);
 
   // Live refresh to check for new completed voters
   useEffect(() => {
@@ -353,7 +407,7 @@ export default function VotePage() {
   // Timer countdown - redirects to results when time expires OR all voters complete
   useEffect(() => {
     // Stop timer if this voter has completed all events or not authenticated
-    if (currentIndex >= events.length || !isAuthenticated || showLogin) {
+    if (currentIndex >= deck.length || !isAuthenticated || showLogin) {
       return;
     }
 
@@ -372,7 +426,7 @@ export default function VotePage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [actualPlanId, router, currentIndex, events.length, allVotersCompleted, isAuthenticated, showLogin]);
+  }, [actualPlanId, router, currentIndex, deck.length, allVotersCompleted, isAuthenticated, showLogin]);
 
   // Redirect to results when all voters have completed
   useEffect(() => {
@@ -439,7 +493,7 @@ export default function VotePage() {
     setCurrentIndex(prev => prev + 1);
     
     // Check if this voter has completed all events
-    if (currentIndex >= events.length - 1) {
+    if (currentIndex >= deck.length - 1) {
       // Always check backend voting status after last vote
       try {
         const response = await fetch(`http://127.0.0.1:8000/api/plans/${actualPlanId}/voting-status`);
@@ -464,16 +518,16 @@ export default function VotePage() {
       } catch (error) {
         console.error('Error checking backend voting status:', error);
       }
-      // For solo sessions, immediately mark as all voters completed
-      const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-      if (groupSizeStr === 'solo') {
-        setAllVotersCompleted(true);
+        // For solo sessions, immediately mark as all voters completed
+        const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+        if (groupSizeStr === 'solo') {
+          setAllVotersCompleted(true);
         console.log('✅ Redirecting to results for solo plan (local state)');
         window.location.href = `/results/${actualPlanId}`;
         setTimeout(() => {
           if (window.location.pathname !== `/results/${actualPlanId}`) {
             window.location.href = `/results/${actualPlanId}`;
-          }
+        }
         }, 1000);
         return;
       }
@@ -482,9 +536,11 @@ export default function VotePage() {
 
   // Manual swipe controls
   const handleManualSwipe = (dir) => {
-    if (currentIndex < events.length) {
-      const currentEvent = events[currentIndex];
-      swiped(dir, currentEvent.id);
+    if (currentIndex < deck.length) {
+      const currentCard = deck[currentIndex];
+      if (currentCard.type === 'event') {
+        swiped(dir, currentCard.id);
+      }
     }
   };
 
@@ -1027,51 +1083,52 @@ export default function VotePage() {
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <div className="relative w-full max-w-sm h-[500px]">
           <AnimatePresence>
-            {currentIndex < events.length && (
+            {currentIndex < deck.length && (
               <motion.div
-                key={events[currentIndex].id}
+                key={deck[currentIndex].type === 'event' ? deck[currentIndex].id : deck[currentIndex].type}
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -60 }}
                 transition={{ duration: 0.3 }}
                 className="absolute w-full"
               >
+                {deck[currentIndex].type === 'event' && (
                 <TinderCard
-                  onSwipe={(dir) => swiped(dir, events[currentIndex].id)}
+                    onSwipe={(dir) => swiped(dir, deck[currentIndex].id)}
                   preventSwipe={['up', 'down']}
                 >
                   <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden">
                     {/* Event image with hours overlay */}
                     <div className="relative h-48 bg-gradient-to-br from-purple-400 to-blue-500">
                       <img 
-                        src={getTopicImage(currentIndex, events[currentIndex].topic)} 
-                        alt={events[currentIndex].name}
+                          src={getTopicImage(currentIndex, deck[currentIndex].topic)} 
+                          alt={deck[currentIndex].name}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute top-4 right-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm font-semibold text-gray-900 dark:text-white">
-                        {events[currentIndex].isDemo ? 'Demo Hours' : events[currentIndex].hours}
+                          {deck[currentIndex].isDemo ? 'Demo Hours' : deck[currentIndex].hours}
                       </div>
                     </div>
 
                     {/* Event details */}
                     <div className="p-6">
-                      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{events[currentIndex].name}</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{deck[currentIndex].name}</h2>
                       
                       {/* Star rating */}
                       <div className="flex items-center gap-2 mb-4">
-                        {events[currentIndex].isDemo ? (
+                          {deck[currentIndex].isDemo ? (
                           <span className="text-gray-400 dark:text-gray-500 text-sm">⭐ Demo Reviews</span>
                         ) : (
                           <>
-                            <span className="text-yellow-400">{renderStars(events[currentIndex].reviews.stars)}</span>
-                            <span className="text-sm text-gray-600 dark:text-gray-400">({events[currentIndex].reviews.count} reviews)</span>
+                              <span className="text-yellow-400">{renderStars(deck[currentIndex].reviews.stars)}</span>
+                              <span className="text-sm text-gray-600 dark:text-gray-400">({deck[currentIndex].reviews.count} reviews)</span>
                           </>
                         )}
                       </div>
 
                       {/* Contact information */}
                       <div className="space-y-2 mb-4">
-                        {events[currentIndex].isDemo ? (
+                          {deck[currentIndex].isDemo ? (
                           <div className="text-center py-4">
                             <div className="text-gray-400 dark:text-gray-500 text-sm mb-2">🔒 Demo Mode</div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">Create a real plan to see contact info</div>
@@ -1080,11 +1137,11 @@ export default function VotePage() {
                           <>
                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                               <span className="w-4 h-4">📞</span>
-                              <span>{events[currentIndex].contact.phone}</span>
+                                <span>{deck[currentIndex].contact.phone}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                               <span className="w-4 h-4">✉️</span>
-                              <span>{events[currentIndex].contact.email}</span>
+                                <span>{deck[currentIndex].contact.email}</span>
                             </div>
                           </>
                         )}
@@ -1093,6 +1150,38 @@ export default function VotePage() {
                     </div>
                   </div>
                 </TinderCard>
+                )}
+                {deck[currentIndex].type === 'hot' && (
+                  <div className="bg-yellow-50 border-2 border-yellow-300 rounded-3xl shadow-2xl p-8 flex flex-col items-center justify-center h-full">
+                    <div className="text-5xl mb-4">🔥</div>
+                    <h2 className="text-2xl font-bold mb-2">Popular Near You</h2>
+                    {hotCardData && hotCardData.event ? (
+                      <>
+                        <div className="text-lg font-semibold mb-1">{hotCardData.event.name}</div>
+                        <div className="text-gray-700 mb-2">👥 Voted on by {hotCardData.event.votes} people in {zip}</div>
+                      </>
+                    ) : (
+                      <div className="text-gray-700 mb-2">💡 Try what locals are loving — a 2v2 soccer challenge</div>
+                    )}
+                  </div>
+                )}
+                {deck[currentIndex].type === 'secret' && (
+                  <div className="bg-gradient-to-br from-purple-200 to-blue-200 border-2 border-purple-400 rounded-3xl shadow-2xl p-8 flex flex-col items-center justify-center h-full cursor-pointer" onClick={handleUnlockSecret}>
+                    {!showSecretCard ? (
+                      <>
+                        <div className="text-5xl mb-4">🃏</div>
+                        <h2 className="text-2xl font-bold mb-2 blur-sm select-none">Secret Card</h2>
+                        <div className="text-gray-700 mb-2 blur-sm select-none">Tap to reveal a locals-only tip!</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-5xl mb-4">🎉</div>
+                        <h2 className="text-2xl font-bold mb-2">Hidden Gem</h2>
+                        <div className="text-gray-700 mb-2">Locals say: "Try the late-night taco truck on 5th!"</div>
+                      </>
+                    )}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -1124,7 +1213,7 @@ export default function VotePage() {
       </div>
 
       {/* Completion state - only show after user has authenticated and completed voting */}
-      {currentIndex >= events.length && events.length > 0 && isAuthenticated && !showLogin && (
+      {currentIndex >= deck.length && deck.length > 0 && isAuthenticated && !showLogin && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1172,44 +1261,57 @@ export default function VotePage() {
                     }, 500);
                   }
                   return (
-                    <>
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 All Votes In!</h3>
-                      <p className="text-gray-600 mb-4">Everyone has finished voting. Check the results!</p>
-                      <button
-                        onClick={() => {
-                          const winningEvent = getWinningEvent();
-                          const params = new URLSearchParams({
-                            topic: Array.isArray(topic) ? topic[0] : topic || '',
-                            groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
-                            zip: Array.isArray(zip) ? zip[0] : zip || '',
-                            winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
-                          });
-                          window.location.href = `/results/${actualPlanId}?${params.toString()}`;
-                        }}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
-                      >
-                        See Results
-                      </button>
-                    </>
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 All Votes In!</h3>
+                <p className="text-gray-600 mb-4">Everyone has finished voting. Check the results!</p>
+                <button
+                  onClick={() => {
+                    const winningEvent = getWinningEvent();
+                    const params = new URLSearchParams({
+                      topic: Array.isArray(topic) ? topic[0] : topic || '',
+                      groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
+                      zip: Array.isArray(zip) ? zip[0] : zip || '',
+                      winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
+                    });
+                    window.location.href = `/results/${actualPlanId}?${params.toString()}`;
+                  }}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                >
+                  See Results
+                </button>
+              </>
                   );
                 })()
-              ) : (
+            ) : (
                 // Waiting for all votes screen (never shown for solo)
-                <>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
-                  <p className="text-gray-600 mb-4">
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
+                <p className="text-gray-600 mb-4">
                     Thanks for voting! Waiting for others to finish...
-                  </p>
-                  <div className="text-sm text-gray-500">
-                    <p>{completedVoters}/{expectedVoters} people have finished voting</p>
-                    <p className="mt-2">Results will be available when everyone is done!</p>
-                  </div>
-                </>
+                </p>
+                <div className="text-sm text-gray-500">
+                        <p>{completedVoters}/{expectedVoters} people have finished voting</p>
+                        <p className="mt-2">Results will be available when everyone is done!</p>
+                </div>
+              </>
               )
             )}
           </div>
         </motion.div>
       )}
+      {/* Add Feeling Lucky button */}
+      <div className="flex justify-center mt-4">
+        <button onClick={handleFeelingLucky} className="bg-gradient-to-r from-pink-500 to-yellow-500 text-white font-bold py-2 px-6 rounded-full shadow-lg hover:scale-105 transition-all duration-200 flex items-center gap-2">
+          <span>🪩</span> Feeling Lucky?
+        </button>
+      </div>
+      {/* Show streak and badge UI */}
+      <div className="flex justify-center mt-2">
+        <div className="bg-white/80 dark:bg-gray-800/80 px-4 py-2 rounded-full shadow text-sm font-semibold flex items-center gap-2">
+          <span>🔥</span> Streak: {streak} day{streak !== 1 ? 's' : ''}
+          {streak >= 3 && <span className="ml-2 bg-yellow-300 text-yellow-900 px-2 py-1 rounded-full text-xs font-bold">Gold Streak!</span>}
+        </div>
+      </div>
     </div>
   );
 } 
