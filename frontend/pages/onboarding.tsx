@@ -28,6 +28,10 @@ const TOPICS = [
   { key: 'movies', label: 'Movies', icon: '🎬' },
   { key: 'outdoors', label: 'Outdoors', icon: '🌳' },
   { key: 'adventure', label: 'Adventure', icon: '🧗' },
+  { key: 'nightlife', label: 'Nightlife', icon: '🌙' },
+  { key: 'wellness', label: 'Wellness', icon: '🧘' },
+  { key: 'art', label: 'Art & Culture', icon: '🖼️' },
+  { key: 'shopping', label: 'Shopping', icon: '🛍️' },
   { key: 'choose', label: 'Choose for me', icon: '🤖' },
 ];
 
@@ -95,6 +99,9 @@ export default function Onboarding() {
   const [events, setEvents] = useState<Event[]>([]);
   const [currentEventIndex, setCurrentEventIndex] = useState(0);
   const [selectedTopic, setSelectedTopic] = useState('');
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
+  const [suggestion, setSuggestion] = useState('');
+  const [suggestionSent, setSuggestionSent] = useState(false);
 
   // Geolocate for ZIP
   const handleGeolocate = () => {
@@ -223,7 +230,18 @@ export default function Onboarding() {
         <title>Choosy Onboarding</title>
         <meta name="description" content="Get started with Choosy" />
       </Head>
-      <div className="min-h-screen bg-gradient-to-br from-violet-100 via-blue-100 to-cyan-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-violet-100 via-blue-100 to-cyan-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex flex-col items-center justify-center">
+        {/* App name and pitch */}
+        {step === 'form' && (
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">Choosy</h1>
+            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg max-w-xl mx-auto">
+              Plan less. Live more.<br />
+              From solo hangs to group outings, just swipe to decide.
+            </p>
+          </div>
+        )}
+        {/* Onboarding box */}
         <AnimatePresence mode="wait">
           {step === 'form' && (
             <motion.div
@@ -319,7 +337,7 @@ export default function Onboarding() {
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Pick a vibe</h2>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 {TOPICS.map(topic => (
                   <button
                     key={topic.key}
@@ -331,6 +349,55 @@ export default function Onboarding() {
                   </button>
                 ))}
               </div>
+              <button
+                onClick={() => setShowSuggestModal(true)}
+                className="w-full mt-2 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 text-gray-800 dark:text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200 border border-gray-300 dark:border-gray-600"
+              >
+                + Suggest a topic
+              </button>
+              {/* Suggest a topic modal */}
+              {showSuggestModal && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-xl w-full max-w-sm">
+                    <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">Suggest a Topic</h3>
+                    {suggestionSent ? (
+                      <div className="text-green-600 font-semibold text-center py-4">Thank you for your suggestion!</div>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          value={suggestion}
+                          onChange={e => setSuggestion(e.target.value)}
+                          placeholder="Your topic idea..."
+                          className="w-full px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white mb-4"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSuggestionSent(true);
+                              setTimeout(() => {
+                                setShowSuggestModal(false);
+                                setSuggestion('');
+                                setSuggestionSent(false);
+                              }, 1500);
+                            }}
+                            className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                            disabled={!suggestion.trim()}
+                          >
+                            Submit
+                          </button>
+                          <button
+                            onClick={() => setShowSuggestModal(false)}
+                            className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold py-3 px-6 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
           {step === 'events' && (
