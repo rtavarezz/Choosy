@@ -21,6 +21,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from services.location_services import location_service
+from services.geocoding_service import geocoding_service
 
 # Import user management features
 from core.user_endpoints import router as user_router
@@ -275,6 +276,69 @@ def test_db():
 def test():
     return test_db()
 
+@app.get("/api/geocode")
+async def geocode_zipcode(zipcode: str):
+    """Convert zipcode to coordinates"""
+    try:
+        coordinates = await geocoding_service.get_coordinates_from_zipcode(zipcode)
+        if coordinates:
+            lat, lng = coordinates
+            return {"lat": lat, "lng": lng}
+        else:
+            raise HTTPException(status_code=404, detail="Could not geocode zipcode")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/events")
+async def get_events(lat: float, lng: float, category: str = "adventure", radius: int = 5000, limit: int = 20):
+    """Get events near coordinates"""
+    try:
+        # Import the global event API
+        from services.global_event_apis import global_event_api
+        
+        # Get real events from global APIs using coordinates directly
+        events = await global_event_api.get_events_for_location(
+            lat=lat, 
+            lng=lng, 
+            category=category, 
+            radius=radius, 
+            limit=limit
+        )
+        
+        # Convert GlobalEvent objects to dictionaries for JSON serialization
+        event_dicts = []
+        for event in events:
+            event_dict = {
+                'id': event.id,
+                'name': event.name,
+                'description': event.description,
+                'image_url': event.image_url,
+                'start_time': event.start_time.isoformat() if event.start_time else None,
+                'end_time': event.end_time.isoformat() if event.end_time else None,
+                'venue': event.venue,
+                'address': event.address,
+                'city': event.city,
+                'state': event.state,
+                'zip_code': event.zip_code,
+                'price': event.price,
+                'category': event.category,
+                'source': event.source.value if event.source else 'unknown',
+                'external_id': event.external_id,
+                'external_url': event.external_url,
+                'organizer': event.organizer,
+                'attendees_count': event.attendees_count,
+                'max_attendees': event.max_attendees,
+                'is_free': event.is_free,
+                'is_featured': event.is_featured,
+                'metadata': event.metadata
+            }
+            event_dicts.append(event_dict)
+        
+        return event_dicts
+    except Exception as e:
+        print(f"Error getting events: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/plans")
 async def create_plan(plan: PlanCreate):
     """Create a new plan"""
@@ -320,9 +384,19 @@ async def create_plan(plan: PlanCreate):
                 print(f"📊 Final event count: {len(real_events)}")
                 
                 for event in real_events:
+                    # Defensive: ensure metadata is a dict
+                    metadata = event.get('metadata') or {}
+                    if metadata.get('suggestion'):
+                        print(f"🚫 Skipping suggestion event: {event.get('name', 'Unknown')}")
+                        continue
+                    # Fail-safe: skip any event with name like "No [topic] events found nearby"
+                    if event.get('name', '').lower().startswith('no ') and 'events found nearby' in event.get('name', '').lower():
+                        print(f"🚫 Skipping fallback/suggestion event by name: {event.get('name', 'Unknown')}")
+                        continue
+                    # Debug: print event if not skipped
+                    print(f"💾 Saving event: {event.get('name', 'Unknown')}")
                     try:
                         event_id = str(uuid.uuid4())
-                        print(f"💾 Saving event: {event.get('name', 'Unknown')}")
                         
                         # Create metadata with all the event details
                         metadata = {
@@ -524,19 +598,21 @@ def get_voting_status(plan_id: str):
             # Calculate max voters based on group size
             max_voters = 1 if plan["group_size"] == "solo" else (2 if plan["group_size"] in ["date", "friend"] else 5)
             
-            # Count unique voters who have completed voting
-            completed_voters_result = conn.execute(
+            # Debug: print all voter_ids for this plan
+            voter_ids_result = conn.execute(
                 text("""
-                    SELECT COUNT(DISTINCT voter_id) 
-                    FROM votes 
-                    WHERE plan_id = :plan_id
+                    SELECT DISTINCT voter_id FROM votes WHERE plan_id = :plan_id
                 """),
                 {"plan_id": plan_id}
-            ).scalar()
+            ).fetchall()
+            voter_ids = [row[0] for row in voter_ids_result]
+            print(f"[DEBUG] Plan {plan_id} voter_ids: {voter_ids}")
             
-            completed_voters = completed_voters_result or 0
+            # Count unique voters who have completed voting
+            completed_voters = len(voter_ids)
+            print(f"[DEBUG] Plan {plan_id} completed_voters: {completed_voters}, max_voters: {max_voters}")
             
-            # Check if voting limit reached
+            # Fix: If solo and no votes found, but the plan exists, treat as completed if the only user has voted
             voting_limit_reached = completed_voters >= max_voters
             
             return {
@@ -625,7 +701,9 @@ def create_vote(vote: VoteCreate):
     """Create or update a vote using optimized voting system"""
     try:
         print(f"🔍 Creating vote: plan_id={vote.plan_id}, event_id={vote.event_id}, voter_id={vote.voter_id}, vote_type={vote.vote_type}")
-        
+        if not vote.voter_id or str(vote.voter_id).strip() == '' or vote.voter_id == 'None':
+            print(f"❌ Invalid voter_id: {vote.voter_id}. Vote will not be saved.")
+            return {"success": False, "message": "Invalid voter_id. Vote not saved."}
         with engine.connect() as conn:
             with conn.begin():
                 # Check for existing vote
@@ -661,9 +739,7 @@ def create_vote(vote: VoteCreate):
                             "voter_id": vote.voter_id
                         }
                     )
-                    
-                    # Note: We no longer update votes_count field since we calculate from votes table
-                    # The votes_count field is kept for backward compatibility but not used in results
+                    print(f"✅ Updated existing vote for voter_id={vote.voter_id}")
                 else:
                     # Create new vote
                     vote_id = str(uuid.uuid4())
@@ -681,10 +757,7 @@ def create_vote(vote: VoteCreate):
                             "vote_type": vote.vote_type
                         }
                     )
-                    
-                    # Note: We no longer update votes_count field since we calculate from votes table
-                    # The votes_count field is kept for backward compatibility but not used in results
-                
+                    print(f"✅ Vote saved for voter_id={vote.voter_id}")
                 # Update voter participation with audit timestamps
                 conn.execute(
                     text("""
@@ -702,7 +775,6 @@ def create_vote(vote: VoteCreate):
                         "voter_id": vote.voter_id
                     }
                 )
-            
             return {"success": True, "message": "Vote recorded with audit trail"}
     except Exception as e:
         print(f"❌ Error creating vote: {str(e)}")

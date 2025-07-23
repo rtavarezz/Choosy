@@ -71,6 +71,26 @@ class GlobalEventAPI:
             'google': {'requests': 0, 'limit': 100000, 'reset_time': datetime.now()}
         }
     
+    def get_google_search_url(self, topic, city):
+        topic_search_terms = {
+            'foodie': 'restaurants',
+            'datenight': 'date night ideas',
+            'concerts': 'concerts',
+            'comedy': 'comedy shows',
+            'racing': 'race tracks',
+            'movies': 'movie theaters',
+            'shopping': 'shopping',
+            'parks': 'parks',
+            'adventure': 'adventure activities',
+            'nightlife': 'nightlife',
+            'sports': 'sports events',
+            'wellness': 'wellness activities',
+            'family': 'family activities',
+            # ...add more as needed
+        }
+        search_term = topic_search_terms.get(topic, topic)
+        return f"https://www.google.com/search?q={search_term.replace(' ', '+')}+near+{city.replace(' ', '+')}"
+
     async def get_events_for_location(
         self, 
         lat: float, 
@@ -111,7 +131,47 @@ class GlobalEventAPI:
         # Deduplicate and rank
         events = self._deduplicate_events(events)
         events = self._rank_events_by_relevance(events, category)
-        
+        events = self.filter_events_by_topic(events, category)
+
+        # --- General fallback for low results ---
+        if len(events) < 2:
+            city_name = self._get_city_from_coordinates(lat, lng)
+            google_url = self.get_google_search_url(category, city_name)
+            suggestion_event = GlobalEvent(
+                id=f'suggestion_google_{category}_{city_name.replace(" ", "_")}',
+                name=f'No {category} events found nearby',
+                description=(
+                    f"Try expanding your search radius or date range. "
+                    f"You can also Google '{category} near {city_name}' for more options. "
+                    f"\n\n[Click here to search Google]({google_url})"
+                ),
+                image_url='https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+                start_time=None,
+                end_time=None,
+                venue=None,
+                address=None,
+                city=city_name,
+                state=None,
+                zip_code=None,
+                price=None,
+                category=category,
+                source=None,
+                external_id=None,
+                external_url=google_url,
+                organizer=None,
+                attendees_count=None,
+                max_attendees=None,
+                is_free=True,
+                is_featured=False,
+                metadata={'suggestion': True}
+            )
+            events.append(suggestion_event)
+            # Optionally add up to 3 fallback events from a broader category
+            fallback_category = 'sports' if category == 'racing' else 'entertainment'
+            fallback_events = self.filter_events_by_topic(self._rank_events_by_relevance(self._deduplicate_events(events), fallback_category), fallback_category)
+            fallback_events = [e for e in fallback_events if e.id != suggestion_event.id][:3]
+            events.extend(fallback_events)
+        # --------------------------------------
         return events[:limit]
     
     async def _fetch_eventbrite_events(self, lat: float, lng: float, category: str, radius: int) -> List[GlobalEvent]:
@@ -650,7 +710,7 @@ class GlobalEventAPI:
             'datenight': '110',  # Food & Drink
             'sports': '108',  # Sports & Fitness
             'parks': '113',  # Outdoor & Adventure
-            'racing': '108',  # Sports & Fitness
+            'racing': '199',  # Auto, Boat & Air (Eventbrite category for racing)
             'swimming': '108',  # Sports & Fitness
             'drinks': '110',  # Food & Drink
             'movies': '104',  # Film, Media & Entertainment
@@ -1078,8 +1138,7 @@ class GlobalEventAPI:
             'swimming': ['swimming_pool', 'aquarium'],
             'drinks': ['bar', 'liquor_store'],
             'datenight': ['restaurant', 'entertainment'],
-            'racing': ['amusement_park', 'entertainment'],
-            'adventure': ['amusement_park', 'entertainment', 'museum', 'art_gallery', 'tourist_attraction', 'point_of_interest']
+            'racing': ['amusement_park', 'entertainment', 'museum', 'art_gallery', 'tourist_attraction', 'point_of_interest']
         }
         return mappings.get(category, ['establishment'])
     
@@ -1097,7 +1156,7 @@ class GlobalEventAPI:
             'swimming': [('leisure', 'swimming_pool'), ('amenity', 'aquarium')],
             'drinks': [('amenity', 'bar'), ('amenity', 'pub')],
             'datenight': [('amenity', 'restaurant'), ('amenity', 'entertainment')],
-            'racing': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment')],
+            'racing': [('leisure', 'go_kart_track'), ('sport', 'karting'), ('leisure', 'race_track'), ('leisure', 'sports_centre'), ('amenity', 'entertainment')],
             'adventure': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment'), ('tourism', 'museum'), ('tourism', 'gallery'), ('tourism', 'attraction'), ('amenity', 'escape_room')]
         }
         return mappings.get(category, [('amenity', 'entertainment')])
@@ -1451,7 +1510,7 @@ class GlobalEventAPI:
             'swimming': ['Sports'],
             'drinks': ['Food & Drink'],
             'datenight': ['Music', 'Food & Drink'],
-            'racing': ['Sports'],
+            'racing': ['Racing', 'Motorsports', 'Auto Racing', 'Go-Kart', 'Motorsport', 'Drag Racing', 'Speedway'],
             'family': ['Family'],
             'adventure': ['Sports'],  # Outdoor activities
             'wellness': ['Sports'],  # Fitness events
@@ -1568,6 +1627,52 @@ class GlobalEventAPI:
         except Exception as e:
             print(f"Error converting Ticketmaster event: {e}")
             return None
+
+    def filter_events_by_topic(self, events, topic):
+        topic_keywords = {
+            'racing': [
+                'race', 'racing', 'motorsport', 'kart', 'go-kart', 'track', 'speedway', 'drag', 'auto', 'nascar',
+                'formula', 'indy', 'drift', 'motocross', 'monster truck', 'grand prix', 'f1', 'rally'
+            ],
+            'foodie': ['food', 'restaurant', 'dining', 'eat', 'cuisine', 'bistro', 'cafe', 'deli', 'brunch', 'dinner', 'lunch'],
+            'nightlife': ['nightlife', 'club', 'bar', 'pub', 'dj', 'party', 'cocktail', 'lounge'],
+            'concerts': ['concert', 'music', 'band', 'live', 'gig', 'show', 'performance'],
+            'comedy': ['comedy', 'stand-up', 'improv', 'comic', 'laugh'],
+            'art': ['art', 'gallery', 'museum', 'exhibit', 'exhibition', 'painting', 'sculpture'],
+            'movies': ['movie', 'film', 'cinema', 'screening'],
+            'sports': ['sport', 'game', 'match', 'tournament', 'league', 'athletic', 'fitness', 'gym'],
+            'parks': ['park', 'garden', 'nature', 'outdoor', 'trail', 'picnic'],
+            'swimming': ['swim', 'pool', 'aquatic', 'water', 'aquarium'],
+            'drinks': ['drink', 'bar', 'cocktail', 'wine', 'beer', 'brewery', 'pub'],
+            'datenight': ['date', 'romantic', 'couple', 'dinner', 'night', 'love'],
+            'adventure': ['adventure', 'escape', 'vr', 'virtual', 'arcade', 'climb', 'zipline', 'explore'],
+            'shopping': ['shop', 'shopping', 'mall', 'store', 'boutique', 'market'],
+            'wellness': ['wellness', 'yoga', 'spa', 'meditation', 'fitness', 'health'],
+            'family': ['family', 'kids', 'children', 'parent', 'play', 'zoo', 'aquarium', 'museum'],
+            # Add more as needed
+        }
+        negative_keywords = {
+            'racing': ['ymca', 'pool', 'fitness', 'gym', 'swim', 'aquatic', 'recreation', 'community center']
+            # Add for other topics if needed
+        }
+        keywords = topic_keywords.get(topic, [topic])
+        neg_keywords = negative_keywords.get(topic, [])
+        filtered = [
+            event for event in events
+            if (
+                any(
+                    kw.lower() in (getattr(event, 'name', '') or '').lower() or
+                    kw.lower() in (getattr(event, 'description', '') or '').lower()
+                    for kw in keywords
+                )
+                and not any(
+                    nkw in (getattr(event, 'name', '') or '').lower() or
+                    nkw in (getattr(event, 'description', '') or '').lower()
+                    for nkw in neg_keywords
+                )
+            )
+        ]
+        return filtered
 
 # Global instance
 global_event_api = GlobalEventAPI() 

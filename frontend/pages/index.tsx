@@ -70,10 +70,10 @@ export default function Home() {
                   )}
                 </button>
                 <Link 
-                  href="/create"
+                  href="/onboarding"
                   className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
                 >
-                  Try Demo
+                  Find Events
                 </Link>
               </>
             )}
@@ -132,13 +132,13 @@ export default function Home() {
                   <span>Create Your First Plan</span>
                 </Link>
               ) : (
-                <button
-                  onClick={() => setShowLoginModal(true)}
+                <Link 
+                  href="/onboarding"
                   className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
                 >
                   <span className="text-2xl">→</span>
-                  <span>Get Started</span>
-                </button>
+                  <span>Find Events Near Me</span>
+                </Link>
               )}
               
               <Link 

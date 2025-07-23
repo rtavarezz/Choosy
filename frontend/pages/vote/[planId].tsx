@@ -440,31 +440,42 @@ export default function VotePage() {
     
     // Check if this voter has completed all events
     if (currentIndex >= events.length - 1) {
-      // Check if this voter has already been marked as completed
-      const voterCompletedKey = `voter_completed_${actualPlanId}_${voterId}`;
-      const alreadyCompleted = localStorage.getItem(voterCompletedKey);
-      
-      if (!alreadyCompleted) {
-        // Mark this voter as completed
-        const storedCompletedVoters = localStorage.getItem(`completed_voters_${actualPlanId}`);
-        const currentCompleted = storedCompletedVoters ? parseInt(storedCompletedVoters) : 0;
-        const newCompleted = currentCompleted + 1;
-        
-        localStorage.setItem(`completed_voters_${actualPlanId}`, newCompleted.toString());
-        setCompletedVoters(newCompleted);
-        
-        // Store this voter's completion status
-        localStorage.setItem(voterCompletedKey, 'true');
-        
-        console.log(`✅ Voter ${voterId} completed all events. Total completed: ${newCompleted}`);
-        
-        // For solo sessions, immediately mark as all voters completed
-        const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-        if (groupSizeStr === 'solo') {
-          setAllVotersCompleted(true);
+      // Always check backend voting status after last vote
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/api/plans/${actualPlanId}/voting-status`);
+        if (response.ok) {
+          const status = await response.json();
+          if (status.voting_limit_reached) {
+            setAllVotersCompleted(true);
+            // If solo, redirect to results immediately
+            if (status.max_voters === 1) {
+              console.log('✅ Redirecting to results for solo plan (backend status)');
+              window.location.href = `/results/${actualPlanId}`;
+              // Fallback: force redirect after 1s if not already
+              setTimeout(() => {
+                if (window.location.pathname !== `/results/${actualPlanId}`) {
+                  window.location.href = `/results/${actualPlanId}`;
+                }
+              }, 1000);
+              return;
+            }
+          }
         }
-      } else {
-        console.log(`⚠️ Voter ${voterId} already marked as completed`);
+      } catch (error) {
+        console.error('Error checking backend voting status:', error);
+      }
+      // For solo sessions, immediately mark as all voters completed
+      const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
+      if (groupSizeStr === 'solo') {
+        setAllVotersCompleted(true);
+        console.log('✅ Redirecting to results for solo plan (local state)');
+        window.location.href = `/results/${actualPlanId}`;
+        setTimeout(() => {
+          if (window.location.pathname !== `/results/${actualPlanId}`) {
+            window.location.href = `/results/${actualPlanId}`;
+          }
+        }, 1000);
+        return;
       }
     }
   };
@@ -1148,69 +1159,53 @@ export default function VotePage() {
                   </button>
                 </div>
               </>
-            ) : allVotersCompleted ? (
-              <>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 All Votes In!</h3>
-                <p className="text-gray-600 mb-4">Everyone has finished voting. Check the results!</p>
-                <button
-                  onClick={() => {
-                    const winningEvent = getWinningEvent();
-                    const params = new URLSearchParams({
-                      topic: Array.isArray(topic) ? topic[0] : topic || '',
-                      groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
-                      zip: Array.isArray(zip) ? zip[0] : zip || '',
-                      winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
-                    });
-                    window.location.href = `/results/${actualPlanId}?${params.toString()}`;
-                  }}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
-                >
-                  See Results
-                </button>
-              </>
             ) : (
-              <>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
-                <p className="text-gray-600 mb-4">
-                  {(() => {
-                    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-                    if (groupSizeStr === 'solo') {
-                      return "Thanks for voting! Here are your results:";
-                    }
-                    return "Thanks for voting! Waiting for others to finish...";
-                  })()}
-                </p>
-                <div className="text-sm text-gray-500">
-                  {(() => {
-                    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-                    if (groupSizeStr === 'solo') {
-                      return (
-                        <button
-                          onClick={() => {
-                            const winningEvent = getWinningEvent();
-                            const params = new URLSearchParams({
-                              topic: Array.isArray(topic) ? topic[0] : topic || '',
-                              groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
-                              zip: Array.isArray(zip) ? zip[0] : zip || '',
-                              winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
-                            });
-                            window.location.href = `/results/${actualPlanId}?${params.toString()}`;
-                          }}
-                          className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
-                        >
-                          See Results
-                        </button>
-                      );
-                    }
-                    return (
-                      <>
-                        <p>{completedVoters}/{expectedVoters} people have finished voting</p>
-                        <p className="mt-2">Results will be available when everyone is done!</p>
-                      </>
-                    );
-                  })()}
-                </div>
-              </>
+              // If solo, always show results button immediately
+              (Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' || allVotersCompleted ? (
+                (() => {
+                  // Final check: if solo and on this page, force redirect
+                  if ((Array.isArray(groupSize) ? groupSize[0] : groupSize) === 'solo' && typeof window !== 'undefined') {
+                    setTimeout(() => {
+                      if (window.location.pathname !== `/results/${actualPlanId}`) {
+                        window.location.href = `/results/${actualPlanId}`;
+                      }
+                    }, 500);
+                  }
+                  return (
+                    <>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 All Votes In!</h3>
+                      <p className="text-gray-600 mb-4">Everyone has finished voting. Check the results!</p>
+                      <button
+                        onClick={() => {
+                          const winningEvent = getWinningEvent();
+                          const params = new URLSearchParams({
+                            topic: Array.isArray(topic) ? topic[0] : topic || '',
+                            groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize || '',
+                            zip: Array.isArray(zip) ? zip[0] : zip || '',
+                            winningEvent: winningEvent ? JSON.stringify(winningEvent) : ''
+                          });
+                          window.location.href = `/results/${actualPlanId}?${params.toString()}`;
+                        }}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                      >
+                        See Results
+                      </button>
+                    </>
+                  );
+                })()
+              ) : (
+                // Waiting for all votes screen (never shown for solo)
+                <>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">🎉 You're Done!</h3>
+                  <p className="text-gray-600 mb-4">
+                    Thanks for voting! Waiting for others to finish...
+                  </p>
+                  <div className="text-sm text-gray-500">
+                    <p>{completedVoters}/{expectedVoters} people have finished voting</p>
+                    <p className="mt-2">Results will be available when everyone is done!</p>
+                  </div>
+                </>
+              )
             )}
           </div>
         </motion.div>

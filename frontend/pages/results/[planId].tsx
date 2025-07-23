@@ -113,9 +113,36 @@ export default function ResultsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isReserving, setIsReserving] = useState(false);
   const [reservationResult, setReservationResult] = useState(null);
+  // Patch: always use backend voting status
   const [allVotersCompleted, setAllVotersCompleted] = useState(false);
   const [expectedVoters, setExpectedVoters] = useState(1);
   const [completedVoters, setCompletedVoters] = useState(0);
+
+  // Patch: Fetch voting status from backend
+  useEffect(() => {
+    async function fetchVotingStatus() {
+      if (!planId) return;
+      const planIdStr = Array.isArray(planId) ? planId[0] : planId;
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/api/plans/${planIdStr}/voting-status`);
+        if (response.ok) {
+          const status = await response.json();
+          console.log('Voting status on results page:', status);
+          setExpectedVoters(status.max_voters);
+          setCompletedVoters(status.completed_voters);
+          setAllVotersCompleted(status.voting_limit_reached);
+        } else {
+          console.error('Failed to fetch voting status:', response.status);
+        }
+      } catch (error) {
+        console.error('Failed to fetch voting status:', error);
+      }
+    }
+    fetchVotingStatus();
+    // Optionally, poll every 2 seconds for real-time updates
+    const interval = setInterval(fetchVotingStatus, 2000);
+    return () => clearInterval(interval);
+  }, [planId]);
 
   // Function to get topic-specific image
   const getTopicImage = (eventIndex: number, eventTopic?: string) => {
@@ -123,30 +150,6 @@ export default function ResultsPage() {
     const images = TOPIC_IMAGES[topicStr] || DEFAULT_IMAGES;
     return images[eventIndex % images.length];
   };
-
-  // Live refresh to check for new completed voters
-  useEffect(() => {
-    const refreshInterval = setInterval(() => {
-      // Check for updated completed voters count
-      const storedCompletedVoters = localStorage.getItem(`completed_voters_${planId}`);
-      if (storedCompletedVoters) {
-        const newCompletedCount = parseInt(storedCompletedVoters);
-        if (newCompletedCount !== completedVoters) {
-          setCompletedVoters(newCompletedCount);
-          // Re-check if all voters completed
-          const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-          const voterCount = groupSizeStr === 'solo' ? 1 : groupSizeStr === 'date' ? 2 : 5;
-          if (newCompletedCount >= voterCount) {
-            setAllVotersCompleted(true);
-            // Don't reload the page - just update the state
-            // The results will be displayed automatically
-          }
-        }
-      }
-    }, 2000); // Check every 2 seconds
-
-    return () => clearInterval(refreshInterval);
-  }, [planId, completedVoters, groupSize]);
 
   // Load results data
   useEffect(() => {
@@ -161,39 +164,8 @@ export default function ResultsPage() {
             console.error('Failed to parse winning event:', e);
           }
         }
-
         // Check if this is a demo or real plan
         const isDemo = Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo';
-        
-        // Set expected voters based on group size - will be updated from API
-        let voterCount = 5; // Default fallback
-        const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-        if (groupSizeStr) {
-          voterCount = groupSizeStr === 'solo' ? 1 : (groupSizeStr === 'date' || groupSizeStr === 'friend') ? 2 : 5;
-        }
-        setExpectedVoters(voterCount);
-        
-        // Get completed voters count
-        const storedCompletedVoters = localStorage.getItem(`completed_voters_${planId}`);
-        let completedVotersCount = storedCompletedVoters ? parseInt(storedCompletedVoters) : 0;
-        
-        // For "Choose for me" flow, if we have a winning event in URL, mark as completed
-        if (parsedWinningEvent && Object.keys(parsedWinningEvent).length > 0) {
-          completedVotersCount = voterCount; // Mark all voters as completed
-        }
-        
-        setCompletedVoters(completedVotersCount);
-        
-        // Check if all voters have completed
-        // For "Choose for me" flow, if we have a winning event in URL, bypass the voting check
-        const hasWinningEventInUrl = parsedWinningEvent && Object.keys(parsedWinningEvent).length > 0;
-        
-        // For solo sessions, always mark as completed
-        const isSoloSession = groupSizeStr === 'solo';
-        
-        const allCompleted = hasWinningEventInUrl || isSoloSession || completedVotersCount >= voterCount;
-        setAllVotersCompleted(allCompleted);
-        
         // For real plans, get results from backend API
         if (!isDemo) {
           try {
@@ -201,11 +173,9 @@ export default function ResultsPage() {
             const response = await fetch(`http://127.0.0.1:8000/api/plans/${planIdStr}/results`);
             if (response.ok) {
               const apiResults = await response.json();
-              
               // Get expected voters from API group size
               const apiGroupSize = apiResults.plan.groupSize;
               const apiVoterCount = apiGroupSize === 'solo' ? 1 : (apiGroupSize === 'date' || apiGroupSize === 'friend') ? 2 : 5;
-              
               // Transform API results to match frontend format
               const transformedResults = {
                 planId: planIdStr,
@@ -239,72 +209,27 @@ export default function ResultsPage() {
                   hours: "2 hours",
                   contact: { phone: '(555) 123-4567', email: 'info@event.com' }
                 })),
-                allVotersCompleted: allCompleted,
-                expectedVoters: apiVoterCount,
-                completedVoters: completedVotersCount
+                // Patch: Remove allVotersCompleted, expectedVoters, completedVoters from here
               };
-              
-              // Update expected voters state with correct value from API
-              setExpectedVoters(apiVoterCount);
-              
               setResults(transformedResults);
               return;
             }
           } catch (error) {
             console.error('Failed to load API results:', error);
-            // Fall back to mock data if API fails
           }
         }
-        
         // For demo plans or if API fails, use mock data
-        // Get real vote counts from localStorage
-        const storedVotes = localStorage.getItem(`votes_${planId}`);
-        const voteCounts = storedVotes ? JSON.parse(storedVotes) : {};
-        
-        // Get all events for this topic and group size
-        const topicStr = Array.isArray(topic) ? topic[0] : topic;
-        const groupSizeStr2 = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-        
-        // No mock events - events will be fetched from backend
-        const allEvents = [];
-        
-        // Create results with real vote counts
-        const eventsWithVotes = allEvents.map(event => ({
-          ...event,
-          votes: voteCounts[event.id] || 0
-        }));
-        
-        // Sort by vote count (highest first)
-        eventsWithVotes.sort((a, b) => b.votes - a.votes);
-        
-        // Get winning event - use URL event for "Choose for me" flow, otherwise use highest votes
-        const winningEvent = parsedWinningEvent || (allCompleted ? eventsWithVotes[0] : null);
-        
-        // Calculate total votes
-        const totalVotes = Object.values(voteCounts).reduce((sum: number, count: any) => sum + (count as number), 0);
-        
         const mockResults = {
           planId: Array.isArray(planId) ? planId[0] : planId,
           topic: Array.isArray(topic) ? topic[0] : topic,
           groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize,
           zip: Array.isArray(zip) ? zip[0] : zip,
-          winningEvent: winningEvent,
-          // For real plans, include plan data; for demo, omit it
-          plan: isDemo ? null : {
-            userName: 'John Smith', // This would come from the actual plan data
-            phoneNumber: '(555) 123-4567', // This would come from the actual plan data
-            topic: Array.isArray(topic) ? topic[0] : topic,
-            groupSize: Array.isArray(groupSize) ? groupSize[0] : groupSize,
-            zipCode: Array.isArray(zip) ? zip[0] : zip
-          },
-          totalVotes: totalVotes,
+          winningEvent: null,
+          plan: null,
+          totalVotes: 0,
           participants: ['friendA', 'friendB', 'friendC'],
-          allEvents: eventsWithVotes,
-          allVotersCompleted: allCompleted,
-          expectedVoters: voterCount,
-          completedVoters: completedVotersCount
+          allEvents: [],
         };
-
         setResults(mockResults);
       } catch (error) {
         console.error('Failed to load results:', error);
@@ -312,7 +237,6 @@ export default function ResultsPage() {
         setIsLoading(false);
       }
     };
-
     if (planId) {
       loadResults();
     }
@@ -395,6 +319,7 @@ export default function ResultsPage() {
     return '⭐'.repeat(Math.floor(stars)) + '☆'.repeat(5 - Math.floor(stars));
   };
 
+  // Patch: Use backend voting status for UI logic
   // Loading state
   if (isLoading) {
     return (
@@ -406,7 +331,6 @@ export default function ResultsPage() {
       </div>
     );
   }
-
   // Error state
   if (!results) {
     return (
@@ -424,14 +348,13 @@ export default function ResultsPage() {
       </div>
     );
   }
-
+  // Patch: Use backend voting status for waiting/results UI
   return (
     <>
       <Head>
         <title>Voting Results - Choosy</title>
         <meta name="description" content="See the results of your group voting" />
       </Head>
-      
       {/* Header */}
       <header className="flex justify-between items-center p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-4">
@@ -466,15 +389,14 @@ export default function ResultsPage() {
               <span className="text-green-600 dark:text-green-400 font-bold ml-2">🎉 All Done!</span>
             )}
           </div>
-
           {/* Waiting for all voters */}
-          {!results.allVotersCompleted && (
+          {!allVotersCompleted && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 mb-8">
               <div className="text-center">
                 <div className="text-6xl mb-4">⏳</div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Waiting for All Votes</h2>
                 <p className="text-gray-600 mb-4">
-                  {results.completedVoters} out of {results.expectedVoters} people have finished voting.
+                  {completedVoters} out of {expectedVoters} people have finished voting.
                 </p>
                 <p className="text-sm text-gray-500">
                   {(() => {
@@ -494,9 +416,8 @@ export default function ResultsPage() {
               </div>
             </div>
           )}
-
           {/* Winner announcement - only show if all voters completed */}
-          {results.allVotersCompleted && results.winningEvent && (
+          {allVotersCompleted && results.winningEvent && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 mb-8">
               <div className="text-center mb-6">
                 <div className="text-6xl mb-4">🏆</div>
@@ -596,7 +517,7 @@ export default function ResultsPage() {
           )}
 
           {/* All results - only show if all voters completed */}
-          {results.allVotersCompleted && (
+          {allVotersCompleted && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 mb-8">
               <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">All Results</h3>
               <div className="space-y-4">
