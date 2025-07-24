@@ -752,7 +752,10 @@ def get_voting_status(plan_id: str):
 
             # Group size is always the number of unique voters (active or completed)
             unique_voter_ids = set(active_voter_ids + completed_voter_ids)
-            max_voters = max(1, len(unique_voter_ids))
+            if len(unique_voter_ids) == 0:
+                max_voters = 1  # Default to 1 if no one has joined yet
+            else:
+                max_voters = len(unique_voter_ids)
 
             # Check if ALL active voters have completed voting
             all_voters_completed = False
