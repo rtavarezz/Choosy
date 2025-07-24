@@ -7,19 +7,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { planId, optionId, voterId, vote } = req.body;
+    const { planId, eventId, voterName, voterPhone, voteType } = req.body;
 
     // Validate required fields
-    if (!planId || !optionId || !voterId || vote === undefined) {
+    if (!planId || !eventId || !voterName || !voterPhone || !voteType) {
       return res.status(400).json({ 
-        error: 'Missing required fields: planId, optionId, voterId, vote' 
+        error: 'Missing required fields: planId, eventId, voterName, voterPhone, voteType' 
       });
     }
 
-    // Validate vote value
-    if (typeof vote !== 'boolean') {
+    // Validate vote type
+    if (!['like', 'dislike'].includes(voteType)) {
       return res.status(400).json({ 
-        error: 'Vote must be a boolean value (true/false)' 
+        error: 'Vote type must be either "like" or "dislike"' 
+      });
+    }
+
+    // Validate phone number length (max 15 digits including country code)
+    const phoneDigits = voterPhone.replace(/\D/g, '');
+    if (phoneDigits.length > 15) {
+      return res.status(400).json({ 
+        error: 'Phone number is too long. Please enter a valid phone number (maximum 15 digits including country code).' 
+      });
+    }
+    if (phoneDigits.length < 10) {
+      return res.status(400).json({ 
+        error: 'Phone number is too short. Please enter a valid phone number (minimum 10 digits).' 
       });
     }
 
@@ -31,9 +44,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
       body: JSON.stringify({
         plan_id: planId,
-        event_id: optionId,
-        voter_id: voterId,
-        vote_type: vote ? 'like' : 'dislike'
+        event_id: eventId,
+        voter_name: voterName,
+        voter_phone: voterPhone,
+        vote_type: voteType
       }),
     });
 

@@ -628,7 +628,7 @@ def get_voting_status(plan_id: str):
         with engine.connect() as conn:
             # Get plan details
             plan_result = conn.execute(
-                text("SELECT topic, group_size, host_name FROM plans WHERE id = :plan_id"),
+                text("SELECT topic, group_size, host_name, host_phone FROM plans WHERE id = :plan_id"),
                 {"plan_id": plan_id}
             ).fetchone()
             
@@ -638,32 +638,11 @@ def get_voting_status(plan_id: str):
             plan = {
                 "topic": plan_result[0],
                 "group_size": plan_result[1],
-                "host_name": plan_result[2]
+                "host_name": plan_result[2],
+                "host_phone": plan_result[3]
             }
             
-            # All plans are dynamic - group size is determined by actual participation
-            # Count how many unique voters have actually signed up
-            unique_voters_result = conn.execute(
-                text("""
-                    SELECT COUNT(DISTINCT voter_id) as unique_voters 
-                    FROM votes 
-                    WHERE plan_id = :plan_id
-                """),
-                {"plan_id": plan_id}
-            ).fetchone()
-            
-            current_voters = unique_voters_result[0] if unique_voters_result else 0
-            
-            # Dynamic group size: start with minimum 2 voters, but grow based on actual participation
-            # If no one has voted yet, start with 2
-            if current_voters == 0:
-                max_voters = 2
-            else:
-                # Use the actual number of voters who have participated, with a minimum of 2
-                max_voters = max(2, current_voters)
-            
-            # Check if all required voters have voted
-            # First, get the total number of events in this plan
+            # Get total number of events in this plan
             total_events_result = conn.execute(
                 text("SELECT COUNT(*) FROM events WHERE plan_id = :plan_id"),
                 {"plan_id": plan_id}
@@ -694,19 +673,74 @@ def get_voting_status(plan_id: str):
             ).fetchone()
             total_voters = total_voters_result[0] if total_voters_result else 0
             
-            voting_limit_reached = completed_voters >= max_voters
+            # Get active voters count from the active voters system
+            active_voters_count = 0
+            active_voter_ids = []
+            if plan_id in active_voters:
+                # Clean up inactive voters (more than 5 minutes since last activity)
+                current_time = datetime.utcnow()
+                active_voters_clean = {}
+                
+                for voter_id, voter_data in active_voters[plan_id].items():
+                    last_activity = datetime.fromisoformat(voter_data['last_activity'])
+                    if (current_time - last_activity).total_seconds() < 300:  # 5 minutes
+                        active_voters_clean[voter_id] = voter_data
+                        active_voter_ids.append(voter_id)
+                    else:
+                        print(f"Removing inactive voter: {voter_id}")
+                
+                active_voters[plan_id] = active_voters_clean
+                active_voters_count = len(active_voters[plan_id])
+            
+            # Get completed voter IDs
+            completed_voter_ids = [row[0] for row in completed_voters_result]
+            
+            # Dynamic group size: use the total number of voters who have participated, with a minimum of 2
+            max_voters = max(2, total_voters)
+            
+            # If no total voters but we have active voters, use active voters count
+            if total_voters == 0 and active_voters_count > 0:
+                max_voters = max(2, active_voters_count)
+            
+            # Check if ALL active voters have completed voting
+            all_voters_completed = False
+            if active_voters_count > 0:
+                # Check if all active voters have completed voting
+                all_completed = True
+                for voter_id in active_voter_ids:
+                    if voter_id not in completed_voter_ids:
+                        all_completed = False
+                        break
+                all_voters_completed = all_completed
+            else:
+                # If no active voters, check if all voters who have voted are completed
+                all_voters_completed = (total_voters > 0 and completed_voters >= total_voters)
+            
+            # Only show results when ALL active voters have completed
+            voting_limit_reached = all_voters_completed
+            
+            print(f"📊 Voting Status for plan {plan_id}:")
+            print(f"   Active voters: {active_voters_count}")
+            print(f"   Completed voters: {completed_voters}")
+            print(f"   Max voters: {max_voters}")
+            print(f"   All completed: {all_voters_completed}")
+            print(f"   Active voter IDs: {active_voter_ids}")
+            print(f"   Completed voter IDs: {completed_voter_ids}")
             
             return {
                 "plan_id": plan_id,
                 "topic": plan["topic"],
                 "group_size": plan["group_size"],
                 "host_name": plan["host_name"],
+                "host_phone": plan["host_phone"],
                 "max_voters": max_voters,
                 "completed_voters": completed_voters,
                 "total_voters": total_voters,
+                "active_voters": active_voters_count,
                 "total_events": total_events,
                 "voting_limit_reached": voting_limit_reached,
-                "can_vote": not voting_limit_reached
+                "can_vote": not voting_limit_reached,
+                "all_voters_completed": all_voters_completed
             }
             
     except Exception as e:
@@ -1343,17 +1377,28 @@ def update_active_voter(plan_id: str, voter_data: dict):
             active_voters[plan_id] = {}
         
         if action == 'join':
-            active_voters[plan_id][voter_id] = {
-                'name': voter_name,
-                'joined_at': datetime.utcnow().isoformat(),
-                'last_activity': datetime.utcnow().isoformat()
-            }
+            # Check if voter already exists
+            if voter_id in active_voters[plan_id]:
+                # Update existing voter's activity timestamp
+                active_voters[plan_id][voter_id]['last_activity'] = datetime.utcnow().isoformat()
+                print(f"🔄 Updated existing voter: {voter_name} ({voter_id})")
+            else:
+                # Add new voter
+                active_voters[plan_id][voter_id] = {
+                    'name': voter_name,
+                    'joined_at': datetime.utcnow().isoformat(),
+                    'last_activity': datetime.utcnow().isoformat()
+                }
+                print(f"✅ Added new voter: {voter_name} ({voter_id})")
         elif action == 'leave':
             if voter_id in active_voters[plan_id]:
                 del active_voters[plan_id][voter_id]
+                print(f"👋 Removed voter: {voter_name} ({voter_id})")
         
+        print(f"📊 Total active voters for plan {plan_id}: {len(active_voters[plan_id])}")
         return {"success": True, "active_voters": len(active_voters[plan_id])}
     except Exception as e:
+        print(f"❌ Error in update_active_voter: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/plans/{plan_id}/active-voters")

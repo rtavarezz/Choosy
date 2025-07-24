@@ -330,6 +330,17 @@ export default function Create() {
     e.preventDefault();
     if (!userName.trim() || !phoneNumber.trim() || !zipCode.trim()) return;
     
+    // Validate phone number length (max 15 digits including country code)
+    const phoneDigits = phoneNumber.replace(/\D/g, '');
+    if (phoneDigits.length > 15) {
+      alert('Phone number is too long. Please enter a valid phone number (maximum 15 digits including country code).');
+      return;
+    }
+    if (phoneDigits.length < 10) {
+      alert('Phone number is too short. Please enter a valid phone number (minimum 10 digits).');
+      return;
+    }
+    
     // Set city area based on zip code
     setCityArea(getCityFromZip(zipCode.trim()));
     
@@ -376,8 +387,9 @@ export default function Create() {
             router.push(`/results/${planId}?${params.toString()}`);
           } else {
             // Normal flow - go to voting
-            sessionStorage.setItem('cameFromCreate', 'true');
-            router.push(`/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`);
+            sessionStorage.setItem('creator_name', userName.trim());
+            sessionStorage.setItem('creator_phone', phoneNumber.trim());
+            router.push(`/voting?planId=${planId}&creator=true`);
           }
         } else {
           alert('Failed to create plan. Please try again.');
@@ -432,22 +444,37 @@ export default function Create() {
   };
 
   // Start swiping (go to voting page)
-  const startSwiping = () => {
-    // Set flag to indicate user came from create page
-    sessionStorage.setItem('cameFromCreate', 'true');
+  const startSwiping = async () => {
+    // Store creator info in sessionStorage
+    sessionStorage.setItem('creator_name', userName.trim());
+    sessionStorage.setItem('creator_phone', phoneNumber.trim());
     
-    // Add small delay to ensure localStorage persistence
-    setTimeout(() => {
-      const votingUrl = `/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`;
-      console.log('🔗 Navigating to voting URL:', votingUrl);
-      router.push(votingUrl);
-    }, 50);
+    // Wait 100ms to ensure storage is written
+    await new Promise((r) => setTimeout(r, 100));
+    
+    // Navigate to new voting page
+    const votingUrl = `/voting?planId=${planId}&creator=true`;
+    console.log('🔗 Navigating to voting URL:', votingUrl);
+    router.push(votingUrl);
   };
 
   // Submit plan creation
   const handlePlanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    
+    // Validate phone number length (max 15 digits including country code)
+    const phoneDigits = phoneNumber.replace(/\D/g, '');
+    if (phoneDigits.length > 15) {
+      alert('Phone number is too long. Please enter a valid phone number (maximum 15 digits including country code).');
+      setIsLoading(false);
+      return;
+    }
+    if (phoneDigits.length < 10) {
+      alert('Phone number is too short. Please enter a valid phone number (minimum 10 digits).');
+      setIsLoading(false);
+      return;
+    }
     
     try {
       const response = await fetch('/api/createPlan', {
@@ -493,7 +520,7 @@ export default function Create() {
         
         // Show sharing step for all users (solo and group)
         const baseUrl = window.location.origin;
-        const shareUrl = `${baseUrl}/vote/${planId}?topic=${topic}&groupSize=${groupSize}&zip=${zipCode}`;
+        const shareUrl = `${baseUrl}/voting?planId=${planId}`;
         console.log('🔗 Generated share URL:', shareUrl);
         setShareUrl(shareUrl);
         setStep(5);

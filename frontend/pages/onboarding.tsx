@@ -188,7 +188,7 @@ export default function Onboarding() {
         topic: selectedTopic,
         groupSize: 'solo',
         zipCode: zipcode.trim(),
-        userName: 'Demo User',
+        userName: 'Host',
         phoneNumber: formattedPhone
       });
 
@@ -200,7 +200,7 @@ export default function Onboarding() {
           topic: selectedTopic,
           groupSize: 'solo',
           zipCode: zipcode.trim(),
-          userName: 'Demo User',
+          userName: 'Host',
           phoneNumber: formattedPhone
         })
       });
@@ -210,8 +210,13 @@ export default function Onboarding() {
       if (response.ok) {
         const data = await response.json();
         console.log('🎯 Plan created successfully:', data);
+        
+        // Store creator info in sessionStorage for auto-authentication
+        sessionStorage.setItem('creator_name', 'Host');
+        sessionStorage.setItem('creator_phone', formattedPhone);
+        
         // Redirect to voting page with real plan ID
-        router.push(`/vote/${data.planId}?topic=${selectedTopic}&groupSize=solo&zip=${zipcode.trim()}`);
+        router.push(`/voting?planId=${data.planId}&creator=true`);
       } else {
         const errorData = await response.json();
         console.error('🎯 Failed to create plan:', errorData);

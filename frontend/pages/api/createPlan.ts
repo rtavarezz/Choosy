@@ -19,6 +19,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Clean phone number for database validation
     const cleanPhone = phoneNumber.replace(/[^\d+]/g, ''); // Remove everything except digits and +
     
+    // Validate phone number length (max 15 digits including country code)
+    const phoneDigits = cleanPhone.replace(/\D/g, '');
+    if (phoneDigits.length > 15) {
+      return res.status(400).json({ 
+        error: 'Phone number is too long. Please enter a valid phone number (maximum 15 digits including country code).' 
+      });
+    }
+    if (phoneDigits.length < 10) {
+      return res.status(400).json({ 
+        error: 'Phone number is too short. Please enter a valid phone number (minimum 10 digits).' 
+      });
+    }
+    
     console.log('🔧 Creating plan with data:', {
       topic,
       groupSize,

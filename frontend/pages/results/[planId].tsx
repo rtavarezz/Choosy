@@ -124,7 +124,7 @@ export default function ResultsPage() {
   const [expectedVoters, setExpectedVoters] = useState(1);
   const [completedVoters, setCompletedVoters] = useState(0);
 
-  // Patch: Fetch voting status from backend
+  // Patch: Fetch voting status from backend (no auto-refresh)
   useEffect(() => {
     async function fetchVotingStatus() {
       if (!planId) return;
@@ -145,8 +145,8 @@ export default function ResultsPage() {
       }
     }
     fetchVotingStatus();
-    // Optionally, poll every 2 seconds for real-time updates
-    const interval = setInterval(fetchVotingStatus, 2000);
+    // Poll every 10 seconds for status updates (no auto-refresh)
+    const interval = setInterval(fetchVotingStatus, 10000);
     return () => clearInterval(interval);
   }, [planId]);
 
@@ -309,7 +309,7 @@ export default function ResultsPage() {
 
   // Handle share functionality
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/vote/${planId}?topic=${results.topic}&groupSize=${results.groupSize}&zip=${results.zip}`;
+    const shareUrl = `${window.location.origin}/voting?planId=${planId}`;
     
     if (navigator.share) {
       try {
@@ -425,12 +425,20 @@ export default function ResultsPage() {
                     return "Results will be available when everyone is done!";
                   })()}
                 </p>
-                <button
-                  onClick={() => router.push(`/vote/${planId}?topic=${results.topic}&groupSize=${results.groupSize}&zip=${results.zip}`)}
-                  className="mt-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
-                >
-                  Back to Voting
-                </button>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => router.push(`/voting?planId=${planId}`)}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                  >
+                    Back to Voting
+                  </button>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                  >
+                    🔄 Refresh Results
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -575,6 +583,14 @@ export default function ResultsPage() {
             </button>
             
             <button
+              onClick={() => window.location.reload()}
+              className="flex-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+            >
+              <span className="text-xl">🔄</span>
+              <span>Refresh Results</span>
+            </button>
+            
+            <button
               onClick={() => router.push('/create')}
               className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
             >
@@ -597,7 +613,7 @@ export default function ResultsPage() {
           {/* Vote again button */}
           <div className="mt-6 text-center">
             <button
-              onClick={() => router.push(`/vote/${planId}?topic=${results.topic}&groupSize=${results.groupSize}&zip=${results.zip}`)}
+              onClick={() => router.push(`/voting?planId=${planId}`)}
               className="text-purple-600 hover:text-purple-700 font-medium transition-colors duration-300"
             >
               Vote Again
