@@ -15,8 +15,8 @@ export default async function handler(
   }
 
   try {
-    // Call the backend location service to get real events
-    const response = await fetch(`http://127.0.0.1:8000/api/events?lat=${lat}&lng=${lng}&category=${category || 'adventure'}&radius=${radius || 5000}&limit=${limit || 20}`);
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    const response = await fetch(`${apiBase}/api/events?lat=${lat}&lng=${lng}&category=${category || 'adventure'}&radius=${radius || 5000}&limit=${limit || 20}`);
     
     if (!response.ok) {
       throw new Error(`Backend events API failed: ${response.status}`);

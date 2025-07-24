@@ -11,13 +11,14 @@ export default async function handler(
   const { zipcode, lat, lng } = req.query;
 
   try {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
     let backendUrl = '';
     if (lat && lng) {
       // If lat/lng provided, call backend to get zipcode
-      backendUrl = `http://127.0.0.1:8000/api/geocode?lat=${lat}&lng=${lng}`;
+      backendUrl = `${apiBase}/api/geocode?lat=${lat}&lng=${lng}`;
     } else if (zipcode) {
       // If zipcode provided, call backend as before
-      backendUrl = `http://127.0.0.1:8000/api/geocode?zipcode=${zipcode}`;
+      backendUrl = `${apiBase}/api/geocode?zipcode=${zipcode}`;
     } else {
       return res.status(400).json({ message: 'Zipcode or lat/lng required' });
     }
