@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useDarkMode } from '../../lib/darkMode';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
+import ProfanityFilter from 'profanity-filter';
 
 // Topic-specific image collections (same as vote page)
 const TOPIC_IMAGES = {
@@ -119,6 +122,9 @@ export default function ResultsPage() {
     phoneNumber: '',
     groupSize: 'solo'
   });
+  const [nameError, setNameError] = useState(''); // Name validation error
+  const [reservationMade, setReservationMade] = useState(false); // Track if reservation was made
+  const [reservationBy, setReservationBy] = useState(''); // Who made the reservation
   // Patch: always use backend voting status
   const [allVotersCompleted, setAllVotersCompleted] = useState(false);
   const [expectedVoters, setExpectedVoters] = useState(1);
@@ -149,6 +155,61 @@ export default function ResultsPage() {
     const interval = setInterval(fetchVotingStatus, 10000);
     return () => clearInterval(interval);
   }, [planId]);
+
+  // Name validation function (same as voting page)
+  const validateName = (name: string): boolean => {
+    const trimmedName = name.trim();
+    
+    // Check length (2-30 characters)
+    if (trimmedName.length < 2 || trimmedName.length > 30) {
+      setNameError('Name must be between 2 and 30 characters');
+      return false;
+    }
+    
+    // Check for only letters, spaces, hyphens, and apostrophes
+    const nameRegex = /^[a-zA-Z\s\-']+$/;
+    if (!nameRegex.test(trimmedName)) {
+      setNameError('Name can only contain letters, spaces, hyphens, and apostrophes');
+      return false;
+    }
+    
+    // Check for system/test names
+    const systemWords = [
+      'admin', 'moderator', 'system', 'test', 'fake', 'spam', 'bot', 'robot',
+      'anonymous', 'anon', 'unknown', 'nobody', 'someone', 'anyone', 'everyone'
+    ];
+    
+    const lowerName = trimmedName.toLowerCase();
+    for (const word of systemWords) {
+      if (lowerName.includes(word)) {
+        setNameError('Please choose an appropriate name');
+        return false;
+      }
+    }
+    
+    // Use profanity filter library for comprehensive profanity detection
+    const filter = new ProfanityFilter();
+    if (filter.isProfane(trimmedName)) {
+      setNameError('Please choose an appropriate name');
+      return false;
+    }
+    
+    // Check for excessive repetition (like "aaaaaa")
+    const repeatedChars = /(.)\1{4,}/;
+    if (repeatedChars.test(trimmedName)) {
+      setNameError('Name cannot contain excessive repeated characters');
+      return false;
+    }
+    
+    // Check for excessive spaces
+    if (trimmedName.includes('  ')) {
+      setNameError('Name cannot contain multiple consecutive spaces');
+      return false;
+    }
+    
+    setNameError('');
+    return true;
+  };
 
   // Function to get topic-specific image
   const getTopicImage = (eventIndex: number, eventTopic?: string) => {
@@ -275,6 +336,17 @@ export default function ResultsPage() {
       return;
     }
     
+    // Validate name before proceeding
+    if (!validateName(reservationForm.userName)) {
+      return; // Stop if validation fails
+    }
+    
+    // Check if reservation already made
+    if (reservationMade) {
+      alert('A reservation has already been made for this event.');
+      return;
+    }
+    
     setIsReserving(true);
     try {
       const response = await fetch('/api/makeReservation', {
@@ -294,6 +366,8 @@ export default function ResultsPage() {
       if (response.ok) {
         const data = await response.json();
         setReservationResult(data.reservation);
+        setReservationMade(true);
+        setReservationBy(reservationForm.userName);
         setShowReservationModal(false);
         alert('Reservation submitted successfully!');
       } else {
@@ -490,14 +564,18 @@ export default function ResultsPage() {
                   
                   <button
                     onClick={handleReservation}
-                    disabled={isReserving}
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    disabled={isReserving || reservationMade}
+                    className={`flex-1 font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
+                      reservationMade 
+                        ? 'bg-gray-400 text-white cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
+                    }`}
                   >
                     <span className="text-xl">
-                      {isReserving ? '⏳' : '🎫'}
+                      {isReserving ? '⏳' : reservationMade ? '✅' : '🎫'}
                     </span>
                     <span>
-                      {isReserving ? 'Reserving...' : 'Reserve Now'}
+                      {isReserving ? 'Reserving...' : reservationMade ? `${reservationBy} already reserved` : 'Reserve Now'}
                     </span>
                   </button>
                 </div>
@@ -640,23 +718,32 @@ export default function ResultsPage() {
                 <input
                   type="text"
                   value={reservationForm.userName}
-                  onChange={(e) => setReservationForm(prev => ({ ...prev, userName: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  onChange={(e) => {
+                    setReservationForm(prev => ({ ...prev, userName: e.target.value }));
+                    if (nameError) setNameError(''); // Clear error on input
+                  }}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    nameError ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="Enter your full name"
                   required
                 />
+                {nameError && (
+                  <p className="mt-1 text-sm text-red-600">{nameError}</p>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number *
                 </label>
-                <input
-                  type="tel"
+                <PhoneInput
+                  country={'us'}
                   value={reservationForm.phoneNumber}
-                  onChange={(e) => setReservationForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="(555) 123-4567"
+                  onChange={(phone) => setReservationForm(prev => ({ ...prev, phoneNumber: phone }))}
+                  placeholder="Enter your phone number"
+                  inputClass="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  containerClass="w-full"
                   required
                 />
               </div>

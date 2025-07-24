@@ -4,6 +4,7 @@ import TinderCard from 'react-tinder-card';
 import { motion, AnimatePresence } from 'framer-motion';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
+import { Filter } from 'bad-words';
 
 // Add CSS styles for swipe animations
 const swipeStyles = `
@@ -304,12 +305,73 @@ export default function VotingPage() {
   const [error, setError] = useState('');
   const [allCardsSwiped, setAllCardsSwiped] = useState(false);
   const [topic, setTopic] = useState('comedy'); // Added state for topic
+  const [nameError, setNameError] = useState(''); // Name validation error
+  
+  // Track form submission attempts
+  const [submissionAttempts, setSubmissionAttempts] = useState(0);
+  const [lastSubmittedName, setLastSubmittedName] = useState('');
+  const [lastSubmittedPhone, setLastSubmittedPhone] = useState('');
   
   // Refs
   const childRefs = useRef<{ [key: number]: any }>({});
   const lastDirection = useRef<string>('');
   const canSwipe = useRef<boolean>(true);
   
+  // Name validation function
+  const validateName = (name: string): boolean => {
+    const trimmedName = name.trim();
+    
+    // Check length (2-30 characters)
+    if (trimmedName.length < 2 || trimmedName.length > 30) {
+      setNameError('Name must be between 2 and 30 characters');
+      return false;
+    }
+    
+    // Check for only letters, spaces, hyphens, and apostrophes
+    const nameRegex = /^[a-zA-Z\s\-']+$/;
+    if (!nameRegex.test(trimmedName)) {
+      setNameError('Name can only contain letters, spaces, hyphens, and apostrophes');
+      return false;
+    }
+    
+    // Check for system/test names
+    const systemWords = [
+      'admin', 'moderator', 'system', 'test', 'fake', 'spam', 'bot', 'robot',
+      'anonymous', 'anon', 'unknown', 'nobody', 'someone', 'anyone', 'everyone'
+    ];
+    
+    const lowerName = trimmedName.toLowerCase();
+    for (const word of systemWords) {
+      if (lowerName.includes(word)) {
+        setNameError('Please choose an appropriate name');
+        return false;
+      }
+    }
+    
+    // Use bad-words filter for comprehensive profanity detection
+    const filter = new Filter();
+    if (filter.isProfane(trimmedName)) {
+      setNameError('Please choose an appropriate name');
+      return false;
+    }
+    
+    // Check for excessive repetition (like "aaaaaa")
+    const repeatedChars = /(.)\1{4,}/;
+    if (repeatedChars.test(trimmedName)) {
+      setNameError('Name cannot contain excessive repeated characters');
+      return false;
+    }
+    
+    // Check for excessive spaces
+    if (trimmedName.includes('  ')) {
+      setNameError('Name cannot contain multiple consecutive spaces');
+      return false;
+    }
+    
+    setNameError('');
+    return true;
+  };
+
   // Generate unique voter ID
   useEffect(() => {
     if (!currentVoterId) {
@@ -695,6 +757,16 @@ export default function VotingPage() {
     e.preventDefault();
     if (!voterName || !voterPhone || !planId) return;
     
+    // Track submission attempt
+    setSubmissionAttempts(prev => prev + 1);
+    setLastSubmittedName(voterName);
+    setLastSubmittedPhone(voterPhone);
+    
+    // Validate name before proceeding
+    if (!validateName(voterName)) {
+      return; // Stop if validation fails
+    }
+    
     console.log('🔐 Login submitted:', { voterName, voterPhone, planId });
     
     try {
@@ -727,6 +799,16 @@ export default function VotingPage() {
       alert('Failed to join voting. Please try again.');
     }
   };
+
+  // Refresh page only after failed submission and new input
+  useEffect(() => {
+    if (submissionAttempts > 0 && 
+        (voterName !== lastSubmittedName || voterPhone !== lastSubmittedPhone) &&
+        voterName && voterPhone) {
+      console.log('🔄 Refreshing page after failed submission and new input');
+      window.location.reload();
+    }
+  }, [voterName, voterPhone, submissionAttempts, lastSubmittedName, lastSubmittedPhone]);
 
   // Handle card swipe
   const swiped = async (direction: string, eventId: string) => {
@@ -936,11 +1018,19 @@ export default function VotingPage() {
                 <input
                   type="text"
                   value={voterName}
-                  onChange={(e) => setVoterName(e.target.value)}
+                  onChange={(e) => {
+                    setVoterName(e.target.value);
+                    if (nameError) setNameError(''); // Clear error on input
+                  }}
                   placeholder="e.g., Sarah Johnson"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    nameError ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   required
                 />
+                {nameError && (
+                  <p className="mt-1 text-sm text-red-600">{nameError}</p>
+                )}
               </div>
 
               <div>

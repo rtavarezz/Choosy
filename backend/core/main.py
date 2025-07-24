@@ -15,6 +15,8 @@ import secrets
 import uuid
 import json
 import traceback
+import re
+from better_profanity import profanity
 
 # Import location service
 import sys
@@ -34,6 +36,47 @@ from core.rate_limiter import rate_limiter, get_client_id
 
 # Import logger
 from utils.logger import logger, log_api_request, log_error
+
+# Name validation function
+def validate_name(name: str) -> bool:
+    """Validate name for appropriateness and format"""
+    if not name or not isinstance(name, str):
+        return False
+    
+    trimmed_name = name.strip()
+    
+    # Check length (2-30 characters)
+    if len(trimmed_name) < 2 or len(trimmed_name) > 30:
+        return False
+    
+    # Check for only letters, spaces, hyphens, and apostrophes
+    if not re.match(r'^[a-zA-Z\s\-\']+$', trimmed_name):
+        return False
+    
+    # Check for system/test names
+    system_words = [
+        'admin', 'moderator', 'system', 'test', 'fake', 'spam', 'bot', 'robot',
+        'anonymous', 'anon', 'unknown', 'nobody', 'someone', 'anyone', 'everyone'
+    ]
+    
+    lower_name = trimmed_name.lower()
+    for word in system_words:
+        if word in lower_name:
+            return False
+    
+    # Use profanity filter for comprehensive profanity detection
+    if profanity.contains_profanity(trimmed_name):
+        return False
+    
+    # Check for excessive repetition (like "aaaaaa")
+    if re.search(r'(.)\1{4,}', trimmed_name):
+        return False
+    
+    # Check for excessive spaces
+    if '  ' in trimmed_name:
+        return False
+    
+    return True
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
@@ -189,9 +232,9 @@ class PlanCreate(BaseModel):
     
     @validator('host_name')
     def validate_host_name(cls, v):
-        if not v or len(v) < 1 or len(v) > 100:
-            raise ValueError('Host name must be 1-100 characters')
-        return v
+        if not validate_name(v):
+            raise ValueError('Please choose an appropriate name (2-30 characters, letters only)')
+        return v.strip()
     
     @validator('host_phone')
     def validate_host_phone(cls, v):
@@ -217,10 +260,22 @@ class ReservationCreate(BaseModel):
     group_size: Optional[str] = "solo"
     event_time: Optional[str] = "7:00 PM"
     event_date: Optional[str] = None
+    
+    @validator('user_name')
+    def validate_user_name(cls, v):
+        if not validate_name(v):
+            raise ValueError('Please choose an appropriate name (2-30 characters, letters only)')
+        return v.strip()
 
 class UserCreate(BaseModel):
     name: str
     phone: str
+    
+    @validator('name')
+    def validate_name_field(cls, v):
+        if not validate_name(v):
+            raise ValueError('Please choose an appropriate name (2-30 characters, letters only)')
+        return v.strip()
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
