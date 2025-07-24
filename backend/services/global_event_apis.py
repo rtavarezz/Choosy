@@ -14,6 +14,7 @@ from enum import Enum
 import json
 import hashlib
 from dotenv import load_dotenv
+from .api_config import api_template_manager, EventType
 
 load_dotenv()
 
@@ -54,22 +55,19 @@ class GlobalEvent:
 
 class GlobalEventAPI:
     def __init__(self):
-        # Initialize API keys from environment variables
-        self.api_keys = {
-            'eventbrite': os.getenv('EVENTBRITE_API_KEY'),
-            'ticketmaster': os.getenv('TICKETMASTER_API_KEY'),
-            'ticketmaster_secret': os.getenv('TICKETMASTER_SECRET'),
-            'meetup': os.getenv('MEETUP_API_KEY'),
-            'yelp': os.getenv('YELP_API_KEY')
-        }
+        # Initialize API keys from environment variables using template manager
+        self.api_keys = {}
+        self.rate_limits = {}
         
-        # Rate limiting
-        self.rate_limits = {
-            'eventbrite': {'requests': 0, 'limit': 10000, 'reset_time': datetime.now()},
-            'meetup': {'requests': 0, 'limit': 5000, 'reset_time': datetime.now()},
-            'facebook': {'requests': 0, 'limit': 200, 'reset_time': datetime.now()},
-            'google': {'requests': 0, 'limit': 100000, 'reset_time': datetime.now()}
-        }
+        # Get API configurations from template manager
+        for api_name, config in api_template_manager.api_configs.items():
+            if config.enabled:
+                self.api_keys[api_name] = os.getenv(config.api_key_env) if config.api_key_env else None
+                self.rate_limits[api_name] = {
+                    'requests': 0, 
+                    'limit': config.rate_limit, 
+                    'reset_time': datetime.now()
+                }
     
     def get_google_search_url(self, topic, city):
         topic_search_terms = {
@@ -101,77 +99,107 @@ class GlobalEventAPI:
     ) -> List[GlobalEvent]:
         """
         Get real events from global APIs - NO MOCK DATA
+        Uses template-based configuration for easy API management
         """
         events = []
         
-        # Fetch from all available APIs concurrently
+        # Get topic configuration from template manager
+        topic_config = api_template_manager.get_topic_config(category)
+        if not topic_config:
+            print(f"❌ No configuration found for topic: {category}")
+            return events
+        
+        print(f"🎯 Fetching {category} events using {len(topic_config.api_sources)} API sources")
+        
+        # Fetch from configured APIs based on topic configuration
         tasks = []
         
-        # Primary event sources (what 222 uses)
-        if self.api_keys.get('eventbrite'):
-            tasks.append(self._fetch_eventbrite_events(lat, lng, category, radius))
-        
-        if self.api_keys.get('meetup'):
-            tasks.append(self._fetch_meetup_events(lat, lng, category, radius))
-        
-        if self.api_keys.get('facebook'):
-            tasks.append(self._fetch_facebook_events(lat, lng, category, radius))
-        
-        if self.api_keys.get('google'):
-            tasks.append(self._fetch_google_events(lat, lng, category, radius))
+        for api_name in topic_config.api_sources:
+            api_config = api_template_manager.get_api_config(api_name)
+            if not api_config or not api_config.enabled:
+                continue
+                
+            if not self.api_keys.get(api_name) and api_name not in ['openstreetmap']:
+                print(f"⚠️ API {api_name} not configured (missing API key)")
+                continue
+            
+            # Create fetch task based on API name
+            if api_name == 'eventbrite':
+                tasks.append(self._fetch_eventbrite_events(lat, lng, category, radius))
+            elif api_name == 'ticketmaster':
+                tasks.append(self._fetch_ticketmaster_events(lat, lng, category, radius))
+            elif api_name == 'meetup':
+                tasks.append(self._fetch_meetup_events(lat, lng, category, radius))
+            elif api_name == 'google_places':
+                tasks.append(self._fetch_google_places_events(lat, lng, category, radius))
+            elif api_name == 'openstreetmap':
+                tasks.append(self._fetch_osm_events(lat, lng, category, radius))
+            elif api_name == 'yelp':
+                tasks.append(self._fetch_yelp_events(lat, lng, category, radius))
+            elif api_name == 'facebook':
+                tasks.append(self._fetch_facebook_events(lat, lng, category, radius))
         
         # Execute all tasks concurrently
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Combine results
-        for result in results:
-            if isinstance(result, list):
-                events.extend(result)
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Combine results
+            for result in results:
+                if isinstance(result, list):
+                    events.extend(result)
+                elif isinstance(result, Exception):
+                    print(f"⚠️ API source failed: {result}")
+                    continue
         
         # Deduplicate and rank
         events = self._deduplicate_events(events)
         events = self._rank_events_by_relevance(events, category)
         events = self.filter_events_by_topic(events, category)
 
-        # --- General fallback for low results ---
-        if len(events) < 2:
-            city_name = self._get_city_from_coordinates(lat, lng)
-            google_url = self.get_google_search_url(category, city_name)
-            suggestion_event = GlobalEvent(
-                id=f'suggestion_google_{category}_{city_name.replace(" ", "_")}',
-                name=f'No {category} events found nearby',
-                description=(
-                    f"Try expanding your search radius or date range. "
-                    f"You can also Google '{category} near {city_name}' for more options. "
-                    f"\n\n[Click here to search Google]({google_url})"
-                ),
-                image_url='https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
-                start_time=None,
-                end_time=None,
-                venue=None,
-                address=None,
-                city=city_name,
-                state=None,
-                zip_code=None,
-                price=None,
-                category=category,
-                source=None,
-                external_id=None,
-                external_url=google_url,
-                organizer=None,
-                attendees_count=None,
-                max_attendees=None,
-                is_free=True,
-                is_featured=False,
-                metadata={'suggestion': True}
-            )
-            events.append(suggestion_event)
-            # Optionally add up to 3 fallback events from a broader category
-            fallback_category = 'sports' if category == 'racing' else 'entertainment'
-            fallback_events = self.filter_events_by_topic(self._rank_events_by_relevance(self._deduplicate_events(events), fallback_category), fallback_category)
-            fallback_events = [e for e in fallback_events if e.id != suggestion_event.id][:3]
-            events.extend(fallback_events)
+        # --- Fun Activities Fallback for low results ---
+        if len(events) < topic_config.min_events_threshold and topic_config.fallback_activities:
+            print(f"🎮 Adding fun offline activities for {category} (only {len(events)} real events found)")
+            
+            # Add fun offline activities and TikTok trends
+            fun_activities = self._create_fun_offline_activities(category)
+            events.extend(fun_activities)
+            
+            # If still low on events, add a suggestion to search Google
+            if len(events) < 3:
+                city_name = self._get_city_from_coordinates(lat, lng)
+                google_url = self.get_google_search_url(category, city_name)
+                suggestion_event = GlobalEvent(
+                    id=f'suggestion_google_{category}_{city_name.replace(" ", "_")}',
+                    name=f'Search for more {category} events',
+                    description=(
+                        f"Want more options? Search Google for '{category} near {city_name}' "
+                        f"or try our fun offline activities above! "
+                        f"\n\n[Click here to search Google]({google_url})"
+                    ),
+                    image_url='https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+                    start_time=None,
+                    end_time=None,
+                    venue=None,
+                    address=None,
+                    city=city_name,
+                    state=None,
+                    zip_code=None,
+                    price=None,
+                    category=category,
+                    source=None,
+                    external_id=None,
+                    external_url=google_url,
+                    organizer=None,
+                    attendees_count=None,
+                    max_attendees=None,
+                    is_free=True,
+                    is_featured=False,
+                    metadata={'suggestion': True}
+                )
+                events.append(suggestion_event)
         # --------------------------------------
+        
+        print(f"✅ Found {len(events)} total events for {category}")
         return events[:limit]
     
     async def _fetch_eventbrite_events(self, lat: float, lng: float, category: str, radius: int) -> List[GlobalEvent]:
@@ -1228,6 +1256,55 @@ class GlobalEventAPI:
             events.append(event)
         
         return events
+
+    def _create_fun_offline_activities(self, category: str) -> List[GlobalEvent]:
+        """Create fun, free offline activities and TikTok trends based on category"""
+        activities = []
+        
+        # Get fun activities for the category
+        fun_activities = self._get_fun_activity_templates(category)
+        
+        for i, activity in enumerate(fun_activities):
+            event_id = f"fun_{category}_{i}_{int(datetime.now().timestamp())}"
+            
+            event = GlobalEvent(
+                id=event_id,
+                name=activity['name'],
+                description=activity['description'],
+                image_url=activity['image_url'],
+                start_time=None,
+                end_time=None,
+                venue=activity['venue'],
+                address="Anywhere you want!",
+                city="Your Area",
+                state="",
+                zip_code="",
+                price="FREE",
+                category=category,
+                source=EventSource.LOCAL,
+                external_id=event_id,
+                external_url=None,
+                organizer="Fun Ideas",
+                attendees_count=None,
+                max_attendees=None,
+                is_free=True,
+                is_featured=True,
+                metadata={
+                    'phone': 'N/A',
+                    'email': 'fun@choosy.com',
+                    'hours': '24/7',
+                    'offline_activity': True,
+                    'tiktok_trend': activity.get('tiktok_trend', False),
+                    'cultural_game': activity.get('cultural_game', False),
+                    'free_activity': True,
+                    'difficulty': activity.get('difficulty', 'Easy'),
+                    'duration': activity.get('duration', '1-2 hours'),
+                    'materials_needed': activity.get('materials_needed', 'None')
+                }
+            )
+            activities.append(event)
+        
+        return activities
     
     def _get_city_from_coordinates(self, lat: float, lng: float) -> str:
         """Get city name from coordinates (simplified)"""
@@ -1245,6 +1322,531 @@ class GlobalEventAPI:
         else:
             return "Local Area"
     
+    def _get_fun_activity_templates(self, category: str) -> List[dict]:
+        """Get fun, free offline activities and TikTok trends based on category"""
+        templates = {
+            'foodie': [
+                {
+                    'name': '🍕 TikTok Pizza Challenge',
+                    'venue': 'Your Kitchen',
+                    'description': 'Try the viral TikTok pizza hack! Use a tortilla, add your favorite toppings, and create a crispy personal pizza. Perfect for solo cooking or group fun!',
+                    'image_url': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Easy',
+                    'duration': '30 minutes',
+                    'materials_needed': 'Tortillas, cheese, toppings, pan'
+                },
+                {
+                    'name': '🌮 Taco Tuesday Challenge',
+                    'venue': 'Any Kitchen',
+                    'description': 'Create the most creative taco! Use unusual ingredients, try fusion flavors, or make it Instagram-worthy. Share your creation!',
+                    'image_url': 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '1 hour',
+                    'materials_needed': 'Tortillas, ingredients, creativity'
+                },
+                {
+                    'name': '🍰 Cake Decorating Battle',
+                    'venue': 'Home Kitchen',
+                    'description': 'Buy a plain cake and decorate it with friends! Use candy, sprinkles, and creativity. Vote on the best design!',
+                    'image_url': 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Plain cake, decorations, creativity'
+                },
+                {
+                    'name': '🍳 TikTok Cooking Challenge',
+                    'venue': 'Kitchen',
+                    'description': 'Try viral cooking hacks and recipes! Film your cooking process and share your culinary creations.',
+                    'image_url': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Ingredients, cooking tools, camera'
+                },
+                {
+                    'name': '🍹 Mocktail Mixing Party',
+                    'venue': 'Home',
+                    'description': 'Create fancy mocktails with friends! Use fresh fruits, herbs, and creative garnishes.',
+                    'image_url': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1 hour',
+                    'materials_needed': 'Fruits, herbs, glasses, creativity'
+                },
+                {
+                    'name': '🍪 Cookie Decorating Contest',
+                    'venue': 'Kitchen',
+                    'description': 'Bake cookies and have a decorating contest! Use icing, sprinkles, and edible decorations.',
+                    'image_url': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Cookies, icing, decorations'
+                }
+            ],
+            'datenight': [
+                {
+                    'name': '💕 TikTok Couple Challenge',
+                    'venue': 'Your Home',
+                    'description': 'Try the viral couple challenges! Blindfolded makeup, synchronized dancing, or the "what\'s in my partner\'s phone" game.',
+                    'image_url': 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Easy',
+                    'duration': '1 hour',
+                    'materials_needed': 'Phone, camera, creativity'
+                },
+                {
+                    'name': '🎭 Improv Comedy Night',
+                    'venue': 'Living Room',
+                    'description': 'Create your own comedy show! Take turns making up stories, acting out scenarios, or playing "Yes, And" improv games.',
+                    'image_url': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Imagination, sense of humor'
+                },
+                {
+                    'name': '🕯️ Candlelit Board Game Night',
+                    'venue': 'Home',
+                    'description': 'Turn off the lights, light some candles, and play your favorite board games by candlelight. Romantic and fun!',
+                    'image_url': 'https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '2-3 hours',
+                    'materials_needed': 'Board games, candles, blankets'
+                }
+            ],
+            'concerts': [
+                {
+                    'name': '🎤 TikTok Karaoke Challenge',
+                    'venue': 'Your Living Room',
+                    'description': 'Sing your heart out to trending TikTok songs! Use apps like Smule or just sing along to YouTube. Record and share!',
+                    'image_url': 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Phone, music app, microphone (optional)'
+                },
+                {
+                    'name': '🥁 Kitchen Band Jam',
+                    'venue': 'Kitchen',
+                    'description': 'Turn kitchen items into instruments! Use pots, pans, spoons, and create your own band. Record a music video!',
+                    'image_url': 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Easy',
+                    'duration': '1 hour',
+                    'materials_needed': 'Kitchen items, creativity'
+                },
+                {
+                    'name': '🎵 Lip Sync Battle',
+                    'venue': 'Any Room',
+                    'description': 'Classic lip sync battle! Choose songs, practice your moves, and compete for the best performance.',
+                    'image_url': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Music, camera, costumes'
+                }
+            ],
+            'comedy': [
+                {
+                    'name': '😂 TikTok Comedy Skits',
+                    'venue': 'Your Home',
+                    'description': 'Recreate viral TikTok comedy skits! Act out funny scenarios, use popular sound effects, and create your own content.',
+                    'image_url': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Phone, camera, creativity'
+                },
+                {
+                    'name': '🎭 Stand-Up Comedy Night',
+                    'venue': 'Living Room',
+                    'description': 'Write and perform your own stand-up comedy! Take turns telling jokes, stories, or doing impressions.',
+                    'image_url': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Hard',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Jokes, confidence, audience'
+                },
+                {
+                    'name': '🎪 Improv Games Night',
+                    'venue': 'Any Space',
+                    'description': 'Play classic improv games like "Yes, And", "Freeze Tag", or "Props". Great for groups and building creativity!',
+                    'image_url': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Imagination, energy'
+                }
+            ],
+            'sports': [
+                {
+                    'name': '🏀 TikTok Basketball Tricks',
+                    'venue': 'Driveway/Park',
+                    'description': 'Try viral basketball trick shots! Set up creative obstacles, use household items, and film your attempts.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Hard',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Basketball, hoop, obstacles'
+                },
+                {
+                    'name': '⚽ Backyard Soccer Tournament',
+                    'venue': 'Backyard/Park',
+                    'description': 'Organize a mini soccer tournament! Use cones for goals, create teams, and play quick matches.',
+                    'image_url': 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Medium',
+                    'duration': '2-3 hours',
+                    'materials_needed': 'Soccer ball, cones, friends'
+                },
+                {
+                    'name': '🏓 Ping Pong Championship',
+                    'venue': 'Garage/Basement',
+                    'description': 'Set up a ping pong table and have a tournament! Create brackets, keep score, and crown a champion.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Ping pong table, paddles, balls'
+                },
+                {
+                    'name': '🏃‍♂️ TikTok Fitness Challenge',
+                    'venue': 'Home/Gym',
+                    'description': 'Try viral fitness challenges! Plank challenges, wall sits, or create your own workout routine.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '30-60 minutes',
+                    'materials_needed': 'Yoga mat, timer, motivation'
+                },
+                {
+                    'name': '🎾 Tennis Wall Practice',
+                    'venue': 'Tennis Court',
+                    'description': 'Find a tennis wall and practice your strokes! Perfect for solo practice or friendly competitions.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Tennis racket, balls, wall'
+                },
+                {
+                    'name': '🏊‍♀️ Pool Workout',
+                    'venue': 'Local Pool',
+                    'description': 'Try water aerobics or swimming laps! Great low-impact exercise that\'s fun and refreshing.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1 hour',
+                    'materials_needed': 'Swimsuit, towel, pool access'
+                },
+                {
+                    'name': '🚴‍♂️ Bike Ride Adventure',
+                    'venue': 'Neighborhood',
+                    'description': 'Go on a bike ride and explore your area! Find new routes, take photos, and enjoy the outdoors.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-3 hours',
+                    'materials_needed': 'Bike, helmet, water'
+                },
+                {
+                    'name': '🏋️‍♀️ Home Gym Circuit',
+                    'venue': 'Home',
+                    'description': 'Create a circuit workout using household items! Use chairs, water bottles, and bodyweight exercises.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '45 minutes',
+                    'materials_needed': 'Household items, timer, space'
+                }
+            ],
+            'parks': [
+                {
+                    'name': '🌳 TikTok Nature Walk',
+                    'venue': 'Local Park',
+                    'description': 'Go on a nature walk and film TikTok-style content! Find interesting plants, animals, or scenic spots.',
+                    'image_url': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Phone, camera, walking shoes'
+                },
+                {
+                    'name': '🧺 Picnic Games',
+                    'venue': 'Park',
+                    'description': 'Pack a picnic and bring classic games! Frisbee, cards, board games, or create your own outdoor activities.',
+                    'image_url': 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '2-3 hours',
+                    'materials_needed': 'Picnic food, games, blanket'
+                },
+                {
+                    'name': '🎯 Outdoor Scavenger Hunt',
+                    'venue': 'Park/Neighborhood',
+                    'description': 'Create a scavenger hunt! Make a list of items to find, take photos, and compete with friends.',
+                    'image_url': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'List, camera, creativity'
+                }
+            ],
+            'adventure': [
+                {
+                    'name': '🗺️ TikTok Geocaching',
+                    'venue': 'Your Area',
+                    'description': 'Try geocaching with a TikTok twist! Film your treasure hunts, create clues, and share your finds.',
+                    'image_url': 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '2-3 hours',
+                    'materials_needed': 'Phone, GPS, small treasures'
+                },
+                {
+                    'name': '🏠 Neighborhood Explorer',
+                    'venue': 'Your Neighborhood',
+                    'description': 'Explore your neighborhood like a tourist! Take photos, discover hidden spots, and learn local history.',
+                    'image_url': 'https://images.unsplash.com/photo-1593508512255-86ab42a8e620?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Camera, walking shoes, curiosity'
+                },
+                {
+                    'name': '🎪 Backyard Obstacle Course',
+                    'venue': 'Backyard',
+                    'description': 'Create an obstacle course using household items! Time each other, add challenges, and have fun.',
+                    'image_url': 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Household items, timer, creativity'
+                }
+            ],
+            'shopping': [
+                {
+                    'name': '🛍️ TikTok Thrift Flip',
+                    'venue': 'Thrift Store + Home',
+                    'description': 'Buy something from a thrift store and transform it! Paint, modify, or style it for a before/after video.',
+                    'image_url': 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '2-3 hours',
+                    'materials_needed': 'Thrift items, craft supplies, creativity'
+                },
+                {
+                    'name': '👗 Fashion Show Night',
+                    'venue': 'Home',
+                    'description': 'Have a fashion show with your clothes! Create outfits, walk the runway, and rate each other\'s style.',
+                    'image_url': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Clothes, accessories, music'
+                },
+                {
+                    'name': '🎨 DIY Craft Market',
+                    'venue': 'Home',
+                    'description': 'Create crafts and have a mini market! Make jewelry, art, or decorations and "sell" to each other.',
+                    'image_url': 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Medium',
+                    'duration': '2-3 hours',
+                    'materials_needed': 'Craft supplies, creativity, imagination'
+                }
+            ],
+            'wellness': [
+                {
+                    'name': '🧘 TikTok Yoga Challenge',
+                    'venue': 'Home',
+                    'description': 'Try viral yoga poses and challenges! Follow TikTok yoga trends, create flows, and share your practice.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '30-60 minutes',
+                    'materials_needed': 'Yoga mat, phone, space'
+                },
+                {
+                    'name': '🌿 DIY Spa Night',
+                    'venue': 'Bathroom',
+                    'description': 'Create your own spa experience! Face masks, bubble baths, meditation, and relaxation techniques.',
+                    'image_url': 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Spa supplies, candles, music'
+                },
+                {
+                    'name': '🚶‍♀️ Mindful Walking',
+                    'venue': 'Neighborhood',
+                    'description': 'Go for a mindful walk! Focus on your surroundings, practice gratitude, and enjoy the present moment.',
+                    'image_url': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '30-60 minutes',
+                    'materials_needed': 'Walking shoes, mindfulness'
+                }
+            ],
+            'family': [
+                {
+                    'name': '👨‍👩‍👧‍👦 TikTok Family Dance',
+                    'venue': 'Living Room',
+                    'description': 'Learn and perform viral TikTok dances as a family! Create your own choreography and film it.',
+                    'image_url': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Music, camera, energy'
+                },
+                {
+                    'name': '🎮 Family Game Tournament',
+                    'venue': 'Home',
+                    'description': 'Have a family game tournament! Board games, card games, or create your own family challenges.',
+                    'image_url': 'https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '2-3 hours',
+                    'materials_needed': 'Games, snacks, family'
+                },
+                {
+                    'name': '🎨 Family Art Project',
+                    'venue': 'Home',
+                    'description': 'Create a family art project! Paint, draw, or craft together. Display your masterpiece proudly!',
+                    'image_url': 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Art supplies, creativity, family'
+                }
+            ],
+            'racing': [
+                {
+                    'name': '🏁 TikTok Go-Kart Challenge',
+                    'venue': 'Local Go-Kart Track',
+                    'description': 'Try viral go-kart tricks and challenges! Film your fastest lap, drift attempts, or create obstacle courses.',
+                    'image_url': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Go-kart track, camera, friends'
+                },
+                {
+                    'name': '🏎️ Remote Control Car Racing',
+                    'venue': 'Driveway/Park',
+                    'description': 'Set up a remote control car race! Create tracks, obstacles, and compete for the fastest time.',
+                    'image_url': 'https://images.unsplash.com/photo-1464983953574-0892a716854b?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'RC cars, batteries, track materials'
+                },
+                {
+                    'name': '🏁 DIY Race Track',
+                    'venue': 'Backyard',
+                    'description': 'Create your own race track using chalk, cones, or household items! Race toy cars or bikes.',
+                    'image_url': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1 hour',
+                    'materials_needed': 'Chalk, cones, toy cars, creativity'
+                },
+                {
+                    'name': '🏃‍♂️ TikTok Speed Challenge',
+                    'venue': 'Park/Track',
+                    'description': 'Try viral speed challenges! Sprint races, obstacle courses, or timed challenges.',
+                    'image_url': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+                    'tiktok_trend': True,
+                    'cultural_game': False,
+                    'difficulty': 'Medium',
+                    'duration': '30-60 minutes',
+                    'materials_needed': 'Timer, space, energy'
+                },
+                {
+                    'name': '🏁 Mario Kart Tournament',
+                    'venue': 'Home',
+                    'description': 'Host a Mario Kart tournament! Set up brackets, choose tracks, and crown a champion.',
+                    'image_url': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '2-3 hours',
+                    'materials_needed': 'Gaming console, Mario Kart, friends'
+                },
+                {
+                    'name': '🏎️ Hot Wheels Championship',
+                    'venue': 'Home',
+                    'description': 'Build elaborate Hot Wheels tracks and race! Create loops, jumps, and obstacles.',
+                    'image_url': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop',
+                    'tiktok_trend': False,
+                    'cultural_game': True,
+                    'difficulty': 'Easy',
+                    'duration': '1-2 hours',
+                    'materials_needed': 'Hot Wheels cars, track pieces, creativity'
+                }
+            ]
+        }
+        
+        return templates.get(category, [
+            {
+                'name': '🎉 Fun Activity Night',
+                'venue': 'Your Home',
+                'description': 'Create your own fun! Pick a random activity, game, or challenge and enjoy quality time together.',
+                'image_url': 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
+                'tiktok_trend': False,
+                'cultural_game': True,
+                'difficulty': 'Easy',
+                'duration': '1-2 hours',
+                'materials_needed': 'Creativity, energy, fun'
+            }
+        ])
+
     def _get_local_event_templates(self, category: str, city_name: str) -> List[dict]:
         """Get realistic local event templates based on category and city"""
         templates = {
@@ -1527,7 +2129,15 @@ class GlobalEventAPI:
             # Get dates
             dates = event_data.get('dates', {})
             start_data = dates.get('start', {})
-            start_time = start_data.get('localDate') + ' ' + start_data.get('localTime', '')
+            start_time = None
+            if start_data.get('localDate'):
+                try:
+                    date_str = start_data.get('localDate')
+                    time_str = start_data.get('localTime', '00:00:00')
+                    datetime_str = f"{date_str} {time_str}"
+                    start_time = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    start_time = None
             
             # Get venue
             embedded = event_data.get('_embedded', {})
@@ -1629,34 +2239,14 @@ class GlobalEventAPI:
             return None
 
     def filter_events_by_topic(self, events, topic):
-        topic_keywords = {
-            'racing': [
-                'race', 'racing', 'motorsport', 'kart', 'go-kart', 'track', 'speedway', 'drag', 'auto', 'nascar',
-                'formula', 'indy', 'drift', 'motocross', 'monster truck', 'grand prix', 'f1', 'rally'
-            ],
-            'foodie': ['food', 'restaurant', 'dining', 'eat', 'cuisine', 'bistro', 'cafe', 'deli', 'brunch', 'dinner', 'lunch'],
-            'nightlife': ['nightlife', 'club', 'bar', 'pub', 'dj', 'party', 'cocktail', 'lounge'],
-            'concerts': ['concert', 'music', 'band', 'live', 'gig', 'show', 'performance'],
-            'comedy': ['comedy', 'stand-up', 'improv', 'comic', 'laugh'],
-            'art': ['art', 'gallery', 'museum', 'exhibit', 'exhibition', 'painting', 'sculpture'],
-            'movies': ['movie', 'film', 'cinema', 'screening'],
-            'sports': ['sport', 'game', 'match', 'tournament', 'league', 'athletic', 'fitness', 'gym'],
-            'parks': ['park', 'garden', 'nature', 'outdoor', 'trail', 'picnic'],
-            'swimming': ['swim', 'pool', 'aquatic', 'water', 'aquarium'],
-            'drinks': ['drink', 'bar', 'cocktail', 'wine', 'beer', 'brewery', 'pub'],
-            'datenight': ['date', 'romantic', 'couple', 'dinner', 'night', 'love'],
-            'adventure': ['adventure', 'escape', 'vr', 'virtual', 'arcade', 'climb', 'zipline', 'explore'],
-            'shopping': ['shop', 'shopping', 'mall', 'store', 'boutique', 'market'],
-            'wellness': ['wellness', 'yoga', 'spa', 'meditation', 'fitness', 'health'],
-            'family': ['family', 'kids', 'children', 'parent', 'play', 'zoo', 'aquarium', 'museum'],
-            # Add more as needed
-        }
-        negative_keywords = {
-            'racing': ['ymca', 'pool', 'fitness', 'gym', 'swim', 'aquatic', 'recreation', 'community center']
-            # Add for other topics if needed
-        }
-        keywords = topic_keywords.get(topic, [topic])
-        neg_keywords = negative_keywords.get(topic, [])
+        """Filter events by topic using template-based configuration"""
+        topic_config = api_template_manager.get_topic_config(topic)
+        if not topic_config:
+            return events
+        
+        keywords = topic_config.search_keywords
+        neg_keywords = topic_config.exclude_keywords
+        
         filtered = [
             event for event in events
             if (

@@ -523,6 +523,8 @@ class LocationService:
             'phone': event.metadata.get('phone') if event.metadata else None,
             'email': event.metadata.get('email') if event.metadata else None,
             'hours': event.metadata.get('hours') if event.metadata else None,
+            # Include all metadata for fun activities
+            'metadata': event.metadata if event.metadata else {},
         }
 
     def _get_hardcoded_racing_venues(self, zipcode: str) -> List[Dict]:

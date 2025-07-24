@@ -84,3 +84,8 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Logs
+*.log
+backend/logs/
+logs/

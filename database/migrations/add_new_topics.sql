@@ -8,7 +8,7 @@ ALTER TABLE plans DROP CONSTRAINT IF EXISTS plans_topic_check;
 ALTER TABLE plans ADD CONSTRAINT plans_topic_check 
 CHECK (topic IN (
     'concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 
-    'gokart', 'swimming', 'drinks', 'movies', 'comedy', 'art', 
+    'racing', 'swimming', 'drinks', 'movies', 'comedy', 'art', 
     'shopping', 'wellness', 'adventure', 'family'
 ));
 
@@ -19,5 +19,5 @@ ALTER TABLE events DROP CONSTRAINT IF EXISTS events_source_type_check;
 ALTER TABLE events ADD CONSTRAINT events_source_type_check 
 CHECK (source_type IN (
     'yelp', 'ticketmaster', 'custom', 'google', 'eventbrite', 
-    'meetup', 'facebook', 'partner', 'osm'
+    'meetup', 'facebook', 'partner', 'local'
 )); 

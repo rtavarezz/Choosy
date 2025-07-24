@@ -113,6 +113,12 @@ export default function ResultsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isReserving, setIsReserving] = useState(false);
   const [reservationResult, setReservationResult] = useState(null);
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [reservationForm, setReservationForm] = useState({
+    userName: '',
+    phoneNumber: '',
+    groupSize: 'solo'
+  });
   // Patch: always use backend voting status
   const [allVotersCompleted, setAllVotersCompleted] = useState(false);
   const [expectedVoters, setExpectedVoters] = useState(1);
@@ -254,8 +260,18 @@ export default function ResultsPage() {
     // Check if this is a demo
     const isDemo = Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo';
     
-    if (isDemo || !results.plan?.userName || !results.plan?.phoneNumber) {
+    if (isDemo) {
       alert('This is a demo! Create a real plan to make reservations.');
+      return;
+    }
+    
+    // Show reservation modal to collect user info
+    setShowReservationModal(true);
+  };
+
+  const handleReservationSubmit = async () => {
+    if (!results?.winningEvent || !reservationForm.userName || !reservationForm.phoneNumber) {
+      alert('Please fill in all required fields.');
       return;
     }
     
@@ -267,9 +283,9 @@ export default function ResultsPage() {
         body: JSON.stringify({
           activityType: results.topic,
           eventName: results.winningEvent.name,
-          userName: results.plan?.userName || 'John Smith', // Get from plan data
-          phoneNumber: results.plan?.phoneNumber || results.winningEvent.contact.phone,
-          groupSize: results.groupSize,
+          userName: reservationForm.userName,
+          phoneNumber: reservationForm.phoneNumber,
+          groupSize: reservationForm.groupSize,
           eventTime: results.winningEvent.hours?.split(' - ')[0] || '7:00 PM',
           eventDate: new Date().toISOString().split('T')[0]
         })
@@ -278,6 +294,8 @@ export default function ResultsPage() {
       if (response.ok) {
         const data = await response.json();
         setReservationResult(data.reservation);
+        setShowReservationModal(false);
+        alert('Reservation submitted successfully!');
       } else {
         alert('Failed to make reservation. Please try again.');
       }
@@ -465,22 +483,13 @@ export default function ResultsPage() {
                   <button
                     onClick={handleReservation}
                     disabled={isReserving}
-                    className={`flex-1 font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-                      (Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo') || !results.plan?.userName || !results.plan?.phoneNumber
-                        ? 'bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white cursor-not-allowed'
-                        : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
-                    }`}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   >
                     <span className="text-xl">
-                      {isReserving ? '⏳' : ((Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo') || !results.plan?.userName || !results.plan?.phoneNumber) ? '🔒' : '🎫'}
+                      {isReserving ? '⏳' : '🎫'}
                     </span>
                     <span>
-                      {isReserving 
-                        ? 'Reserving...' 
-                        : ((Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo') || !results.plan?.userName || !results.plan?.phoneNumber) 
-                          ? 'Demo Mode' 
-                          : 'Reserve Now'
-                      }
+                      {isReserving ? 'Reserving...' : 'Reserve Now'}
                     </span>
                   </button>
                 </div>
@@ -596,6 +605,81 @@ export default function ResultsPage() {
           </div>
         </div>
       </div>
+
+      {/* Reservation Modal */}
+      {showReservationModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-4">🎫</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Make a Reservation</h3>
+              <p className="text-gray-600">Please provide your details to reserve this event</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Name *
+                </label>
+                <input
+                  type="text"
+                  value={reservationForm.userName}
+                  onChange={(e) => setReservationForm(prev => ({ ...prev, userName: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Enter your full name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  value={reservationForm.phoneNumber}
+                  onChange={(e) => setReservationForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="(555) 123-4567"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Group Size
+                </label>
+                <select
+                  value={reservationForm.groupSize}
+                  onChange={(e) => setReservationForm(prev => ({ ...prev, groupSize: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="solo">Just me</option>
+                  <option value="date">Date (2 people)</option>
+                  <option value="friend">Friends (2-4 people)</option>
+                  <option value="group">Group (5+ people)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowReservationModal(false)}
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReservationSubmit}
+                disabled={isReserving || !reservationForm.userName || !reservationForm.phoneNumber}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-4 rounded-xl hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {isReserving ? 'Submitting...' : 'Submit Reservation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 } 
