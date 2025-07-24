@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useDarkMode } from '../../lib/darkMode';
-import PhoneInput from 'react-phone-input-2/dist/lib';
+import PhoneInput from 'react-phone-input-2/lib/lib';
 import 'react-phone-input-2/lib/style.css';
 import ProfanityFilter from 'profanity-filter';
 
