@@ -1,5 +1,5 @@
 import Head from 'next/head';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
 import { useDarkMode } from '../lib/darkMode';
@@ -83,6 +83,9 @@ export default function Onboarding() {
   const [selectedTopic, setSelectedTopic] = useState('');
   const [showTopicSuggestion, setShowTopicSuggestion] = useState(false);
   const [suggestedTopic, setSuggestedTopic] = useState('');
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => setIsClient(true), []);
 
   // Geolocation detection
   const handleGeolocate = () => {
@@ -227,6 +230,8 @@ export default function Onboarding() {
       alert('Error creating plan. Please try again.');
     }
   };
+
+  if (!isClient) return null;
 
   return (
     <>
