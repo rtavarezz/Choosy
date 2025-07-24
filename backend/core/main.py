@@ -749,14 +749,11 @@ def get_voting_status(plan_id: str):
             
             # Get completed voter IDs
             completed_voter_ids = [row[0] for row in completed_voters_result]
-            
-            # Dynamic group size: use the total number of voters who have participated, with a minimum of 2
-            max_voters = max(2, total_voters)
-            
-            # If no total voters but we have active voters, use active voters count
-            if total_voters == 0 and active_voters_count > 0:
-                max_voters = max(2, active_voters_count)
-            
+
+            # Group size is always the number of unique voters (active or completed)
+            unique_voter_ids = set(active_voter_ids + completed_voter_ids)
+            max_voters = max(1, len(unique_voter_ids))
+
             # Check if ALL active voters have completed voting
             all_voters_completed = False
             if active_voters_count > 0:
@@ -769,8 +766,8 @@ def get_voting_status(plan_id: str):
                 all_voters_completed = all_completed
             else:
                 # If no active voters, check if all voters who have voted are completed
-                all_voters_completed = (total_voters > 0 and completed_voters >= total_voters)
-            
+                all_voters_completed = (max_voters > 0 and completed_voters >= max_voters)
+
             # Only show results when ALL active voters have completed
             voting_limit_reached = all_voters_completed
             
