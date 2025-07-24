@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import TinderCard from 'react-tinder-card';
 import { motion, AnimatePresence } from 'framer-motion';
-import PhoneInput from 'react-phone-input-2';
+import PhoneInput from 'react-phone-input-2/dist/lib';
 import 'react-phone-input-2/lib/style.css';
 import { Filter } from 'bad-words';
 
@@ -1044,7 +1044,6 @@ export default function VotingPage() {
                   placeholder="Enter your phone number"
                   inputClass="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   containerClass="w-full"
-                  required
                 />
               </div>
 
