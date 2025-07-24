@@ -755,21 +755,31 @@ export default function VotePage() {
       try {
         // Get user info from localStorage
         const voterInfo = localStorage.getItem(`voter_${actualPlanId}`);
-        const voter = voterInfo ? JSON.parse(voterInfo) : null;
-        
+        let voterId = '';
+        if (voterInfo) {
+          const voter = JSON.parse(voterInfo);
+          // Always use phone number for host, userId or phone for guests
+          if (voter.isCreator) {
+            voterId = voter.phone; // Use phone number for creator to match host_phone
+          } else {
+            voterId = voter.userId || voter.phone; // Use userId if available, otherwise use phone as ID
+          }
+        } else {
+          voterId = voterPhone; // Fallback to phone number
+        }
+        // Ensure voterId is always a string
+        voterId = String(voterId);
         const voteData = {
           plan_id: actualPlanId,
           event_id: eventId,
-          voter_id: voter?.userId || voterId,
+          voter_id: voterId,
           vote_type: dir === 'right' ? 'like' : 'dislike'
         };
-        
         const response = await fetch('/api/votes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(voteData)
         });
-        
         if (!response.ok) {
           console.error('Failed to save vote:', response.status);
         }
