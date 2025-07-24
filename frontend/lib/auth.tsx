@@ -21,8 +21,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Backend API base URL
-const API_BASE_URL = 'http://localhost:8000';
+// Replace hardcoded API_BASE_URL with environment variable or remove if not needed
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

@@ -837,7 +837,7 @@ export default function VotingPage() {
         voterId = voterPhone; // Fallback to phone number
       }
       
-      const response = await fetch('http://127.0.0.1:8000/api/votes', {
+      const response = await fetch('/api/votes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

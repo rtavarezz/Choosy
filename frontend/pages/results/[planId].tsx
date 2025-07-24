@@ -136,7 +136,7 @@ export default function ResultsPage() {
       if (!planId) return;
       const planIdStr = Array.isArray(planId) ? planId[0] : planId;
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/plans/${planIdStr}/voting-status`);
+        const response = await fetch(`/api/plans/${planIdStr}/voting-status`);
         if (response.ok) {
           const status = await response.json();
           console.log('Voting status on results page:', status);
@@ -237,7 +237,7 @@ export default function ResultsPage() {
         if (!isDemo) {
           try {
             const planIdStr = Array.isArray(planId) ? planId[0] : planId;
-            const response = await fetch(`http://127.0.0.1:8000/api/plans/${planIdStr}/results`);
+            const response = await fetch(`/api/plans/${planIdStr}/results`);
             if (response.ok) {
               const apiResults = await response.json();
               // Get expected voters from API group size

@@ -657,7 +657,7 @@ export default function VotePage() {
       const cacheKey = `voting_status_${actualPlanId}`;
       try {
         const status = await getCachedOrFetch(cacheKey, async () => {
-          const response = await fetch(`http://127.0.0.1:8000/api/plans/${actualPlanId}/voting-status`);
+          const response = await fetch(`/api/plans/${actualPlanId}/voting-status`);
           if (response.ok) {
             return await response.json();
           }
@@ -764,7 +764,7 @@ export default function VotePage() {
           vote_type: dir === 'right' ? 'like' : 'dislike'
         };
         
-        const response = await fetch('http://127.0.0.1:8000/api/votes', {
+        const response = await fetch('/api/votes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(voteData)
@@ -811,7 +811,7 @@ export default function VotePage() {
       
       // Only check backend for group plans
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/plans/${actualPlanId}/voting-status`);
+        const response = await fetch(`/api/plans/${actualPlanId}/voting-status`);
         if (response.ok) {
           const status = await response.json();
           if (status.voting_limit_reached) {
@@ -915,7 +915,7 @@ export default function VotePage() {
       // Check voting status from backend first
       try {
         const planIdStr = Array.isArray(actualPlanId) ? actualPlanId[0] : actualPlanId;
-        const response = await fetch(`http://127.0.0.1:8000/api/plans/${planIdStr}/voting-status`);
+        const response = await fetch(`/api/plans/${planIdStr}/voting-status`);
         if (response.ok) {
           const status = await response.json();
           console.log('🔐 Login check - voting status:', status);
@@ -984,7 +984,7 @@ export default function VotePage() {
             phone: voterPhone.trim()
           };
           
-          const response = await fetch('http://127.0.0.1:8000/api/users', {
+          const response = await fetch('/api/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData)
@@ -1080,7 +1080,7 @@ export default function VotePage() {
     const checkVotingStatus = async () => {
       try {
         // Check voting status from backend
-        const response = await fetch(`http://127.0.0.1:8000/api/plans/${actualPlanId}/voting-status`);
+        const response = await fetch(`/api/plans/${actualPlanId}/voting-status`);
         if (response.ok) {
           const status = await response.json();
           console.log('🔐 Voting status from backend:', status);
@@ -1358,7 +1358,7 @@ export default function VotePage() {
     const creatorInfo = localStorage.getItem(`creator_${actualPlanId}`);
     if (creatorInfo) {
       const { name, phone } = JSON.parse(creatorInfo);
-      fetch('http://127.0.0.1:8000/api/users', {
+      fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, phone })
