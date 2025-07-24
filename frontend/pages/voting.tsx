@@ -6,7 +6,7 @@ import PhoneInput from 'react-phone-input-2/lib/lib';
 import 'react-phone-input-2/lib/style.css';
 import { Filter } from 'bad-words';
 
-// Add CSS styles for swipe animations
+// Add CSS styles for swipe animations and gamification
 const swipeStyles = `
   .swipe-right {
     transform: translateX(100px) rotate(15deg) scale(1.05) !important;
@@ -24,6 +24,35 @@ const swipeStyles = `
     will-change: transform;
     transform-style: preserve-3d;
   }
+
+  .trending-badge {
+    background: linear-gradient(45deg, #ff6b6b, #ffa500);
+    animation: pulse 2s infinite;
+  }
+
+  .social-hint {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    animation: fadeInOut 3s ease-in-out;
+  }
+
+  .lucky-spin {
+    animation: spin 0.6s ease-in-out;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  @keyframes fadeInOut {
+    0%, 100% { opacity: 0; transform: translateY(-10px); }
+    50% { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
 `;
 
 // Inject styles
@@ -32,6 +61,25 @@ if (typeof document !== 'undefined') {
   style.textContent = swipeStyles;
   document.head.appendChild(style);
 }
+
+// Social hints for FOMO
+const SOCIAL_HINTS = [
+  "👀 Some friends liked this one...",
+  "🔥 Getting good vibes here",
+  "💫 This one's popular tonight",
+  "✨ Hidden gem alert!",
+  "🎯 Your group might love this",
+  "🌟 Trending in your area"
+];
+
+// Trending badges
+const TRENDING_BADGES = [
+  "🔥 Hot Pick",
+  "⭐ Top Rated", 
+  "💎 Hidden Gem",
+  "🎉 Popular Choice",
+  "🌟 Trending"
+];
 
 // Topic-specific image collections
 const TOPIC_IMAGES = {
@@ -311,6 +359,13 @@ export default function VotingPage() {
   const [submissionAttempts, setSubmissionAttempts] = useState(0);
   const [lastSubmittedName, setLastSubmittedName] = useState('');
   const [lastSubmittedPhone, setLastSubmittedPhone] = useState('');
+  
+  // Gamification state
+  const [showSocialHint, setShowSocialHint] = useState(false);
+  const [currentSocialHint, setCurrentSocialHint] = useState('');
+  const [isLuckySpinning, setIsLuckySpinning] = useState(false);
+  const [luckyMessage, setLuckyMessage] = useState('');
+  const [showLuckyMessage, setShowLuckyMessage] = useState(false);
   
   // Refs
   const childRefs = useRef<{ [key: number]: any }>({});
@@ -864,6 +919,9 @@ export default function VotingPage() {
       const newIndex = prev + 1;
       console.log(`📊 Card ${prev + 1} swiped, moving to card ${newIndex + 1} of ${deck.length}`);
       
+      // Show social hint for next card
+      setTimeout(() => showRandomSocialHint(), 500);
+      
       // Check if this was the last card
       if (newIndex >= deck.length) {
         console.log('🎉 Voting complete! All cards swiped');
@@ -896,16 +954,67 @@ export default function VotingPage() {
     }
   };
 
-  // Handle "Feeling Lucky" click
-  const handleFeelingLucky = () => {
+  // Enhanced "Feeling Lucky" with animations and special events
+  const handleFeelingLucky = async () => {
     console.log('🎲 Feeling Lucky clicked!');
-    if (canSwipe.current && currentIndex < deck.length) {
-      const randomDirection = Math.random() > 0.5 ? 'right' : 'left';
-      console.log(`🎲 Random direction: ${randomDirection}`);
-      swipe(randomDirection);
-    } else {
+    
+    if (!canSwipe.current || currentIndex >= deck.length) {
       console.log('❌ Cannot swipe - either disabled or no more cards');
+      return;
     }
+
+    // Add spinning animation
+    setIsLuckySpinning(true);
+    
+    // Show lucky message
+    const luckyMessages = [
+      "You just unlocked a hidden gem 💎",
+      "This one's off the radar... 👀",
+      "Lucky you! This is trending 🔥",
+      "Special pick just for you ✨",
+      "You found the secret sauce! 🎯"
+    ];
+    const randomMessage = luckyMessages[Math.floor(Math.random() * luckyMessages.length)];
+    setLuckyMessage(randomMessage);
+    setShowLuckyMessage(true);
+
+    // Wait for animation
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
+    // Find a highly-rated event or random one
+    const currentEvent = deck[currentIndex];
+    const isHighRated = currentEvent.reviews?.stars >= 4.5 || Math.random() < 0.3;
+    
+    // Bias towards liking high-rated events
+    const direction = isHighRated ? 'right' : (Math.random() > 0.5 ? 'right' : 'left');
+    
+    console.log(`🎲 Lucky direction: ${direction} (high-rated: ${isHighRated})`);
+    
+    // Hide message after a delay
+    setTimeout(() => setShowLuckyMessage(false), 2000);
+    setIsLuckySpinning(false);
+    
+    swipe(direction);
+  };
+
+  // Show random social hints for FOMO
+  const showRandomSocialHint = () => {
+    if (Math.random() < 0.15 && !showSocialHint) { // 15% chance
+      const hint = SOCIAL_HINTS[Math.floor(Math.random() * SOCIAL_HINTS.length)];
+      setCurrentSocialHint(hint);
+      setShowSocialHint(true);
+      
+      // Hide after 3 seconds
+      setTimeout(() => setShowSocialHint(false), 3000);
+    }
+  };
+
+  // Get trending badge for highly-rated events
+  const getTrendingBadge = (event: Event) => {
+    if (event.reviews?.stars >= 4.5 || Math.random() < 0.2) {
+      return TRENDING_BADGES[Math.floor(Math.random() * TRENDING_BADGES.length)];
+    }
+    return null;
   };
 
   // Copy share link
@@ -1091,9 +1200,9 @@ export default function VotingPage() {
                 </button>
                 <button
                   onClick={handleFeelingLucky}
-                  className="text-white text-xs font-semibold px-3 py-1 rounded-full hover:scale-105 transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500"
+                  className={`text-white text-xs font-semibold px-3 py-1 rounded-full hover:scale-105 transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500 ${isLuckySpinning ? 'lucky-spin' : ''}`}
                 >
-                  Feeling Lucky?
+                  {isLuckySpinning ? '🎲' : '🎲'} Feeling Lucky?
                 </button>
               </div>
             </div>
@@ -1119,6 +1228,18 @@ export default function VotingPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Lucky Message Overlay */}
+          {showLuckyMessage && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-full shadow-2xl font-bold text-lg"
+            >
+              {luckyMessage}
+            </motion.div>
           )}
 
           {/* Card Deck */}
@@ -1161,10 +1282,30 @@ export default function VotingPage() {
                           if (nextElement) nextElement.style.display = 'flex';
                         }}
                       />
+                      
+                      {/* Trending Badge */}
+                      {getTrendingBadge(deck[currentIndex]) && (
+                        <div className="absolute top-3 left-3 trending-badge text-white text-xs font-bold px-2 py-1 rounded-full">
+                          {getTrendingBadge(deck[currentIndex])}
+                        </div>
+                      )}
+                      
                       {/* Compact hours badge */}
                       <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-semibold text-gray-900">
                         {deck[currentIndex].price || 'Varies'}
                       </div>
+                      
+                      {/* Social Hint Overlay */}
+                      {showSocialHint && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          className="absolute bottom-3 left-3 right-3 social-hint text-white text-xs font-medium px-3 py-2 rounded-lg text-center"
+                        >
+                          {currentSocialHint}
+                        </motion.div>
+                      )}
                     </div>
                     {/* Event details */}
                     <div className="p-6">
