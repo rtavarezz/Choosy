@@ -855,3 +855,7 @@ export default function Create() {
     </>
   );
 } 
+
+export async function getServerSideProps() {
+  return { props: {} };
+} 

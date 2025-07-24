@@ -442,3 +442,7 @@ export default function Onboarding() {
     </>
   );
 } 
+
+export async function getServerSideProps() {
+  return { props: {} };
+} 
