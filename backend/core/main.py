@@ -773,6 +773,11 @@ def get_voting_status(plan_id: str):
 
             # Only show results when ALL active voters have completed
             voting_limit_reached = all_voters_completed
+
+            # --- PATCH: If no active voters and completed_voters >= max_voters, mark as complete ---
+            if active_voters_count == 0 and completed_voters >= max_voters:
+                all_voters_completed = True
+                voting_limit_reached = True
             
             print(f"📊 Voting Status for plan {plan_id}:")
             print(f"   Active voters: {active_voters_count}")
