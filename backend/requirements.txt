@@ -16,3 +16,4 @@ redis==5.0.4
 psutil==5.9.6
 pytest==7.4.3
 pytest-asyncio==0.21.1 
+PyJWT==2.10.1 
