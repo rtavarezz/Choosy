@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { sanitizePlanData, validateName, validateZipCode, validatePhoneNumber } from '../../lib/security';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests
@@ -16,21 +17,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Clean phone number for database validation
-    const cleanPhone = phoneNumber.replace(/[^\d+]/g, ''); // Remove everything except digits and +
+    // Sanitize and validate input
+    const sanitizedData = sanitizePlanData({ topic, groupSize, zipCode, userName, phoneNumber });
     
-    // Validate phone number length (max 15 digits including country code)
-    const phoneDigits = cleanPhone.replace(/\D/g, '');
-    if (phoneDigits.length > 15) {
-      return res.status(400).json({ 
-        error: 'Phone number is too long. Please enter a valid phone number (maximum 15 digits including country code).' 
-      });
+    if (!validateName(sanitizedData.userName)) {
+      return res.status(400).json({ error: 'Invalid name format' });
     }
-    if (phoneDigits.length < 10) {
-      return res.status(400).json({ 
-        error: 'Phone number is too short. Please enter a valid phone number (minimum 10 digits).' 
-      });
+    
+    if (!validateZipCode(sanitizedData.zipCode)) {
+      return res.status(400).json({ error: 'Invalid ZIP code format' });
     }
+    
+    if (!validatePhoneNumber(sanitizedData.phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
+    // Use sanitized data
+    const { userName: cleanUserName, zipCode: cleanZipCode, phoneNumber: cleanPhone } = sanitizedData;
     
     console.log('🔧 Creating plan with data:', {
       topic,
@@ -49,10 +52,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        topic,
-        group_size: groupSize, // Already a string from frontend
-        zip_code: zipCode,
-        host_name: userName,
+        topic: sanitizedData.topic,
+        group_size: sanitizedData.groupSize,
+        zip_code: cleanZipCode,
+        host_name: cleanUserName,
         host_phone: cleanPhone,
         custom_events: customEvents || []
       }),
@@ -61,13 +64,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('🔧 FastAPI response status:', response.status);
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.log('🔧 FastAPI error:', errorData);
-      return res.status(response.status).json(errorData);
+      // Handle 502 Bad Gateway and other server errors
+      if (response.status === 502) {
+        console.log('🔧 Backend server is down (502 Bad Gateway)');
+        return res.status(502).json({ 
+          error: 'Backend server is temporarily unavailable',
+          message: 'Please try again in a few minutes'
+        });
+      }
+      
+      // Try to parse error response, but handle empty responses
+      try {
+        const errorData = await response.json();
+        console.log('🔧 FastAPI error:', errorData);
+        return res.status(response.status).json(errorData);
+      } catch (parseError) {
+        console.log('🔧 Could not parse error response:', parseError);
+        return res.status(response.status).json({ 
+          error: 'Backend error',
+          message: `Server returned ${response.status} status`
+        });
+      }
     }
 
-    const data = await response.json();
-    console.log('🔧 FastAPI success response:', data);
+    // Try to parse success response, but handle empty responses
+    let data;
+    try {
+      data = await response.json();
+      console.log('🔧 FastAPI success response:', data);
+    } catch (parseError) {
+      console.log('🔧 Could not parse success response:', parseError);
+      return res.status(500).json({ 
+        error: 'Invalid response from backend',
+        message: 'Backend returned malformed data'
+      });
+    }
 
     // Return success response
     res.status(200).json({ 

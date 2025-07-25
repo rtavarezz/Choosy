@@ -10,7 +10,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [isSignup, setIsSignup] = useState(false);
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -29,12 +29,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       return false;
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
-      return false;
-    }
+
 
     // Name validation for signup
     if (isSignup && name.trim().length < 2) {
@@ -60,9 +55,9 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       let result;
       
       if (isSignup) {
-        result = await signup(phone, name, email);
+        result = await signup(phone, name);
       } else {
-        result = await login(phone, email);
+        result = await login(phone);
       }
 
       if (result.success) {
@@ -70,7 +65,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
         // Reset form
         setPhone('');
         setName('');
-        setEmail('');
+
         setIsSignup(false);
         
         // Close modal after a short delay
@@ -169,20 +164,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">We'll use this to verify your account</p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Email Address *
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-              required
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">We'll use this for account recovery</p>
-          </div>
+
 
           {isSignup && (
             <div>

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phone TEXT UNIQUE NOT NULL CHECK (phone ~ '^\+?[1-9]\d{1,14}$'), -- Phone number validation
   name TEXT NOT NULL CHECK (length(name) >= 1 AND length(name) <= 100), -- Name validation
-  email TEXT UNIQUE CHECK (email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'), -- Email validation
+
   avatar_url TEXT CHECK (avatar_url IS NULL OR avatar_url ~ '^https?://'), -- Avatar URL validation
   preferences JSONB DEFAULT '{}', -- User preferences (categories, price ranges, etc.)
   ai_profile JSONB DEFAULT '{}', -- AI learning profile (event patterns, preferences)
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 CREATE TABLE IF NOT EXISTS plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   topic TEXT NOT NULL CHECK (topic IN ('concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 'racing', 'swimming', 'drinks', 'movies', 'comedy', 'art', 'shopping', 'wellness', 'adventure', 'family')), -- Topic validation
-  group_size TEXT NOT NULL CHECK (group_size IN ('solo', 'date', 'friend', 'group')), -- Group size validation
+  group_size TEXT NOT NULL CHECK (group_size IN ('myself', '2', '3+')), -- Group size validation
   zip_code TEXT NOT NULL CHECK (zip_code ~ '^[A-Z0-9\s\-]{3,10}$'), -- International postal code validation (3-10 alphanumeric chars, spaces, hyphens)
   host_name TEXT NOT NULL CHECK (length(host_name) >= 1 AND length(host_name) <= 100), -- Name validation
   host_phone TEXT NOT NULL CHECK (host_phone ~ '^\+?[1-9]\d{1,14}$'), -- Phone validation
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS custom_events (
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
 CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
 CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_preferences_category ON user_preferences(category);

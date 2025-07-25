@@ -521,7 +521,7 @@ class LocationService:
             'is_featured': event.is_featured,
             # Include metadata fields for contact info and hours
             'phone': event.metadata.get('phone') if event.metadata else None,
-            'email': event.metadata.get('email') if event.metadata else None,
+    
             'hours': event.metadata.get('hours') if event.metadata else None,
             # Include all metadata for fun activities
             'metadata': event.metadata if event.metadata else {},

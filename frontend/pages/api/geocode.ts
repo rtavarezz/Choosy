@@ -25,10 +25,28 @@ export default async function handler(
 
     const response = await fetch(backendUrl);
     if (!response.ok) {
+      // Handle 502 Bad Gateway specifically
+      if (response.status === 502) {
+        console.log('🔧 Backend geocoding server is down (502 Bad Gateway)');
+        return res.status(502).json({ 
+          error: 'Geocoding service temporarily unavailable',
+          message: 'Please try again in a few minutes'
+        });
+      }
       throw new Error(`Backend geocoding failed: ${response.status}`);
     }
-    const data = await response.json();
-    res.status(200).json(data);
+    
+    // Try to parse response, but handle empty responses
+    try {
+      const data = await response.json();
+      res.status(200).json(data);
+    } catch (parseError) {
+      console.log('🔧 Could not parse geocoding response:', parseError);
+      return res.status(500).json({ 
+        error: 'Invalid response from geocoding service',
+        message: 'Service returned malformed data'
+      });
+    }
   } catch (error) {
     console.error('Geocoding error:', error);
     res.status(500).json({ message: 'Failed to geocode' });

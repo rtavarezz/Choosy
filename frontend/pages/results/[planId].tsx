@@ -120,7 +120,7 @@ export default function ResultsPage() {
   const [reservationForm, setReservationForm] = useState({
     userName: '',
     phoneNumber: '',
-    groupSize: 'solo'
+    groupSize: 'myself'
   });
   const [nameError, setNameError] = useState(''); // Name validation error
   const [reservationMade, setReservationMade] = useState(false); // Track if reservation was made
@@ -255,7 +255,7 @@ export default function ResultsPage() {
                   votes: apiResults.events[0].votes,
                   image: getTopicImage(0, apiResults.plan.topic),
                   hours: "2 hours",
-                  contact: { phone: '(555) 123-4567', email: 'info@event.com' }
+                  contact: { phone: '(555) 123-4567' }
                 } : null,
                 plan: {
                   userName: apiResults.plan.userName,
@@ -274,7 +274,7 @@ export default function ResultsPage() {
                   percentage: event.percentage,
                   image: getTopicImage(index, apiResults.plan.topic),
                   hours: "2 hours",
-                  contact: { phone: '(555) 123-4567', email: 'info@event.com' }
+                  contact: { phone: '(555) 123-4567' }
                 })),
                 // Patch: Remove allVotersCompleted, expectedVoters, completedVoters from here
               };
@@ -548,7 +548,7 @@ export default function ResultsPage() {
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <span className="w-5 h-5">✉️</span>
-                    <span className="text-gray-700">{results.winningEvent.contact.email}</span>
+                    
                   </div>
                 </div>
 
@@ -757,10 +757,9 @@ export default function ResultsPage() {
                   onChange={(e) => setReservationForm(prev => ({ ...prev, groupSize: e.target.value }))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  <option value="solo">Just me</option>
-                  <option value="date">Date (2 people)</option>
-                  <option value="friend">Friends (2-4 people)</option>
-                  <option value="group">Group (5+ people)</option>
+                  <option value="myself">Myself</option>
+                  <option value="2">2 people</option>
+                  <option value="3+">3+ people</option>
                 </select>
               </div>
             </div>

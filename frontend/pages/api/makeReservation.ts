@@ -38,7 +38,7 @@ export default async function handler(
         event_name: eventName,
         user_name: userName,
         phone_number: phoneNumber,
-        group_size: groupSize || 'solo',
+        group_size: groupSize || 'myself',
         event_time: eventTime || '7:00 PM',
         event_date: eventDate || new Date().toISOString().split('T')[0]
       }),

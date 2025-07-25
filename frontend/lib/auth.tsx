@@ -4,7 +4,7 @@ interface User {
   id: string;
   name: string;
   phone: string;
-  email?: string;
+
   avatar_url?: string;
   preferences?: any;
   gamification?: any;
@@ -13,8 +13,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (phone: string, email: string) => Promise<{ success: boolean; message: string }>;
-  signup: (phone: string, name: string, email: string) => Promise<{ success: boolean; message: string }>;
+  login: (phone: string) => Promise<{ success: boolean; message: string }>;
+  signup: (phone: string, name: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -61,14 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (phone: string, email: string): Promise<{ success: boolean; message: string }> => {
+  const login = async (phone: string): Promise<{ success: boolean; message: string }> => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phone, email }),
+        body: JSON.stringify({ phone }),
       });
 
       const data = await response.json();
@@ -86,21 +86,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signup = async (phone: string, name: string, email: string): Promise<{ success: boolean; message: string }> => {
+  const signup = async (phone: string, name: string): Promise<{ success: boolean; message: string }> => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phone, name, email }),
+        body: JSON.stringify({ phone, name }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
         // After successful signup, log them in
-        const loginResult = await login(phone, email);
+        const loginResult = await login(phone);
         if (loginResult.success) {
           return { success: true, message: 'Account created and logged in successfully' };
         } else {

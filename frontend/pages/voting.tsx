@@ -39,6 +39,33 @@ const swipeStyles = `
     animation: spin 0.6s ease-in-out;
   }
 
+  .voter-avatar {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    animation: bounce 2s infinite;
+  }
+
+  .group-progress {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    animation: shimmer 2s infinite;
+  }
+
+  .waiting-animation {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #ff6b6b;
+    animation: confetti-fall 3s linear infinite;
+  }
+
+  .personalized-badge {
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
@@ -52,6 +79,27 @@ const swipeStyles = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200px 0; }
+    100% { background-position: calc(200px + 100%) 0; }
+  }
+
+  @keyframes confetti-fall {
+    0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  @keyframes glow {
+    from { box-shadow: 0 0 5px #ff6b6b, 0 0 10px #ff6b6b, 0 0 15px #ff6b6b; }
+    to { box-shadow: 0 0 10px #4ecdc4, 0 0 20px #4ecdc4, 0 0 30px #4ecdc4; }
   }
 `;
 
@@ -310,7 +358,7 @@ interface Event {
   reviews: { count: number; stars: number }; // Backend returns object, not number
   metadata: any;
   topic: string;
-  contact: { phone: string; email: string };
+  contact: { phone: string };
 }
 
 interface VotingStatus {
@@ -366,6 +414,16 @@ export default function VotingPage() {
   const [isLuckySpinning, setIsLuckySpinning] = useState(false);
   const [luckyMessage, setLuckyMessage] = useState('');
   const [showLuckyMessage, setShowLuckyMessage] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showPersonalizedBadge, setShowPersonalizedBadge] = useState(false);
+  const [showQuickFeedback, setShowQuickFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [waitingForFriends, setWaitingForFriends] = useState(false);
+  const [availablePowerUps, setAvailablePowerUps] = useState({
+    revealPopularity: true,
+    luckyDraw: true
+  });
+  const [showPowerUpModal, setShowPowerUpModal] = useState(false);
   
   // Refs
   const childRefs = useRef<{ [key: number]: any }>({});
@@ -664,28 +722,27 @@ export default function VotingPage() {
     try {
       const response = await fetch(`/api/plans/${planId}/voting-status`);
       if (response.ok) {
-        const data = await response.json();
-        console.log('📊 Voting status:', data);
+        const status: VotingStatus = await response.json();
+        console.log('📊 Voting status:', status);
         
-        setCompletedVoters(data.completed_voters || 0);
-        setExpectedVoters(data.max_voters || 1);
-        setVotingLimitReached(data.voting_limit_reached || false);
-        setTopic(data.topic || 'comedy');
-      } else {
-        console.warn('⚠️ Voting status endpoint failed, using defaults');
-        // Use defaults if endpoint fails
-        setCompletedVoters(0);
-        setExpectedVoters(1);
-        setVotingLimitReached(false);
-        setTopic('comedy');
+        setVotingLimitReached(status.voting_limit_reached);
+        setExpectedVoters(status.max_voters);
+        setCompletedVoters(status.completed_voters);
+        
+        // Show waiting animation if others are still voting
+        if (status.completed_voters < status.max_voters && status.total_voters > 1) {
+          setWaitingForFriends(true);
+        } else {
+          setWaitingForFriends(false);
+        }
+        
+        // If voting is complete, trigger confetti
+        if (status.voting_limit_reached && !votingLimitReached) {
+          triggerConfetti();
+        }
       }
     } catch (error) {
-      console.warn('⚠️ Error checking voting status, using defaults:', error);
-      // Use defaults if endpoint fails
-      setCompletedVoters(0);
-      setExpectedVoters(1);
-      setVotingLimitReached(false);
-      setTopic('comedy');
+      console.error('❌ Error checking voting status:', error);
     }
   };
 
@@ -867,69 +924,59 @@ export default function VotingPage() {
 
   // Handle card swipe
   const swiped = async (direction: string, eventId: string) => {
-    if (!planId || !voterName) return;
-    
+    console.log('🔄 Swiped', direction, 'on event:', eventId);
     lastDirection.current = direction;
-    console.log(`🎯 Card swiped: ${direction} for event ${eventId}`);
-    
-    // Record vote
+
     try {
-      const voteType = direction === 'right' ? 'like' : 'dislike';
-      
-      // Get voter info from localStorage
-      const voterInfo = localStorage.getItem(`voter_${String(planId)}`);
-      let voterId = '';
-      
-      if (voterInfo) {
-        const voter = JSON.parse(voterInfo);
-        // If this is the creator, use their phone number as voter ID to ensure consistency
-        if (voter.isCreator) {
-          voterId = voter.phone; // Use phone number for creator to match host_phone
-        } else {
-          voterId = voter.userId || voter.phone; // Use userId if available, otherwise use phone as ID
-        }
-      } else {
-        voterId = voterPhone; // Fallback to phone number
-      }
-      
-      const response = await fetch('/api/votes', {
+      const voterId = voterPhone;
+      const response = await fetch('/api/voteOption', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plan_id: String(planId),
+          plan_id: planId,
           event_id: eventId,
+          vote: direction === 'right' ? 'yes' : 'no',
           voter_id: voterId,
-          vote_type: voteType
+          voter_name: voterName
         })
       });
-      
-      if (!response.ok) {
-        console.error('Failed to record vote:', response.status);
-        const errorData = await response.text();
-        console.error('Error response:', errorData);
-      } else {
+
+      if (response.ok) {
         console.log('✅ Vote recorded successfully');
+        
+        // Trigger confetti on right swipe (like)
+        if (direction === 'right') {
+          triggerConfetti();
+        }
+
+        // Show personalized badge for some events (20% chance)
+        if (Math.random() < 0.2) {
+          setShowPersonalizedBadge(true);
+          setTimeout(() => setShowPersonalizedBadge(false), 3000);
+        }
+
+        // Show quick feedback after voting (30% chance)
+        if (Math.random() < 0.3) {
+          setTimeout(() => setShowQuickFeedback(true), 1000);
+        }
+      } else {
+        console.error('❌ Failed to record vote:', response.status);
       }
-    } catch (err) {
-      console.error('Error recording vote:', err);
+    } catch (error) {
+      console.error('❌ Error recording vote:', error);
     }
-    
-    // Move to next card and check completion
+
     setCurrentIndex(prev => {
       const newIndex = prev + 1;
-      console.log(`📊 Card ${prev + 1} swiped, moving to card ${newIndex + 1} of ${deck.length}`);
-      
-      // Show social hint for next card
-      setTimeout(() => showRandomSocialHint(), 500);
+      setTimeout(() => showRandomSocialHint(), 500); // Trigger social hint
       
       // Check if this was the last card
       if (newIndex >= deck.length) {
-        console.log('🎉 Voting complete! All cards swiped');
+        console.log('🎉 All cards swiped!');
         setAllCardsSwiped(true);
-        // All cards swiped - check voting status
-        setTimeout(() => {
-          checkVotingStatus();
-        }, 1000);
+        
+        // Show quick feedback after completing all votes
+        setTimeout(() => setShowQuickFeedback(true), 1000);
       }
       
       return newIndex;
@@ -1017,6 +1064,74 @@ export default function VotingPage() {
     return null;
   };
 
+  // Helper function to get voter avatar/initials
+  const getVoterAvatar = (name: string) => {
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return initials;
+  };
+
+  // Helper function to get personalized suggestion
+  const getPersonalizedSuggestion = (event: Event) => {
+    const suggestions = [
+      "✨ We think you'll love this!",
+      "🎯 Perfect match for your vibe",
+      "💫 Based on your preferences",
+      "🌟 Recommended for you",
+      "💎 Hidden gem alert!"
+    ];
+    return suggestions[Math.floor(Math.random() * suggestions.length)];
+  };
+
+  // Confetti animation
+  const triggerConfetti = () => {
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 3000);
+  };
+
+  // Quick feedback handler
+  const handleQuickFeedback = async (isPositive: boolean) => {
+    setFeedbackSubmitted(true);
+    // In the future, this could send feedback to your backend
+    console.log('User feedback:', isPositive ? 'positive' : 'negative');
+    setTimeout(() => {
+      setShowQuickFeedback(false);
+      setFeedbackSubmitted(false);
+    }, 2000);
+  };
+
+  // Generate shareable results card
+  const generateShareableResults = () => {
+    const shareText = `🎉 Our Choosy group is voting on ${deck.length} amazing ${topic} events! 
+    
+👥 ${activeVoters.length} people voting
+📊 ${completedVoters}/${expectedVoters} completed
+🎯 Topic: ${topic}
+
+Join us: ${window.location.href}`;
+    
+    return shareText;
+  };
+
+  // Enhanced share function
+  const shareResults = async () => {
+    const shareText = generateShareableResults();
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Choosy - Group Voting',
+          text: shareText,
+          url: window.location.href
+        });
+      } catch (error) {
+        console.log('Share cancelled or failed');
+        copyShareLink();
+      }
+    } else {
+      copyShareLink();
+    }
+  };
+
   // Copy share link
   const copyShareLink = () => {
     const shareUrl = `${window.location.origin}/voting?planId=${planId}`;
@@ -1043,6 +1158,48 @@ export default function VotingPage() {
   const voteAgain = () => {
     window.location.reload();
   };
+
+  // Power-up functions
+  const useRevealPopularity = () => {
+    if (!availablePowerUps.revealPopularity) return;
+    
+    setAvailablePowerUps(prev => ({ ...prev, revealPopularity: false }));
+    setShowPowerUpModal(false);
+    
+    // Show a fun message about popularity
+    const popularityMessages = [
+      "🔥 This one's getting lots of love!",
+      "💫 Popular choice among your group",
+      "⭐ High rating from the community",
+      "🎯 Trending in your area"
+    ];
+    
+    const message = popularityMessages[Math.floor(Math.random() * popularityMessages.length)];
+    setLuckyMessage(message);
+    setShowLuckyMessage(true);
+    setTimeout(() => setShowLuckyMessage(false), 3000);
+  };
+
+  const useLuckyDraw = () => {
+    if (!availablePowerUps.luckyDraw) return;
+    
+    setAvailablePowerUps(prev => ({ ...prev, luckyDraw: false }));
+    setShowPowerUpModal(false);
+    
+    // Add a surprise event to the deck
+    const surpriseEvents = [
+      { name: "🎲 Mystery Adventure", description: "A surprise activity chosen just for you!" },
+      { name: "🌟 Hidden Gem", description: "A local favorite you might have missed" },
+      { name: "🎉 Special Event", description: "Something unique happening tonight" }
+    ];
+    
+    const surprise = surpriseEvents[Math.floor(Math.random() * surpriseEvents.length)];
+    setLuckyMessage(`🎁 ${surprise.name}: ${surprise.description}`);
+    setShowLuckyMessage(true);
+    setTimeout(() => setShowLuckyMessage(false), 3000);
+  };
+
+
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 overflow-hidden">
@@ -1084,7 +1241,7 @@ export default function VotingPage() {
                 📊 View Results
               </button>
               <button
-                onClick={copyShareLink}
+                onClick={shareResults}
                 className="w-full bg-gradient-to-r from-green-400 to-blue-500 text-white font-semibold py-3 px-6 rounded-lg hover:from-green-500 hover:to-blue-600 transition-all duration-200"
               >
                 📤 Share Results
@@ -1192,7 +1349,14 @@ export default function VotingPage() {
               {/* Right: Share and Feeling Lucky */}
               <div className="flex items-center gap-3">
                 <button
-                  onClick={copyShareLink}
+                  onClick={() => setShowPowerUpModal(true)}
+                  className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-full hover:from-pink-600 hover:to-purple-700 transition-all duration-300 text-xs font-medium"
+                >
+                  <span>⚡</span>
+                  <span>Power-ups</span>
+                </button>
+                <button
+                  onClick={shareResults}
                   className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full hover:from-purple-700 hover:to-blue-700 transition-all duration-300 text-xs font-medium"
                 >
                   <span>📤</span>
@@ -1221,10 +1385,43 @@ export default function VotingPage() {
                 <div className="flex flex-wrap gap-1 mt-2">
                   {activeVoters.map((voter, index) => (
                     <div key={index} className="flex items-center gap-1 bg-white/20 rounded-full px-2 py-1">
+                      <div className="voter-avatar w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        {getVoterAvatar(voter.name)}
+                      </div>
                       <span className="text-white text-xs">{voter.name}</span>
                       <span className="text-yellow-400 text-xs">⏱️ {Math.max(0, voter.time_remaining)}s</span>
                     </div>
                   ))}
+                </div>
+                
+                {/* Group Progress Bar */}
+                {expectedVoters > 1 && (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs text-white mb-1">
+                      <span>Group Progress</span>
+                      <span>{completedVoters}/{expectedVoters} completed</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div 
+                        className="group-progress h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min((completedVoters / expectedVoters) * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Waiting for Friends Animation */}
+          {waitingForFriends && (
+            <div className="mx-4 mb-4">
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg p-3 text-center waiting-animation">
+                <div className="text-white font-semibold text-sm">
+                  ⏳ Waiting for friends to finish voting...
+                </div>
+                <div className="text-white text-xs mt-1">
+                  {expectedVoters - completedVoters} more to go!
                 </div>
               </div>
             </div>
@@ -1239,6 +1436,101 @@ export default function VotingPage() {
               className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-3 rounded-full shadow-2xl font-bold text-lg"
             >
               {luckyMessage}
+            </motion.div>
+          )}
+
+          {/* Confetti Animation */}
+          {showConfetti && (
+            <div className="fixed inset-0 pointer-events-none z-40">
+              {[...Array(50)].map((_, i) => (
+                <div
+                  key={i}
+                  className="confetti"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    animationDelay: `${Math.random() * 2}s`,
+                    background: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57'][Math.floor(Math.random() * 5)]
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Quick Feedback Modal */}
+          {showQuickFeedback && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4"
+            >
+              <div className="text-center">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">
+                  {feedbackSubmitted ? 'Thanks for your feedback!' : 'How were these suggestions?'}
+                </h3>
+                {!feedbackSubmitted ? (
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={() => handleQuickFeedback(true)}
+                      className="bg-green-500 text-white p-3 rounded-full hover:bg-green-600 transition-colors"
+                    >
+                      👍 Loved them!
+                    </button>
+                    <button
+                      onClick={() => handleQuickFeedback(false)}
+                      className="bg-red-500 text-white p-3 rounded-full hover:bg-red-600 transition-colors"
+                    >
+                      👎 Not my vibe
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-green-600 text-2xl">🎉</div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Power-up Modal */}
+          {showPowerUpModal && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4"
+            >
+              <div className="text-center">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">⚡ Choose Your Power-up!</h3>
+                <p className="text-sm text-gray-600 mb-4">Use these special abilities once per session</p>
+                
+                <div className="space-y-3">
+                  {availablePowerUps.revealPopularity && (
+                    <button
+                      onClick={useRevealPopularity}
+                      className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
+                    >
+                      🔍 Reveal Popularity
+                    </button>
+                  )}
+                  
+                  {availablePowerUps.luckyDraw && (
+                    <button
+                      onClick={useLuckyDraw}
+                      className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-3 rounded-lg hover:from-yellow-500 hover:to-orange-600 transition-all duration-200"
+                    >
+                      🎁 Lucky Draw
+                    </button>
+                  )}
+                  
+
+                </div>
+                
+                <button
+                  onClick={() => setShowPowerUpModal(false)}
+                  className="mt-4 w-full bg-gray-300 text-gray-700 p-2 rounded-lg hover:bg-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -1288,6 +1580,18 @@ export default function VotingPage() {
                         <div className="absolute top-3 left-3 trending-badge text-white text-xs font-bold px-2 py-1 rounded-full">
                           {getTrendingBadge(deck[currentIndex])}
                         </div>
+                      )}
+                      
+                      {/* Personalized Badge */}
+                      {showPersonalizedBadge && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          className="absolute top-3 right-3 personalized-badge text-white text-xs font-bold px-2 py-1 rounded-full"
+                        >
+                          {getPersonalizedSuggestion(deck[currentIndex])}
+                        </motion.div>
                       )}
                       
                       {/* Compact hours badge */}
@@ -1356,10 +1660,7 @@ export default function VotingPage() {
                               <span>📞</span>
                               <span className="truncate">{deck[currentIndex].contact?.phone || 'N/A'}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <span>✉️</span>
-                              <span className="truncate">{deck[currentIndex].contact?.email || 'N/A'}</span>
-                            </div>
+
                           </>
                         )}
                       </div>

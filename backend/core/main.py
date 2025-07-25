@@ -1,14 +1,16 @@
 from fastapi import FastAPI, HTTPException, Depends, status, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 import os
 import secrets
@@ -25,11 +27,16 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from services.location_services import location_service
 from services.geocoding_service import geocoding_service
 from services.api_config import api_template_manager
-# Temporarily disable cache manager import to test geocoding
-# from core.cache_manager import cache_manager, cached
-
-# Import user management features
+from core.cache_manager import cache_manager, cached
+from core.db import engine, SessionLocal, Base
+from utils.validation import ValidationError
 from core.user_endpoints import router as user_router
+from core.auth_system import AuthSystem, SessionManager, MockSMSService
+from utils.validation import InputValidator, ErrorHandler, validate_and_sanitize_input
+from utils.monitoring import (
+    setup_monitoring, get_health_status, monitor_performance, 
+    log_user_action, log_security_event, start_periodic_monitoring
+)
 
 # Import rate limiter
 from core.rate_limiter import rate_limiter, get_client_id
@@ -84,122 +91,138 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# --- Password-related functions are not used in MVP ---
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL not set in .env")
-
 # Optimize database connection with pooling
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=20,
-    max_overflow=30,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    pool_timeout=30
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# engine = create_engine(
+#     DATABASE_URL,
+#     pool_size=20,
+#     max_overflow=30,
+#     pool_pre_ping=True,
+#     pool_recycle=3600,
+#     pool_timeout=30,
+#     echo=os.getenv("DEBUG", "false").lower() == "true"  # Log SQL queries in debug mode
+# )
+# SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Setup monitoring
+setup_monitoring(engine)
+start_periodic_monitoring()
 
 app = FastAPI(title="Choosy API", description="API for Choosy group decision making app")
 
+# Get allowed origins from environment or use defaults
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+
+# Security middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# Request logging and rate limiting middleware - temporarily disabled for testing
-# @app.middleware("http")
-# async def request_middleware(request: Request, call_next):
-#     """Log requests and apply rate limiting"""
-#     import time
-#     
-#     start_time = time.time()
-#     
-#     # Rate limiting - temporarily disabled for testing
-#     # client_id = get_client_id(request)
-#     # allowed, info = rate_limiter.is_allowed(client_id)
-#     
-#     # if not allowed:
-#     #     logger.warning(f"Rate limit exceeded for {client_id}")
-#     #     return JSONResponse(
-#     #         status_code=429,
-#         content={
-#             "error": info["error"],
-#             "message": info["message"],
-#             "retry_after": info["retry_after"]
-#         }
-#     )
-#     
-#     # Process request
-#     try:
-#         response = await call_next(request)
-#         duration = time.time() - start_time
-#         
-#         # Log successful request
-#         log_api_request(
-#             method=request.method,
-#             url=str(request.url),
-#             status_code=response.status_code,
-#             duration=duration
-#         )
-#         
-#         # Add rate limit headers - temporarily disabled
-#         # response.headers["X-RateLimit-Remaining-Minute"] = str(info["remaining_minute"])
-#         # response.headers["X-RateLimit-Remaining-Hour"] = str(info["remaining_hour"])
-#         
-#         return response
-#         
-#     except Exception as e:
-#         duration = time.time() - start_time
-#         log_error(e, f"Request {request.method} {request.url}", client_id)
-#         raise
+@app.middleware("http")
+async def request_middleware(request: Request, call_next):
+    """Log requests and apply rate limiting"""
+    import time
+    
+    start_time = time.time()
+    
+    # Rate limiting
+    client_id = get_client_id(request)
+    allowed, info = rate_limiter.is_allowed(client_id)
+    
+    if not allowed:
+        logger.warning(f"Rate limit exceeded for {client_id}")
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": info["error"],
+                "message": info["message"],
+                "retry_after": info["retry_after"]
+            }
+        )
+    
+    # Process request
+    try:
+        response = await call_next(request)
+        duration = time.time() - start_time
+        
+        # Log successful request
+        log_api_request(
+            method=request.method,
+            url=str(request.url),
+            status_code=response.status_code,
+            duration=duration
+        )
+        
+        # Add rate limit headers
+        response.headers["X-RateLimit-Remaining-Minute"] = str(info["remaining_minute"])
+        response.headers["X-RateLimit-Remaining-Hour"] = str(info["remaining_hour"])
+        
+        return response
+        
+    except Exception as e:
+        duration = time.time() - start_time
+        log_error(e, f"Request {request.method} {request.url}", client_id)
+        raise
 
 # Include user endpoints
 app.include_router(user_router)
 
-# Global error handler - temporarily disabled for testing
-# @app.exception_handler(Exception)
-# async def global_exception_handler(request: Request, exc: Exception):
-#     """Handle all unhandled exceptions gracefully"""
-#     error_id = str(uuid.uuid4())
-#     
-#     # Log the error for debugging
-#     print(f"❌ Error {error_id}: {str(exc)}")
-#     print(f"📍 URL: {request.url}")
-#     print(f"🔍 Method: {request.method}")
-#     print(f"📄 Traceback: {traceback.format_exc()}")
-#     
-#     # Return user-friendly error
-#     return JSONResponse(
-#         status_code=500,
-#         content={
-#             "error": "Something went wrong",
-#             "error_id": error_id,
-#             "message": "We're working on fixing this. Please try again.",
-#             "status": "error"
-#         }
-#     )
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Handle all unhandled exceptions gracefully"""
+    error_id = str(uuid.uuid4())
+    
+    # Log the error for debugging
+    logger.error(f"❌ Error {error_id}: {str(exc)}")
+    logger.error(f"📍 URL: {request.url}")
+    logger.error(f"🔍 Method: {request.method}")
+    logger.error(f"📄 Traceback: {traceback.format_exc()}")
+    
+    # Return user-friendly error
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Something went wrong",
+            "error_id": error_id,
+            "message": "We're working on fixing this. Please try again.",
+            "status": "error"
+        }
+    )
 
-# Database connection error handler - temporarily disabled for testing
-# @app.exception_handler(Exception)
-# async def database_exception_handler(request: Request, exc: Exception):
-#     """Handle database connection errors"""
-#     if "connection" in str(exc).lower() or "database" in str(exc).lower():
-#         return JSONResponse(
-#             status_code=503,
-#             content={
-#                 "error": "Database temporarily unavailable",
-#                 "message": "Please try again in a moment",
-#                 "status": "error"
-#         }
-#     )
-#     raise exc
+@app.exception_handler(Exception)
+async def database_exception_handler(request: Request, exc: Exception):
+    """Handle database connection errors"""
+    if "connection" in str(exc).lower() or "database" in str(exc).lower():
+        logger.error(f"Database connection error: {str(exc)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "Database temporarily unavailable",
+                "message": "Please try again in a moment",
+                "status": "error"
+        }
+    )
+    raise exc
 
 class PlanCreate(BaseModel):
     topic: str
@@ -210,33 +233,33 @@ class PlanCreate(BaseModel):
     custom_events: Optional[List[dict]] = []
     
     # Input validation
-    @validator('topic')
+    @field_validator('topic')
     def validate_topic(cls, v):
         valid_topics = ['concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 'racing', 'swimming', 'drinks', 'movies', 'comedy', 'art', 'shopping', 'wellness', 'adventure', 'family']
         if v not in valid_topics:
             raise ValueError(f'Topic must be one of: {valid_topics}')
         return v
     
-    @validator('group_size')
+    @field_validator('group_size')
     def validate_group_size(cls, v):
         valid_sizes = ['solo', 'date', 'friend', 'group']
         if v not in valid_sizes:
             raise ValueError(f'Group size must be one of: {valid_sizes}')
         return v
     
-    @validator('zip_code')
+    @field_validator('zip_code')
     def validate_zip_code(cls, v):
         if not v or len(v) < 3 or len(v) > 10:
             raise ValueError('ZIP code must be 3-10 characters')
         return v
     
-    @validator('host_name')
+    @field_validator('host_name')
     def validate_host_name(cls, v):
         if not validate_name(v):
             raise ValueError('Please choose an appropriate name (2-30 characters, letters only)')
         return v.strip()
     
-    @validator('host_phone')
+    @field_validator('host_phone')
     def validate_host_phone(cls, v):
         import re
         # Remove all non-digit characters except + at the beginning
@@ -257,11 +280,11 @@ class ReservationCreate(BaseModel):
     event_name: str
     user_name: str
     phone_number: str
-    group_size: Optional[str] = "solo"
+    group_size: Optional[str] = "myself"
     event_time: Optional[str] = "7:00 PM"
     event_date: Optional[str] = None
-    
-    @validator('user_name')
+
+    @field_validator('user_name')
     def validate_user_name(cls, v):
         if not validate_name(v):
             raise ValueError('Please choose an appropriate name (2-30 characters, letters only)')
@@ -271,27 +294,22 @@ class UserCreate(BaseModel):
     name: str
     phone: str
     
-    @validator('name')
+    @field_validator('name')
     def validate_name_field(cls, v):
         if not validate_name(v):
             raise ValueError('Please choose an appropriate name (2-30 characters, letters only)')
         return v.strip()
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+# --- Password-related functions are not used in MVP ---
+# def verify_password(plain_password, hashed_password):
+#     return pwd_context.verify(plain_password, hashed_password)
+#
+# def get_password_hash(password):
+#     return pwd_context.hash(password)
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict, expires_delta: timedelta = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+# Remove old JWT functions since they're now in AuthSystem
+# def create_access_token(data: dict, expires_delta: timedelta = None):
+# def verify_token(token: str):
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
@@ -300,7 +318,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = AuthSystem.verify_token(token)
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
@@ -309,28 +327,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 @app.get("/")
 def health():
-    """Health check endpoint for monitoring"""
-    try:
-        # Test database connection
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        
-        return {
-            "status": "healthy",
-            "message": "Choosy API is running",
-            "timestamp": datetime.now().isoformat(),
-            "version": "1.0.0"
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "unhealthy",
-                "message": "Database connection failed",
-                "timestamp": datetime.now().isoformat()
-            }
-        )
+    """Health check endpoint with comprehensive monitoring"""
+    return get_health_status()
 
 @app.get("/test-db")
 def test_db():
@@ -418,148 +416,93 @@ async def get_events(lat: float, lng: float, category: str = "adventure", radius
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/plans")
-async def create_plan(plan: PlanCreate):
-    """Create a new plan with optimized performance"""
+async def create_plan(
+    plan_data: dict,
+    current_user: dict = Depends(AuthSystem.get_current_user)
+):
+    """Create a new plan (requires authentication)"""
     try:
-        plan_id = str(uuid.uuid4())
-        print(f"🔍 Creating plan {plan_id} for {plan.topic} in {plan.zip_code}")
+        # Validate and sanitize plan data
+        validated_data = InputValidator.validate_plan_data(plan_data)
         
-        # Use connection pooling for better performance
-        with SessionLocal() as db:
-            try:
-                # Insert plan with optimized query
-                db.execute(
-                    text("""
-                        INSERT INTO plans (id, topic, group_size, zip_code, host_name, host_phone, created_at, expires_at)
-                        VALUES (:id, :topic, :group_size, :zip_code, :host_name, :host_phone, NOW(), NOW() + INTERVAL '15 minutes')
-                    """),
-                    {
-                        "id": plan_id,
-                        "topic": plan.topic,
-                        "group_size": plan.group_size,
-                        "zip_code": plan.zip_code,
-                        "host_name": plan.host_name,
-                        "host_phone": plan.host_phone
-                    }
-                )
-                db.commit()
-                print(f"✅ Plan inserted successfully")
-                
-                # Get real events from global APIs
-                print(f"🔍 Fetching events for {plan.topic} in {plan.zip_code}")
-                real_events = await location_service.get_places_by_zipcode(plan.zip_code, plan.topic)
-                print(f"📊 Found {len(real_events)} real events")
-                
-                # If no real events found, try venue-based suggestions as fallback
-                if not real_events:
-                    print(f"No real events found for {plan.topic} in {plan.zip_code}, using venue suggestions as fallback")
-                    # Try with a broader category or different approach
-                    fallback_events = await location_service.get_places_by_zipcode(plan.zip_code, 'foodie')  # Use foodie as fallback
-                    if fallback_events:
-                        real_events = fallback_events
-                        print(f"📊 After fallback: {len(real_events)} events")
-                    else:
-                        print(f"📊 No fallback events found either")
-                
-                print(f"📊 Final event count: {len(real_events)}")
-                
-                for event in real_events:
-                    # Defensive: ensure metadata is a dict
-                    metadata = event.get('metadata') or {}
-                    if metadata.get('suggestion'):
-                        print(f"🚫 Skipping suggestion event: {event.get('name', 'Unknown')}")
-                        continue
-                    # Fail-safe: skip any event with name like "No [topic] events found nearby"
-                    if event.get('name', '').lower().startswith('no ') and 'events found nearby' in event.get('name', '').lower():
-                        print(f"🚫 Skipping fallback/suggestion event by name: {event.get('name', 'Unknown')}")
-                        continue
-                    # Debug: print event if not skipped
-                    print(f"💾 Saving event: {event.get('name', 'Unknown')}")
-                    try:
-                        event_id = str(uuid.uuid4())
-                        
-                        # Preserve original metadata and add additional fields
-                        original_metadata = event.get('metadata') or {}
-                        metadata = {
-                            'venue': event.get('venue', ''),
-                            'address': event.get('address', ''),
-                            'city': event.get('city', ''),
-                            'state': event.get('state', ''),
-                            'zip_code': event.get('zip_code', ''),
-                            'price': event.get('price', ''),
-                            'category': event.get('category', ''),
-                            'source': event.get('source', ''),
-                            'external_id': event.get('external_id', ''),
-                            'external_url': event.get('external_url', ''),
-                            'organizer': event.get('organizer', ''),
-                            'attendees_count': event.get('attendees_count'),
-                            'max_attendees': event.get('max_attendees'),
-                            'is_free': event.get('is_free', False),
-                            'is_featured': event.get('is_featured', False),
-                            'phone': event.get('phone'),
-                            'email': event.get('email'),
-                            'hours': event.get('hours'),
-                            'description': event.get('description', ''),
-                            'image_url': event.get('image_url'),
-                            # Preserve fun activity flags
-                            'offline_activity': original_metadata.get('offline_activity', False),
-                            'tiktok_trend': original_metadata.get('tiktok_trend', False),
-                            'cultural_game': original_metadata.get('cultural_game', False),
-                            'free_activity': original_metadata.get('free_activity', False),
-                            'difficulty': original_metadata.get('difficulty', 'Easy'),
-                            'duration': original_metadata.get('duration', '1-2 hours'),
-                            'materials_needed': original_metadata.get('materials_needed', 'None')
-                        }
-                        
-                        print(f"📝 Event data: {event.get('name')} - {event.get('source', 'unknown')}")
-                        
-                        db.execute(
-                            text("""
-                                INSERT INTO events (id, plan_id, name, image, hours, source_type, votes_count, metadata)
-                                VALUES (:id, :plan_id, :name, :image, :hours, :source_type, 0, :metadata)
-                            """),
-                            {
-                                "id": event_id,
-                                "plan_id": plan_id,
-                                "name": event["name"],
-                                "image": event.get("image_url") or event.get("image"),
-                                "hours": (event.get("hours", "Hours not available"))[:100],  # Truncate to 100 chars
-                                "source_type": event.get("source_type") or event.get("source", "custom"),
-                                "metadata": json.dumps(metadata)
-                            }
-                        )
-                        print(f"✅ Event saved: {event.get('name')}")
-                    except Exception as e:
-                        print(f"❌ Error saving event {event.get('name', 'Unknown')}: {e}")
-                        raise e
-                
-                for event in plan.custom_events[:2]:  # Limit to 2 custom events max
-                    event_id = str(uuid.uuid4())
-                    db.execute(
-                        text("""
-                            INSERT INTO events (id, plan_id, name, source_type, votes_count)
-                            VALUES (:id, :plan_id, :name, 'custom', 0)
-                        """),
-                        {
-                            "id": event_id,
-                            "plan_id": plan_id,
-                            "name": event.get("name", "Custom Event")
-                        }
-                    )
-                
-                print(f"💾 Committing transaction...")
-                db.commit()
-                print(f"✅ Transaction committed successfully")
-                return {"id": plan_id, "message": "Plan created successfully"}
-                
-            except Exception as e:
-                print(f"❌ Error in transaction: {e}")
-                db.rollback()
-                raise e
-                
+        # Create plan with authenticated user as creator
+        plan_id = str(uuid.uuid4())
+        
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO plans (id, title, description, zip_code, group_size, creator_id, created_at, updated_at)
+                    VALUES (:id, :title, :description, :zip_code, :group_size, :creator_id, NOW(), NOW())
+                """),
+                {
+                    "id": plan_id,
+                    "title": validated_data["title"],
+                    "description": validated_data.get("description", ""),
+                    "zip_code": validated_data["zip_code"],
+                    "group_size": validated_data["group_size"],
+                    "creator_id": current_user["id"]
+                }
+            )
+            conn.commit()
+        
+        return {
+            "success": True,
+            "plan_id": plan_id,
+            "message": "Plan created successfully"
+        }
     except Exception as e:
-        print(f"❌ Error creating plan: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating plan: {e}")
+        if isinstance(e, ValidationError):
+            raise ErrorHandler.handle_validation_error(e)
+        raise HTTPException(status_code=500, detail="Failed to create plan")
+
+@app.post("/api/plans/{plan_id}/vote")
+async def vote_on_option(
+    plan_id: str,
+    vote_data: dict,
+    current_user: dict = Depends(AuthSystem.get_current_user)
+):
+    """Vote on an option (requires authentication and plan access)"""
+    try:
+        # Validate plan_id
+        validated_plan_id = InputValidator.validate_uuid(plan_id, "plan_id")
+        
+        # Check if user has access to this plan
+        if not AuthSystem.check_plan_access(current_user["id"], validated_plan_id):
+            raise HTTPException(status_code=403, detail="Access denied to this plan")
+        
+        # Validate vote data
+        validated_vote_data = InputValidator.validate_vote_data(vote_data)
+        
+        # Record vote
+        vote_id = str(uuid.uuid4())
+        
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO votes (id, plan_id, voter_id, option_id, vote_type, created_at)
+                    VALUES (:id, :plan_id, :voter_id, :option_id, :vote_type, NOW())
+                """),
+                {
+                    "id": vote_id,
+                    "plan_id": validated_plan_id,
+                    "voter_id": current_user["id"],
+                    "option_id": validated_vote_data["option_id"],
+                    "vote_type": validated_vote_data["vote_type"]
+                }
+            )
+            conn.commit()
+        
+        return {
+            "success": True,
+            "vote_id": vote_id,
+            "message": "Vote recorded successfully"
+        }
+    except Exception as e:
+        logger.error(f"Error recording vote: {e}")
+        if isinstance(e, ValidationError):
+            raise ErrorHandler.handle_validation_error(e)
+        raise HTTPException(status_code=500, detail="Failed to record vote")
 
 @app.post("/api/plans/{plan_id}/events")
 def create_events_for_plan(plan_id: str, events: List[dict]):
@@ -652,7 +595,7 @@ def get_events_for_plan(plan_id: str):
                     "price": metadata.get('price', ''),
                     "category": metadata.get('category', ''),
                     "phone": metadata.get('phone'),
-                    "email": metadata.get('email'),
+            
                     "description": metadata.get('description', '') or f"Experience the best {metadata.get('category', 'local')} vibes at {row[1]}. Perfect for {metadata.get('category', 'fun')} activities and memorable moments.",
                     "organizer": metadata.get('organizer', ''),
                     "external_url": metadata.get('external_url'),
@@ -666,7 +609,7 @@ def get_events_for_plan(plan_id: str):
                     # Add contact info for display
                     "contact": {
                         "phone": metadata.get('phone', '+1 212-997-4144'),
-                        "email": metadata.get('email', 'N/A')
+                
                     }
                 }
                 
@@ -1036,42 +979,13 @@ def create_user(user: UserCreate):
 
 @app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(
-                text("SELECT id, phone, name FROM users WHERE phone = :phone"),
-                {"phone": form_data.username}
-            )
-            user = result.fetchone()
-            
-            if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Incorrect phone number",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-            
-            # For now, we'll use a simple password check
-            # In production, you'd want to store hashed passwords
-            if form_data.password != "demo123":  # Replace with proper password verification
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Incorrect password",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-            
-            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-            access_token = create_access_token(
-                data={"sub": user[0]}, expires_delta=access_token_expires
-            )
-            return {
-                "access_token": access_token,
-                "token_type": "bearer",
-                "user_id": user[0],
-                "user_name": user[2]
-            }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """
+    Legacy login endpoint - redirects to new auth system
+    """
+    raise HTTPException(
+        status_code=400,
+        detail="Please use /api/auth/send-code and /api/auth/verify-code for authentication"
+    )
 
 
 @app.get("/users/me")
@@ -1104,6 +1018,10 @@ def get_users_count():
 @app.get("/admin/users")
 def get_all_users():
     """Get all users (ADMIN ONLY - remove in production)"""
+    # Check if we're in development mode
+    if os.getenv("ENVIRONMENT", "development") == "production":
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+    
     try:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT id, name FROM users LIMIT 10"))
@@ -1234,6 +1152,10 @@ def optimize_events():
 @app.get("/admin/analytics/event-stats")
 def get_event_statistics():
     """Get event storage statistics"""
+    # Check if we're in development mode
+    if os.getenv("ENVIRONMENT", "development") == "production":
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+    
     try:
         # Import here to avoid circular imports
         import sys
@@ -1246,20 +1168,40 @@ def get_event_statistics():
         
         return stats
     except Exception as e:
-        print(f"Error in get_event_statistics: {str(e)}")
+        logger.error(f"Error in get_event_statistics: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/db/pool-status")
+def get_db_pool_status():
+    """Get database connection pool status"""
+    # Check if we're in development mode
+    if os.getenv("ENVIRONMENT", "development") == "production":
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+    
+    try:
+        pool = engine.pool
+        return {
+            "pool_size": pool.size(),
+            "checked_in": pool.checkedin(),
+            "checked_out": pool.checkedout(),
+            "overflow": pool.overflow(),
+            "invalid": pool.invalid()
+        }
+    except Exception as e:
+        logger.error(f"Error getting pool status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/events/trending")
-# @cached(ttl=300, key_prefix="trending")  # Cache for 5 minutes
+@cached(ttl=300, key_prefix="trending")  # Cache for 5 minutes
 async def get_trending_events(zip: str = Query(..., description="ZIP code to get trending events for")):
     """Get trending events for a specific ZIP code area with caching"""
     try:
         # Check cache first
-        # cache_key = f"trending_events:{zip}"
-        # cached_result = cache_manager.get(cache_key)
-        # if cached_result:
-        #     logger.debug(f"Cache hit for trending events: {zip}")
-        #     return cached_result
+        cache_key = f"trending_events:{zip}"
+        cached_result = cache_manager.get(cache_key)
+        if cached_result:
+            logger.debug(f"Cache hit for trending events: {zip}")
+            return cached_result
         
         # Get location data for the ZIP code
         coordinates = await geocoding_service.get_coordinates_from_zipcode(zip)
@@ -1301,7 +1243,7 @@ async def get_trending_events(zip: str = Query(..., description="ZIP code to get
                         "zip_code": zip
                     }
                     # Cache the result
-                    # cache_manager.set(cache_key, result, ttl=300)
+                    cache_manager.set(cache_key, result, ttl=300)
                     return result
             except Exception as db_error:
                 logger.error(f"Database error in trending events: {db_error}")
@@ -1511,6 +1453,138 @@ async def get_topics():
             'description': topic_config.description
         })
     return {'topics': topics}
+
+@app.post("/api/auth/send-code")
+@monitor_performance
+async def send_verification_code(phone: str):
+    """Send verification code to phone number"""
+    try:
+        # Validate phone number
+        validated_phone = InputValidator.validate_phone_number(phone)
+        
+        # Create verification session
+        session_id = SessionManager.create_verification_session(validated_phone)
+        
+        # Log security event
+        log_security_event("verification_code_sent", {"phone": validated_phone})
+        
+        return {
+            "success": True,
+            "session_id": session_id,
+            "message": "Verification code sent"
+        }
+    except Exception as e:
+        logger.error(f"Error sending verification code: {e}")
+        if isinstance(e, ValidationError):
+            raise ErrorHandler.handle_validation_error(e)
+        raise HTTPException(status_code=500, detail="Failed to send verification code")
+
+@app.post("/api/auth/verify-code")
+@monitor_performance
+async def verify_code(session_data: dict):
+    """Verify SMS code and return access token"""
+    try:
+        # Validate session data
+        validated_data = InputValidator.validate_session_data(session_data)
+        
+        # Verify the code
+        code_valid = SessionManager.verify_session_code(validated_data["session_id"], validated_data["code"])
+        phone = SessionManager.get_session_phone(validated_data["session_id"])
+        if not code_valid or not phone:
+            log_security_event("auth_failed", {"reason": "invalid_code", "session_id": validated_data["session_id"]})
+            raise ErrorHandler.handle_validation_error(ValidationError("code", "Invalid or expired verification code"))
+        
+        # Get phone from session
+        phone = SessionManager.get_session_phone(validated_data["session_id"])
+        if not phone:
+            raise ErrorHandler.handle_validation_error(ValidationError("session_id", "Invalid or expired verification code"))
+        
+        # Check if user exists, create if not
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT id, name FROM users WHERE phone = :phone"),
+                {"phone": phone}
+            )
+            user = result.fetchone()
+            
+            if not user:
+                # Create new user with default name
+                user_id = str(uuid.uuid4())
+                default_name = f"User{phone[-4:]}"  # Use last 4 digits as default name
+                
+                conn.execute(
+                    text("""
+                        INSERT INTO users (id, phone, name, created_at, updated_at)
+                        VALUES (:id, :phone, :name, NOW(), NOW())
+                    """),
+                    {"id": user_id, "phone": phone, "name": default_name}
+                )
+                conn.commit()
+                
+                user = (user_id, default_name)
+                log_user_action(user_id, "user_created", {"phone": phone, "name": default_name})
+            else:
+                user = (str(user[0]), user[1])
+            
+            # Create access token
+            access_token = AuthSystem.create_access_token(user[0], phone)
+            refresh_token = AuthSystem.create_refresh_token(user[0])
+            
+            # Log successful authentication
+            log_user_action(user[0], "user_login", {"phone": phone})
+            log_security_event("auth_success", {"user_id": user[0], "phone": phone})
+            
+            return {
+                "success": True,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "user_id": user[0],
+                "user_name": user[1],
+                "phone": phone
+            }
+    except Exception as e:
+        logger.error(f"Error verifying code: {e}")
+        if isinstance(e, ValidationError):
+            raise ErrorHandler.handle_validation_error(e)
+        # If the error message is empty, raise a default validation error
+        raise ErrorHandler.handle_validation_error(ValidationError("code", "Invalid or expired verification code"))
+
+@app.post("/api/auth/refresh")
+async def refresh_token(refresh_token: str):
+    """Refresh access token using refresh token"""
+    try:
+        payload = AuthSystem.verify_token(refresh_token)
+        
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=400, detail="Invalid token type")
+        
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Invalid token")
+        
+        # Get user phone for new access token
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT phone FROM users WHERE id = :user_id"),
+                {"user_id": user_id}
+            )
+            user = result.fetchone()
+            
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # Create new access token
+            access_token = AuthSystem.create_access_token(user_id, user[0])
+            
+            return {
+                "success": True,
+                "access_token": access_token
+            }
+    except Exception as e:
+        logger.error(f"Error refreshing token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to refresh token")
+
+# Input validation is now handled by utils.validation module
 
 if __name__ == "__main__":
     import uvicorn

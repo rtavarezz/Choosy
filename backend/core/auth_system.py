@@ -1,458 +1,246 @@
 """
-Authentication System for Choosy
-Secure user authentication and session management
+Authentication and Authorization System for Choosy
+Handles user authentication, JWT tokens, and authorization checks
 """
 
-import secrets
-import hashlib
-import json
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Tuple
-import psycopg2
 import os
-from dotenv import load_dotenv
+import jwt
+import secrets
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
+from fastapi import HTTPException, status, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import text
+from core.db import engine
+from utils.logger import logger
+from utils.validation import ValidationError
 
-load_dotenv()
+# Security configuration
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+# Security scheme
+security = HTTPBearer()
 
 class AuthSystem:
-    def __init__(self):
-        self.db_url = os.getenv('DATABASE_URL')
-        self.session_duration = timedelta(days=30)  # 30 day sessions
+    """Centralized authentication and authorization system"""
+    
+    @staticmethod
+    def create_access_token(user_id: str, user_phone: str) -> str:
+        """Create JWT access token"""
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        to_encode = {
+            "sub": user_id,
+            "phone": user_phone,
+            "exp": expire,
+            "type": "access"
+        }
+        return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    @staticmethod
+    def create_refresh_token(user_id: str) -> str:
+        """Create JWT refresh token"""
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        to_encode = {
+            "sub": user_id,
+            "exp": expire,
+            "type": "refresh"
+        }
+        return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    @staticmethod
+    def verify_token(token: str) -> Dict[str, Any]:
+        """Verify JWT token and return payload"""
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            return payload
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except jwt.JWTError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    
+    @staticmethod
+    def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+        """Get current authenticated user from token"""
+        token = credentials.credentials
+        payload = AuthSystem.verify_token(token)
         
-    def get_connection(self):
-        """Get database connection"""
-        return psycopg2.connect(self.db_url)
-    
-    async def register_user(
-        self, 
-        phone: str, 
-        name: str, 
-        email: str = None,
-        avatar_url: str = None
-    ) -> Dict:
-        """
-        Register a new user account
-        Returns: {'success': bool, 'user_id': str, 'message': str}
-        """
+        if payload.get("type") != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Verify user still exists in database
         try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            # Check if user already exists with this phone number
-            cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
-            if cur.fetchone():
-                cur.close()
-                conn.close()
-                return {'success': False, 'message': 'A user with this phone number already exists. Please use a different phone number or try logging in.'}
-            
-            # Check if user already exists with this email (if email provided)
-            if email:
-                cur.execute("SELECT id FROM users WHERE email = %s", (email,))
-                if cur.fetchone():
-                    cur.close()
-                    conn.close()
-                    return {'success': False, 'message': 'A user with this email address already exists. Please use a different email or try logging in.'}
-            
-            # Create new user
-            cur.execute("""
-                INSERT INTO users (phone, name, email, avatar_url, preferences, ai_profile, gamification)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (
-                phone, 
-                name, 
-                email, 
-                avatar_url,
-                json.dumps({}),  # Empty preferences
-                json.dumps({}),  # Empty user profile
-                json.dumps({"points": 0, "level": 1, "streak": 0, "achievements": []})  # Initial gamification
-            ))
-            
-            user_id = cur.fetchone()[0]
-            
-            # Create initial user profile
-            cur.execute("""
-                INSERT INTO ai_user_profiles (user_id, profile_data)
-                VALUES (%s, %s)
-            """, (user_id, json.dumps({
-                'learning_rate': 0.1,
-                'preference_stability': 0.5,
-                'exploration_factor': 0.3,
-                'last_updated': datetime.now().isoformat()
-            })))
-            
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return {
-                'success': True, 
-                'user_id': str(user_id), 
-                'message': 'User registered successfully'
-            }
-            
-        except psycopg2.IntegrityError as e:
-            # Handle database constraint violations
-            error_msg = str(e)
-            if "users_phone_key" in error_msg:
-                return {'success': False, 'message': 'A user with this phone number already exists. Please use a different phone number or try logging in.'}
-            elif "users_email_key" in error_msg:
-                return {'success': False, 'message': 'A user with this email address already exists. Please use a different email or try logging in.'}
-            else:
-                return {'success': False, 'message': 'Registration failed due to invalid data'}
-        except Exception as e:
-            print(f"Error registering user: {e}")
-            return {'success': False, 'message': 'Registration failed. Please try again.'}
-    
-    async def login_user(self, phone: str) -> Dict:
-        """
-        Login a user with phone number
-        Returns: {'success': bool, 'session_token': str, 'user_data': Dict, 'message': str}
-        """
-        try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            # Get user data
-            cur.execute("""
-                SELECT id, name, email, avatar_url, preferences, gamification, last_active
-                FROM users WHERE phone = %s
-            """, (phone,))
-            
-            result = cur.fetchone()
-            if not result:
-                cur.close()
-                conn.close()
-                return {'success': False, 'message': 'User not found'}
-            
-            user_id, name, email, avatar_url, preferences, gamification, last_active = result
-            
-            # Generate session token
-            session_token = self._generate_session_token()
-            expires_at = datetime.now() + self.session_duration
-            
-            # Create session
-            cur.execute("""
-                INSERT INTO user_sessions (user_id, session_token, expires_at)
-                VALUES (%s, %s, %s)
-            """, (user_id, session_token, expires_at))
-            
-            # Update last active
-            cur.execute("""
-                UPDATE users SET last_active = NOW() WHERE id = %s
-            """, (user_id,))
-            
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            user_data = {
-                'id': str(user_id),
-                'name': name,
-                'phone': phone,
-                'email': email,
-                'avatar_url': avatar_url,
-                'preferences': preferences or {},
-                'gamification': gamification or {},
-                'last_active': last_active.isoformat() if last_active else None
-            }
-            
-            return {
-                'success': True,
-                'session_token': session_token,
-                'user_data': user_data,
-                'message': 'Login successful'
-            }
-            
-        except Exception as e:
-            print(f"Error logging in user: {e}")
-            return {'success': False, 'message': 'Login failed'}
-
-    async def login_user_with_email(self, phone: str, email: str) -> Dict:
-        """
-        Login a user with phone number and email verification
-        Returns: {'success': bool, 'session_token': str, 'user_data': Dict, 'message': str}
-        """
-        try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            # Get user data with both phone and email verification
-            cur.execute("""
-                SELECT id, name, email, avatar_url, preferences, gamification, last_active
-                FROM users WHERE phone = %s AND email = %s
-            """, (phone, email))
-            
-            result = cur.fetchone()
-            if not result:
-                cur.close()
-                conn.close()
-                return {'success': False, 'message': 'Invalid phone number or email. Please check your credentials and try again.'}
-            
-            user_id, name, user_email, avatar_url, preferences, gamification, last_active = result
-            
-            # Generate session token
-            session_token = self._generate_session_token()
-            expires_at = datetime.now() + self.session_duration
-            
-            # Create session
-            cur.execute("""
-                INSERT INTO user_sessions (user_id, session_token, expires_at)
-                VALUES (%s, %s, %s)
-            """, (user_id, session_token, expires_at))
-            
-            # Update last active
-            cur.execute("""
-                UPDATE users SET last_active = NOW() WHERE id = %s
-            """, (user_id,))
-            
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            user_data = {
-                'id': str(user_id),
-                'name': name,
-                'phone': phone,
-                'email': user_email,
-                'avatar_url': avatar_url,
-                'preferences': preferences or {},
-                'gamification': gamification or {},
-                'last_active': last_active.isoformat() if last_active else None
-            }
-            
-            return {
-                'success': True,
-                'session_token': session_token,
-                'user_data': user_data,
-                'message': 'Login successful'
-            }
-            
-        except Exception as e:
-            print(f"Error logging in user: {e}")
-            return {'success': False, 'message': 'Login failed. Please try again.'}
-    
-    async def validate_session(self, session_token: str) -> Optional[str]:
-        """
-        Validate session token and return user_id if valid
-        Returns: user_id if valid, None if invalid
-        """
-        try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            # Check if session exists and is not expired
-            cur.execute("""
-                SELECT user_id FROM user_sessions 
-                WHERE session_token = %s AND expires_at > NOW()
-            """, (session_token,))
-            
-            result = cur.fetchone()
-            cur.close()
-            conn.close()
-            
-            if result:
-                return str(result[0])
-            else:
-                return None
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT id, phone, name FROM users WHERE id = :user_id"),
+                    {"user_id": user_id}
+                )
+                user = result.fetchone()
                 
-        except Exception as e:
-            print(f"Error validating session: {e}")
-            return None
-    
-    async def logout_user(self, session_token: str) -> bool:
-        """Logout user by invalidating session token"""
-        try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            cur.execute("""
-                DELETE FROM user_sessions WHERE session_token = %s
-            """, (session_token,))
-            
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error logging out user: {e}")
-            return False
-    
-    async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
-        """Get user data by ID"""
-        try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            cur.execute("""
-                SELECT id, name, phone, email, avatar_url, preferences, gamification, last_active, created_at
-                FROM users WHERE id = %s
-            """, (user_id,))
-            
-            result = cur.fetchone()
-            cur.close()
-            conn.close()
-            
-            if result:
+                if not user:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="User not found",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+                
                 return {
-                    'id': str(result[0]),
-                    'name': result[1],
-                    'phone': result[2],
-                    'email': result[3],
-                    'avatar_url': result[4],
-                    'preferences': result[5] or {},
-                    'gamification': result[6] or {},
-                    'last_active': result[7].isoformat() if result[7] else None,
-                    'created_at': result[8].isoformat() if result[8] else None
+                    "id": user[0],
+                    "phone": user[1],
+                    "name": user[2]
                 }
-            else:
-                return None
-                
         except Exception as e:
-            print(f"Error getting user: {e}")
-            return None
+            logger.error(f"Database error in get_current_user: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Authentication service error"
+            )
     
-    async def update_user_profile(
-        self, 
-        user_id: str, 
-        updates: Dict
-    ) -> bool:
-        """Update user profile information"""
+    @staticmethod
+    def require_authentication(func):
+        """Decorator to require authentication for endpoints"""
+        async def wrapper(*args, **kwargs):
+            # This will be used with FastAPI dependency injection
+            return await func(*args, **kwargs)
+        return wrapper
+    
+    @staticmethod
+    def check_plan_access(user_id: str, plan_id: str) -> bool:
+        """Check if user has access to a specific plan"""
         try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            # Build update query dynamically
-            update_fields = []
-            update_values = []
-            
-            allowed_fields = ['name', 'email', 'avatar_url', 'preferences']
-            
-            for field, value in updates.items():
-                if field in allowed_fields:
-                    update_fields.append(f"{field} = %s")
-                    update_values.append(value)
-            
-            if not update_fields:
-                return False
-            
-            update_values.append(user_id)
-            
-            query = f"""
-                UPDATE users 
-                SET {', '.join(update_fields)}, updated_at = NOW()
-                WHERE id = %s
-            """
-            
-            cur.execute(query, update_values)
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return True
-            
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("""
+                        SELECT 1 FROM plans 
+                        WHERE id = :plan_id 
+                        AND (creator_id = :user_id OR :user_id IN (
+                            SELECT voter_id FROM votes WHERE plan_id = :plan_id
+                        ))
+                    """),
+                    {"plan_id": plan_id, "user_id": user_id}
+                )
+                return result.fetchone() is not None
         except Exception as e:
-            print(f"Error updating user profile: {e}")
+            logger.error(f"Error checking plan access: {e}")
             return False
     
-    async def delete_user(self, user_id: str) -> bool:
-        """Delete user account and all associated data"""
+    @staticmethod
+    def is_plan_creator(user_id: str, plan_id: str) -> bool:
+        """Check if user is the creator of a plan"""
         try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            # Delete user sessions
-            cur.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
-            
-            # Delete user achievements
-            cur.execute("DELETE FROM user_achievements WHERE user_id = %s", (user_id,))
-            
-            # Delete AI profile
-            cur.execute("DELETE FROM ai_user_profiles WHERE user_id = %s", (user_id,))
-            
-            # Delete user preferences
-            cur.execute("DELETE FROM user_preferences WHERE user_id = %s", (user_id,))
-            
-            # Delete user event history
-            cur.execute("DELETE FROM user_event_history WHERE user_id = %s", (user_id,))
-            
-            # Delete user plans
-            cur.execute("DELETE FROM user_plans WHERE user_phone = (SELECT phone FROM users WHERE id = %s)", (user_id,))
-            
-            # Delete user
-            cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
-            
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return True
-            
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT 1 FROM plans WHERE id = :plan_id AND creator_id = :user_id"),
+                    {"plan_id": plan_id, "user_id": user_id}
+                )
+                return result.fetchone() is not None
         except Exception as e:
-            print(f"Error deleting user: {e}")
+            logger.error(f"Error checking plan creator: {e}")
             return False
-    
-    async def check_availability(self, phone: str = None, email: str = None) -> Dict:
-        """
-        Check if phone number or email is available for registration
-        Returns: {'success': bool, 'phone_available': bool, 'email_available': bool, 'message': str}
-        """
-        try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            phone_available = True
-            email_available = True
-            
-            # Check phone availability
-            if phone:
-                cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
-                if cur.fetchone():
-                    phone_available = False
-            
-            # Check email availability
-            if email:
-                cur.execute("SELECT id FROM users WHERE email = %s", (email,))
-                if cur.fetchone():
-                    email_available = False
-            
-            cur.close()
-            conn.close()
-            
-            return {
-                'success': True,
-                'phone_available': phone_available,
-                'email_available': email_available,
-                'message': 'Availability check completed'
-            }
-            
-        except Exception as e:
-            print(f"Error checking availability: {e}")
-            return {'success': False, 'message': 'Availability check failed'}
 
-    def _generate_session_token(self) -> str:
-        """Generate a secure session token"""
-        return secrets.token_urlsafe(32)
+# Mock SMS verification for MVP
+class MockSMSService:
+    """Mock SMS service for MVP - replace with real service in production"""
     
-    async def cleanup_expired_sessions(self) -> int:
-        """Clean up expired sessions and return count of deleted sessions"""
-        try:
-            conn = self.get_connection()
-            cur = conn.cursor()
-            
-            cur.execute("""
-                DELETE FROM user_sessions WHERE expires_at < NOW()
-            """)
-            
-            deleted_count = cur.rowcount
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return deleted_count
-            
-        except Exception as e:
-            print(f"Error cleaning up sessions: {e}")
-            return 0 
+    @staticmethod
+    def generate_verification_code() -> str:
+        """Generate a 6-digit verification code"""
+        return str(secrets.randbelow(1000000)).zfill(6)
+    
+    @staticmethod
+    def send_verification_code(phone: str, code: str) -> bool:
+        """Mock SMS sending - always returns True for MVP"""
+        logger.info(f"Mock SMS sent to {phone}: Your verification code is {code}")
+        return True
+    
+    @staticmethod
+    def verify_code(phone: str, code: str) -> bool:
+        """Mock code verification - accepts any 6-digit code for MVP"""
+        # In production, this would check against stored codes with expiration
+        return len(code) == 6 and code.isdigit()
+
+# Session management
+class SessionManager:
+    """Manage user sessions and verification codes"""
+    
+    # In-memory storage for MVP - use Redis in production
+    _verification_codes: Dict[str, Dict[str, Any]] = {}
+    
+    @classmethod
+    def create_verification_session(cls, phone: str) -> str:
+        """Create a new verification session"""
+        code = MockSMSService.generate_verification_code()
+        session_id = secrets.token_urlsafe(16)
+        
+        cls._verification_codes[session_id] = {
+            "phone": phone,
+            "code": code,
+            "created_at": datetime.utcnow(),
+            "attempts": 0,
+            "verified": False
+        }
+        
+        # Send mock SMS
+        MockSMSService.send_verification_code(phone, code)
+        
+        return session_id
+    
+    @classmethod
+    def verify_session_code(cls, session_id: str, code: str) -> bool:
+        if session_id not in cls._verification_codes:
+            return False
+        session = cls._verification_codes[session_id]
+        # Check if session is expired (15 minutes)
+        if datetime.utcnow() - session["created_at"] > timedelta(minutes=15):
+            del cls._verification_codes[session_id]
+            return False
+        # Check attempts limit
+        if session["attempts"] >= 2:
+            del cls._verification_codes[session_id]
+            return False
+        session["attempts"] += 1
+        # Only return True if the code matches exactly
+        if code == session["code"]:
+            session["verified"] = True
+            return True
+        return False
+    
+    @classmethod
+    def get_session_phone(cls, session_id: str) -> Optional[str]:
+        """Get phone number from session"""
+        if session_id in cls._verification_codes:
+            return cls._verification_codes[session_id]["phone"]
+        return None
+    
+    @classmethod
+    def cleanup_expired_sessions(cls):
+        """Clean up expired sessions"""
+        current_time = datetime.utcnow()
+        expired_sessions = [
+            session_id for session_id, session in cls._verification_codes.items()
+            if current_time - session["created_at"] > timedelta(minutes=15)
+        ]
+        for session_id in expired_sessions:
+            del cls._verification_codes[session_id] 

@@ -390,7 +390,7 @@ export default function VotePage() {
                 reviews: event.reviews || { stars: 4.0 + Math.random() * 1.0, count: Math.floor(Math.random() * 50) + 10 },
                 contact: {
                   phone: event.phone || '(555) 123-4567',
-                  email: event.email || 'info@event.com'
+      
                 },
                 isDemo: true
               }));
@@ -411,7 +411,7 @@ export default function VotePage() {
                   price: '$15',
                   venue: 'The Music Hall',
                   reviews: { stars: 4.5, count: 25 },
-                  contact: { phone: '(555) 123-4567', email: 'info@musichall.com' },
+                  contact: { phone: '(555) 123-4567' },
                   isDemo: true,
                   type: 'event'
                 },
@@ -425,7 +425,7 @@ export default function VotePage() {
                   price: '$20',
                   venue: 'Comedy Club',
                   reviews: { stars: 4.2, count: 18 },
-                  contact: { phone: '(555) 234-5678', email: 'info@comedyclub.com' },
+                  contact: { phone: '(555) 234-5678' },
                   isDemo: true,
                   type: 'event'
                 },
@@ -439,7 +439,7 @@ export default function VotePage() {
                   price: '$25',
                   venue: 'Downtown Plaza',
                   reviews: { stars: 4.8, count: 42 },
-                  contact: { phone: '(555) 345-6789', email: 'info@foodfestival.com' },
+                  contact: { phone: '(555) 345-6789' },
                   isDemo: true,
                   type: 'event'
                 }
@@ -459,7 +459,7 @@ export default function VotePage() {
                 price: '$15',
                 venue: 'The Music Hall',
                 reviews: { stars: 4.5, count: 25 },
-                contact: { phone: '(555) 123-4567', email: 'info@musichall.com' },
+                contact: { phone: '(555) 123-4567' },
                 isDemo: true,
                 type: 'event'
               }
@@ -479,7 +479,7 @@ export default function VotePage() {
               price: '$15',
               venue: 'The Music Hall',
               reviews: { stars: 4.5, count: 25 },
-              contact: { phone: '(555) 123-4567', email: 'info@musichall.com' },
+              contact: { phone: '(555) 123-4567' },
               isDemo: true,
               type: 'event'
             }
@@ -1794,7 +1794,7 @@ export default function VotePage() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                               <span>✉️</span>
-                              <span className="truncate">{currentCard.contact?.email || 'N/A'}</span>
+      
                             </div>
                           </>
                         )}
