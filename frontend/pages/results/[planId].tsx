@@ -6,7 +6,7 @@ import PhoneInput from 'react-phone-input-2/lib/lib';
 import 'react-phone-input-2/lib/style.css';
 import ProfanityFilter from 'profanity-filter';
 
-// Topic-specific image collections (same as vote page)
+// Topic-specific image collections
 const TOPIC_IMAGES = {
   food: [
     'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=300&fit=crop',
@@ -98,39 +98,31 @@ const TOPIC_IMAGES = {
 const DEFAULT_IMAGES = [
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop',
   'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop',
+  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop',
+  'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop',
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop'
 ];
-
-// Mock friend data for avatar display
-const MOCK_FRIENDS = {
-  friendA: { name: 'Sarah', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=50&h=50&fit=crop&crop=face' },
-  friendB: { name: 'Mike', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop&crop=face' },
-  friendC: { name: 'Emma', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop&crop=face' }
-};
 
 export default function ResultsPage() {
   const router = useRouter();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { planId, topic, groupSize, zip, winningEvent: winningEventParam } = router.query;
+  
+  // State
   const [results, setResults] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isReserving, setIsReserving] = useState(false);
-  const [reservationResult, setReservationResult] = useState(null);
-  const [showReservationModal, setShowReservationModal] = useState(false);
-  const [reservationForm, setReservationForm] = useState({
-    userName: '',
-    phoneNumber: '',
-    groupSize: 'myself'
-  });
-  const [nameError, setNameError] = useState(''); // Name validation error
-  const [reservationMade, setReservationMade] = useState(false); // Track if reservation was made
-  const [reservationBy, setReservationBy] = useState(''); // Who made the reservation
-  // Patch: always use backend voting status
+  const [error, setError] = useState(null);
+  const [showReservation, setShowReservation] = useState(false);
+  const [reservationName, setReservationName] = useState('');
+  const [reservationPhone, setReservationPhone] = useState('');
+  const [reservationGroupSize, setReservationGroupSize] = useState('myself');
+  const [nameError, setNameError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [allVotersCompleted, setAllVotersCompleted] = useState(false);
   const [expectedVoters, setExpectedVoters] = useState(1);
   const [completedVoters, setCompletedVoters] = useState(0);
 
-  // Patch: Fetch voting status from backend (no auto-refresh)
+  // Fetch voting status from backend
   useEffect(() => {
     async function fetchVotingStatus() {
       if (!planId) return;
@@ -151,12 +143,12 @@ export default function ResultsPage() {
       }
     }
     fetchVotingStatus();
-    // Poll every 10 seconds for status updates (no auto-refresh)
+    // Poll every 10 seconds for status updates
     const interval = setInterval(fetchVotingStatus, 10000);
     return () => clearInterval(interval);
   }, [planId]);
 
-  // Name validation function (same as voting page)
+  // Name validation function
   const validateName = (name: string): boolean => {
     const trimmedName = name.trim();
     
@@ -231,61 +223,75 @@ export default function ResultsPage() {
             console.error('Failed to parse winning event:', e);
           }
         }
+        
         // Check if this is a demo or real plan
         const isDemo = Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo';
+        
         // For real plans, get results from backend API
         if (!isDemo) {
           try {
             const planIdStr = Array.isArray(planId) ? planId[0] : planId;
             const response = await fetch(`/api/plans/${planIdStr}/results`);
-            if (response.ok) {
-              const apiResults = await response.json();
-              // Get expected voters from API group size
-              const apiGroupSize = apiResults.plan.groupSize;
-              const apiVoterCount = apiGroupSize === 'solo' ? 1 : (apiGroupSize === 'date' || apiGroupSize === 'friend') ? 2 : 5;
-              // Transform API results to match frontend format
-              const transformedResults = {
-                planId: planIdStr,
-                topic: apiResults.plan.topic,
-                groupSize: apiResults.plan.groupSize,
-                zip: apiResults.plan.zipCode,
-                winningEvent: apiResults.events.length > 0 ? {
-                  id: apiResults.events[0].id,
-                  name: apiResults.events[0].name,
-                  votes: apiResults.events[0].votes,
-                  image: getTopicImage(0, apiResults.plan.topic),
-                  hours: "2 hours",
-                  contact: { phone: '(555) 123-4567' }
-                } : null,
-                plan: {
-                  userName: apiResults.plan.userName,
-                  phoneNumber: apiResults.plan.phoneNumber,
-                  topic: apiResults.plan.topic,
-                  groupSize: apiResults.plan.groupSize,
-                  zipCode: apiResults.plan.zipCode
-                },
-                totalVotes: apiResults.totalVotes,
-                participants: apiResults.participants,
-                allEvents: apiResults.events.map((event, index) => ({
-                  id: event.id,
-                  name: event.name,
-                  votes: event.votes,
-                  total_votes: event.total_votes,
-                  percentage: event.percentage,
-                  image: getTopicImage(index, apiResults.plan.topic),
-                  hours: "2 hours",
-                  contact: { phone: '(555) 123-4567' }
-                })),
-                // Patch: Remove allVotersCompleted, expectedVoters, completedVoters from here
-              };
-              setResults(transformedResults);
+            if (!response.ok) {
+              setIsLoading(false);
+              setError('Failed to load results');
               return;
             }
+            
+            const apiResults = await response.json();
+            
+            // Check if there are no events
+            if (!apiResults.events || apiResults.events.length === 0) {
+              setIsLoading(false);
+              setError('No events found for this plan');
+              return;
+            }
+            
+            // Transform API results to match frontend format
+            const transformedResults = {
+              planId: planIdStr,
+              topic: apiResults.plan.topic,
+              groupSize: apiResults.plan.groupSize,
+              zip: apiResults.plan.zipCode,
+              winningEvent: apiResults.events.length > 0 ? {
+                id: apiResults.events[0].id,
+                name: apiResults.events[0].name,
+                votes: apiResults.events[0].votes,
+                image: getTopicImage(0, apiResults.plan.topic),
+                hours: "2 hours",
+                contact: { phone: '(555) 123-4567' }
+              } : null,
+              plan: {
+                userName: apiResults.plan.userName,
+                phoneNumber: apiResults.plan.phoneNumber,
+                topic: apiResults.plan.topic,
+                groupSize: apiResults.plan.groupSize,
+                zipCode: apiResults.plan.zipCode
+              },
+              totalVotes: apiResults.totalVotes,
+              participants: apiResults.participants,
+              allEvents: apiResults.events.map((event, index) => ({
+                id: event.id,
+                name: event.name,
+                votes: event.votes,
+                total_votes: event.total_votes,
+                percentage: event.percentage,
+                image: getTopicImage(index, apiResults.plan.topic),
+                hours: "2 hours",
+                contact: { phone: '(555) 123-4567' }
+              }))
+            };
+            setResults(transformedResults);
+            return;
           } catch (error) {
             console.error('Failed to load API results:', error);
+            setIsLoading(false);
+            setError('Failed to load results');
+            return;
           }
         }
-        // For demo plans or if API fails, use mock data
+        
+        // For demo plans, use mock data
         const mockResults = {
           planId: Array.isArray(planId) ? planId[0] : planId,
           topic: Array.isArray(topic) ? topic[0] : topic,
@@ -300,6 +306,7 @@ export default function ResultsPage() {
         setResults(mockResults);
       } catch (error) {
         console.error('Failed to load results:', error);
+        setError('Failed to load results');
       } finally {
         setIsLoading(false);
       }
@@ -317,86 +324,70 @@ export default function ResultsPage() {
   // Handle reservation
   const handleReservation = async () => {
     if (!results?.winningEvent) return;
-    
-    // Check if this is a demo
-    const isDemo = Array.isArray(planId) ? planId[0] === 'demo' : planId === 'demo';
-    
-    if (isDemo) {
-      alert('This is a demo! Create a real plan to make reservations.');
-      return;
-    }
-    
-    // Show reservation modal to collect user info
-    setShowReservationModal(true);
+    setShowReservation(true);
   };
 
+  // Handle reservation submit
   const handleReservationSubmit = async () => {
-    if (!results?.winningEvent || !reservationForm.userName || !reservationForm.phoneNumber) {
-      alert('Please fill in all required fields.');
+    // Validate name
+    if (!validateName(reservationName)) {
       return;
     }
-    
-    // Validate name before proceeding
-    if (!validateName(reservationForm.userName)) {
-      return; // Stop if validation fails
-    }
-    
-    // Check if reservation already made
-    if (reservationMade) {
-      alert('A reservation has already been made for this event.');
+
+    // Validate phone
+    if (!reservationPhone || reservationPhone.length < 10) {
+      setPhoneError('Please enter a valid phone number');
       return;
     }
-    
-    setIsReserving(true);
+    setPhoneError('');
+
     try {
       const response = await fetch('/api/makeReservation', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          activityType: results.topic,
-          eventName: results.winningEvent.name,
-          userName: reservationForm.userName,
-          phoneNumber: reservationForm.phoneNumber,
-          groupSize: reservationForm.groupSize,
-          eventTime: results.winningEvent.hours?.split(' - ')[0] || '7:00 PM',
-          eventDate: new Date().toISOString().split('T')[0]
-        })
+          activity_type: results.topic,
+          event_name: results.winningEvent.name,
+          user_name: reservationName,
+          phone_number: reservationPhone,
+          group_size: reservationGroupSize,
+          event_time: "7:00 PM",
+          event_date: new Date().toISOString().split('T')[0]
+        }),
       });
-      
+
       if (response.ok) {
-        const data = await response.json();
-        setReservationResult(data.reservation);
-        setReservationMade(true);
-        setReservationBy(reservationForm.userName);
-        setShowReservationModal(false);
         alert('Reservation submitted successfully!');
+        setShowReservation(false);
+        setReservationName('');
+        setReservationPhone('');
+        setReservationGroupSize('myself');
       } else {
-        alert('Failed to make reservation. Please try again.');
+        alert('Failed to submit reservation. Please try again.');
       }
     } catch (error) {
       console.error('Reservation error:', error);
-      alert('Something went wrong. Please try again.');
-    } finally {
-      setIsReserving(false);
+      alert('Failed to submit reservation. Please try again.');
     }
   };
 
-  // Handle share functionality
+  // Handle share
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/voting?planId=${planId}`;
+    const shareUrl = `${window.location.origin}/vote?planId=${planId}`;
     
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Join our plan on Choosy!',
-          text: `Vote on ${results.topic} events near ${results.zip}`,
-          url: shareUrl
+          title: 'Join my voting session!',
+          text: 'Help me decide what to do!',
+          url: shareUrl,
         });
       } catch (error) {
         console.error('Share failed:', error);
       }
     } else {
-      // Fallback: copy to clipboard
       try {
         await navigator.clipboard.writeText(shareUrl);
         alert('Link copied to clipboard!');
@@ -406,12 +397,6 @@ export default function ResultsPage() {
     }
   };
 
-  // Render star rating
-  const renderStars = (stars) => {
-    return '⭐'.repeat(Math.floor(stars)) + '☆'.repeat(5 - Math.floor(stars));
-  };
-
-  // Patch: Use backend voting status for UI logic
   // Loading state
   if (isLoading) {
     return (
@@ -423,13 +408,14 @@ export default function ResultsPage() {
       </div>
     );
   }
+
   // Error state
-  if (!results) {
+  if (error || !results) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Results Not Found</h1>
-          <p className="text-gray-600 mb-6">The voting session may have expired or doesn't exist.</p>
+          <p className="text-gray-600 mb-6">{error || 'The voting session may have expired or doesn\'t exist.'}</p>
           <button
             onClick={() => router.push('/create')}
             className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
@@ -440,23 +426,27 @@ export default function ResultsPage() {
       </div>
     );
   }
-  // Patch: Use backend voting status for waiting/results UI
+
+  // Check if this is a solo plan (standardize on "myself")
+  const isSoloPlan = results.groupSize === 'myself';
+
   return (
     <>
       <Head>
         <title>Voting Results - Choosy</title>
         <meta name="description" content="See the results of your group voting" />
       </Head>
+      
       {/* Header */}
       <header className="flex justify-between items-center p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.push('/')}
-            className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-2 px-6 rounded-lg shadow-lg transition-all duration-300"
           >
             ← Back to Home
           </button>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Voting Results</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white ml-4">Voting Results</h1>
         </div>
         
         <button
@@ -473,16 +463,19 @@ export default function ResultsPage() {
       
       <div className="relative min-h-screen bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-2xl mx-auto">
-          {/* Voter progress */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full shadow-lg mb-4">
-            <span className="text-lg font-bold">👥</span>
-            <span className="font-semibold text-gray-900 dark:text-white">{completedVoters}/{expectedVoters} finished voting</span>
-            {allVotersCompleted && (
-              <span className="text-green-600 dark:text-green-400 font-bold ml-2">🎉 All Done!</span>
-            )}
-          </div>
-          {/* Waiting for all voters */}
-          {!allVotersCompleted && (
+          {/* Voter progress - only show for group plans */}
+          {!isSoloPlan && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full shadow-lg mb-4">
+              <span className="text-lg font-bold">👥</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{completedVoters}/{expectedVoters} finished voting</span>
+              {allVotersCompleted && (
+                <span className="text-green-600 dark:text-green-400 font-bold ml-2">🎉 All Done!</span>
+              )}
+            </div>
+          )}
+
+          {/* Waiting for all voters - only show for group plans */}
+          {!isSoloPlan && !allVotersCompleted && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 mb-8">
               <div className="text-center">
                 <div className="text-6xl mb-4">⏳</div>
@@ -490,39 +483,36 @@ export default function ResultsPage() {
                 <p className="text-gray-600 mb-4">
                   {completedVoters} out of {expectedVoters} people have finished voting.
                 </p>
-                <p className="text-sm text-gray-500">
-                  {(() => {
-                    const groupSizeStr = Array.isArray(groupSize) ? groupSize[0] : groupSize;
-                    if (groupSizeStr === 'solo') {
-                      return "This is a solo session - you should see results immediately!";
-                    }
-                    return "Results will be available when everyone is done!";
-                  })()}
+                <p className="text-sm text-gray-500 mb-6">
+                  Results will be available when everyone is done!
                 </p>
-                <div className="flex gap-3 mt-6">
+                <div className="flex gap-3 justify-center">
                   <button
                     onClick={() => router.push(`/voting?planId=${planId}`)}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:scale-105 transition-all duration-200 text-sm"
                   >
                     Back to Voting
                   </button>
                   <button
                     onClick={() => window.location.reload()}
-                    className="bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold py-3 px-6 rounded-xl hover:scale-105 transition-all duration-200"
+                    className="bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold py-2 px-4 rounded-lg hover:scale-105 transition-all duration-200 text-sm"
                   >
-                    🔄 Refresh Results
+                    🔄 Refresh
                   </button>
                 </div>
               </div>
             </div>
           )}
-          {/* Winner announcement - only show if all voters completed */}
-          {allVotersCompleted && results.winningEvent && (
+
+          {/* Winner announcement - show immediately for solo plans, or when all voters completed for group plans */}
+          {(isSoloPlan || allVotersCompleted) && results.winningEvent && (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 mb-8">
               <div className="text-center mb-6">
                 <div className="text-6xl mb-4">🏆</div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Winner!</h2>
-                <p className="text-gray-600">Your group chose this event</p>
+                <p className="text-gray-600">
+                  {isSoloPlan ? 'You chose this event' : 'Your group chose this event'}
+                </p>
               </div>
 
               {/* Winner card */}
@@ -546,216 +536,113 @@ export default function ResultsPage() {
                     <span className="w-5 h-5">📞</span>
                     <span className="text-gray-700">{results.winningEvent.contact.phone}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="w-5 h-5">✉️</span>
-                    
-                  </div>
                 </div>
 
                 {/* Action buttons */}
                 <div className="flex gap-3">
                   <button
                     onClick={() => handleCall(results.winningEvent.contact.phone)}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                   >
-                    <span className="text-xl font-bold">📞</span>
+                    <span className="text-lg">📞</span>
                     <span>Call Now</span>
                   </button>
                   
                   <button
                     onClick={handleReservation}
-                    disabled={isReserving || reservationMade}
-                    className={`flex-1 font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-                      reservationMade 
-                        ? 'bg-gray-400 text-white cursor-not-allowed' 
-                        : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
-                    }`}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                   >
-                    <span className="text-xl">
-                      {isReserving ? '⏳' : reservationMade ? '✅' : '🎫'}
-                    </span>
-                    <span>
-                      {isReserving ? 'Reserving...' : reservationMade ? `${reservationBy} already reserved` : 'Reserve Now'}
-                    </span>
+                    <span className="text-lg">📅</span>
+                    <span>Reserve</span>
                   </button>
                 </div>
-
-                {/* Reservation result */}
-                {reservationResult && (
-                  <>
-                    <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border-2 border-green-200">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-2xl">✅</span>
-                        <h4 className="font-semibold text-green-800">Reservation {reservationResult.status === 'confirmed' ? 'Confirmed!' : 'Submitted!'}</h4>
-                      </div>
-                      <p className="text-sm text-green-700 mb-2">{reservationResult.message}</p>
-                      <div className="text-xs text-green-600 space-y-1">
-                        <p>Confirmation #: {reservationResult.confirmationNumber}</p>
-                        <p>Provider: {reservationResult.provider}</p>
-                        {reservationResult.requiresConfirmation && (
-                          <p className="font-medium">📞 You'll receive a confirmation call soon!</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-4 text-center">
-                      <button
-                        onClick={() => router.push('/')}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 mt-2"
-                      >
-                        Return Home
-                      </button>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
           )}
 
-          {/* All results - only show if all voters completed */}
-          {allVotersCompleted && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20 mb-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">All Results</h3>
-              <div className="space-y-4">
-                {results.allEvents.slice(0, 4).map((event, index) => (
-                  <div key={event.id} className={`flex items-center justify-between p-4 rounded-xl border-2 ${
-                    index === 0 ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-white'
-                  }`}>
-                    <div className="flex items-center gap-4">
-                      <img 
-                        src={event.image} 
-                        alt={event.name}
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{event.name}</h4>
-                        <p className="text-sm text-gray-600">{event.hours}</p>
-                        <p className="text-sm text-purple-600 font-semibold">{event.votes} votes</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {index === 0 && (
-                        <div className="text-2xl mb-1">🥇</div>
-                      )}
-                      {index === 1 && (
-                        <div className="text-2xl mb-1">🥈</div>
-                      )}
-                      {index === 2 && (
-                        <div className="text-2xl mb-1">🥉</div>
-                      )}
-                      <div className="text-sm text-gray-500">#{index + 1}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          {/* Share button */}
+          <div className="text-center mb-8">
             <button
               onClick={handleShare}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mx-auto"
             >
-              <span className="text-xl font-bold">📤</span>
-              <span>Share Results</span>
-            </button>
-            
-            <button
-              onClick={() => window.location.reload()}
-              className="flex-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
-            >
-              <span className="text-xl">🔄</span>
-              <span>Refresh Results</span>
-            </button>
-            
-            <button
-              onClick={() => router.push('/create')}
-              className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
-            >
-              <span className="text-xl">✨</span>
-              <span>Create New Plan</span>
+              <span className="text-lg">📤</span>
+              <span>Share with Friends</span>
             </button>
           </div>
 
-          {/* Home button */}
-          <div className="text-center">
-            <button
-              onClick={() => router.push('/')}
-              className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold py-3 px-8 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mx-auto"
-            >
-              <span className="text-xl">🏠</span>
-              <span>Go Home</span>
-            </button>
-          </div>
-
-          {/* Vote again button */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => router.push(`/voting?planId=${planId}`)}
-              className="text-purple-600 hover:text-purple-700 font-medium transition-colors duration-300"
-            >
-              Vote Again
-            </button>
-          </div>
+          {/* All events results */}
+          {results.allEvents && results.allEvents.length > 0 && (
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
+              <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">All Results</h3>
+              <div className="space-y-4">
+                {results.allEvents.slice(0, 6).map((event, index) => {
+                  const image = event.image || '/default-event.jpg';
+                  let medal = null;
+                  if (index === 0) medal = '🥇';
+                  else if (index === 1) medal = '🥈';
+                  else if (index === 2) medal = '🥉';
+                  return (
+                    <div key={event.id} className="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl shadow-md border border-purple-100 hover:scale-105 transition-transform duration-200">
+                      <img 
+                        src={image} 
+                        alt={event.name}
+                        className="w-14 h-14 rounded-lg object-cover border-2 border-purple-200 shadow-sm"
+                        onError={e => { e.currentTarget.src = '/default-event.jpg'; }}
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 text-lg mb-1">{event.name}</h4>
+                        <p className="text-sm text-gray-600 mb-1">{event.votes} votes <span className='text-xs text-gray-400'>({event.percentage}%)</span></p>
+                      </div>
+                      {medal && (
+                        <span className="text-2xl">{medal}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Reservation Modal */}
-      {showReservationModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
-            <div className="text-center mb-6">
-              <div className="text-4xl mb-4">🎫</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Make a Reservation</h3>
-              <p className="text-gray-600">Please provide your details to reserve this event</p>
-            </div>
-
+      {showReservation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold mb-4">Make a Reservation</h3>
+            
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Your Name *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                 <input
                   type="text"
-                  value={reservationForm.userName}
-                  onChange={(e) => {
-                    setReservationForm(prev => ({ ...prev, userName: e.target.value }));
-                    if (nameError) setNameError(''); // Clear error on input
-                  }}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                    nameError ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Enter your full name"
-                  required
+                  value={reservationName}
+                  onChange={(e) => setReservationName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Your name"
                 />
-                {nameError && (
-                  <p className="mt-1 text-sm text-red-600">{nameError}</p>
-                )}
+                {nameError && <p className="text-red-500 text-sm mt-1">{nameError}</p>}
               </div>
-
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                 <PhoneInput
                   country={'us'}
-                  value={reservationForm.phoneNumber}
-                  onChange={(phone) => setReservationForm(prev => ({ ...prev, phoneNumber: phone }))}
-                  placeholder="Enter your phone number"
-                  inputClass="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  value={reservationPhone}
+                  onChange={(phone) => setReservationPhone(phone)}
+                  inputClass="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   containerClass="w-full"
-                  required
                 />
+                {phoneError && <p className="text-red-500 text-sm mt-1">{phoneError}</p>}
               </div>
-
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Group Size
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Group Size</label>
                 <select
-                  value={reservationForm.groupSize}
-                  onChange={(e) => setReservationForm(prev => ({ ...prev, groupSize: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  value={reservationGroupSize}
+                  onChange={(e) => setReservationGroupSize(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="myself">Myself</option>
                   <option value="2">2 people</option>
@@ -763,20 +650,19 @@ export default function ResultsPage() {
                 </select>
               </div>
             </div>
-
+            
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setShowReservationModal(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                onClick={() => setShowReservation(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReservationSubmit}
-                disabled={isReserving || !reservationForm.userName || !reservationForm.phoneNumber}
-                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-4 rounded-xl hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:scale-105 transition-all duration-200"
               >
-                {isReserving ? 'Submitting...' : 'Submit Reservation'}
+                Submit
               </button>
             </div>
           </div>

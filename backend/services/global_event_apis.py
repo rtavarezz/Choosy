@@ -1185,7 +1185,7 @@ class GlobalEventAPI:
             'drinks': [('amenity', 'bar'), ('amenity', 'pub')],
             'datenight': [('amenity', 'restaurant'), ('amenity', 'entertainment')],
             'racing': [('leisure', 'go_kart_track'), ('sport', 'karting'), ('leisure', 'race_track'), ('leisure', 'sports_centre'), ('amenity', 'entertainment')],
-            'adventure': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment'), ('tourism', 'museum'), ('tourism', 'gallery'), ('tourism', 'attraction'), ('amenity', 'escape_room')]
+            'adventure': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment'), ('tourism', 'attraction'), ('amenity', 'escape_room')]
         }
         return mappings.get(category, [('amenity', 'entertainment')])
     

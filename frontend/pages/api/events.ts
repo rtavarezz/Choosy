@@ -30,7 +30,7 @@ export default async function handler(
   const cleanLimit = Math.min(Math.max(parseInt(limit as string) || 20, 1), 100);
 
   try {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    const apiBase = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
     const response = await fetch(
       `${apiBase}/api/events?lat=${latNum}&lng=${lngNum}&category=${cleanCategory}&radius=${cleanRadius}&limit=${cleanLimit}`
     );

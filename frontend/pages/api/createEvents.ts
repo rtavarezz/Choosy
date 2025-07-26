@@ -12,8 +12,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Missing planId or events array' });
     }
 
-    // Call FastAPI backend to create events
-    const response = await fetch(`http://127.0.0.1:8000/api/plans/${planId}/events`, {
+    // Use environment variable for backend URL
+    const BACKEND = process.env.BACKEND_URL!;
+    if (!BACKEND) {
+      console.error('BACKEND_URL environment variable not set');
+      return res.status(500).json({ error: 'Backend configuration error' });
+    }
+
+    const response = await fetch(`${BACKEND}/api/plans/${planId}/events`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -22,8 +28,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(response.status).json({ error: errorData.detail || 'Failed to create events' });
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Backend error:', response.status, errorData);
+      return res.status(response.status).json({ 
+        error: errorData.detail || `Backend error: ${response.status}` 
+      });
     }
 
     const data = await response.json();

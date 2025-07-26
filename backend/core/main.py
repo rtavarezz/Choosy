@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, field_validator
 from typing import List, Optional
 import os
@@ -680,18 +680,35 @@ def get_voting_status(plan_id: str):
                 active_voters_clean = {}
                 
                 for voter_id, voter_data in active_voters[plan_id].items():
-                    last_activity = datetime.fromisoformat(voter_data['last_activity'])
-                    if (current_time - last_activity).total_seconds() < 300:  # 5 minutes
-                        active_voters_clean[voter_id] = voter_data
-                        active_voter_ids.append(voter_id)
-                    else:
-                        print(f"Removing inactive voter: {voter_id}")
+                    try:
+                        # Handle timezone-aware datetime parsing (ChatGPT's suggestion)
+                        last_activity_str = voter_data['last_activity']
+                        if 'T' in last_activity_str and '+' in last_activity_str:
+                            # ISO format with timezone
+                            last_activity = datetime.fromisoformat(last_activity_str)
+                        else:
+                            # UTC format without timezone - treat as UTC
+                            last_activity = datetime.fromisoformat(last_activity_str).replace(tzinfo=timezone.utc)
+                        
+                        if (current_time - last_activity.replace(tzinfo=None)).total_seconds() < 300:  # 5 minutes
+                            active_voters_clean[voter_id] = voter_data
+                            active_voter_ids.append(voter_id)
+                        else:
+                            print(f"Removing inactive voter: {voter_id}")
+                    except Exception as e:
+                        print(f"Error parsing last_activity for voter {voter_id}: {e}")
+                        # Remove voter with invalid timestamp
+                        continue
                 
                 active_voters[plan_id] = active_voters_clean
                 active_voters_count = len(active_voters[plan_id])
             
             # Get completed voter IDs
             completed_voter_ids = [row[0] for row in completed_voters_result]
+
+            # Get active voter IDs
+            active_voter_ids = list(active_voters[plan_id].keys()) if plan_id in active_voters else []
+            active_voters_count = len(active_voter_ids)
 
             # Group size is always the number of unique voters (active or completed)
             unique_voter_ids = set(active_voter_ids + completed_voter_ids)
@@ -700,28 +717,14 @@ def get_voting_status(plan_id: str):
             else:
                 max_voters = len(unique_voter_ids)
 
-            # Check if ALL active voters have completed voting
+            # Fix all_voters_completed logic
             all_voters_completed = False
             if active_voters_count > 0:
-                # Check if all active voters have completed voting
-                all_completed = True
-                for voter_id in active_voter_ids:
-                    if voter_id not in completed_voter_ids:
-                        all_completed = False
-                        break
-                all_voters_completed = all_completed
+                all_voters_completed = all(voter_id in completed_voter_ids for voter_id in active_voter_ids)
             else:
-                # If no active voters, check if all voters who have voted are completed
                 all_voters_completed = (max_voters > 0 and completed_voters >= max_voters)
-
-            # Only show results when ALL active voters have completed
             voting_limit_reached = all_voters_completed
 
-            # --- PATCH: If no active voters and completed_voters >= max_voters, mark as complete ---
-            if active_voters_count == 0 and completed_voters >= max_voters:
-                all_voters_completed = True
-                voting_limit_reached = True
-            
             print(f"📊 Voting Status for plan {plan_id}:")
             print(f"   Active voters: {active_voters_count}")
             print(f"   Completed voters: {completed_voters}")
@@ -1368,40 +1371,27 @@ async def get_api_config_status():
 active_voters = {}
 
 @app.post("/api/plans/{plan_id}/active-voters")
-def update_active_voter(plan_id: str, voter_data: dict):
-    """Update active voter status"""
-    try:
-        voter_id = voter_data.get('voter_id')
-        voter_name = voter_data.get('name')
-        action = voter_data.get('action', 'join')  # 'join' or 'leave'
-        
-        if not plan_id in active_voters:
-            active_voters[plan_id] = {}
-        
-        if action == 'join':
-            # Check if voter already exists
-            if voter_id in active_voters[plan_id]:
-                # Update existing voter's activity timestamp
-                active_voters[plan_id][voter_id]['last_activity'] = datetime.utcnow().isoformat()
-                print(f"🔄 Updated existing voter: {voter_name} ({voter_id})")
-            else:
-                # Add new voter
-                active_voters[plan_id][voter_id] = {
-                    'name': voter_name,
-                    'joined_at': datetime.utcnow().isoformat(),
-                    'last_activity': datetime.utcnow().isoformat()
-                }
-                print(f"✅ Added new voter: {voter_name} ({voter_id})")
-        elif action == 'leave':
-            if voter_id in active_voters[plan_id]:
-                del active_voters[plan_id][voter_id]
-                print(f"👋 Removed voter: {voter_name} ({voter_id})")
-        
-        print(f"📊 Total active voters for plan {plan_id}: {len(active_voters[plan_id])}")
-        return {"success": True, "active_voters": len(active_voters[plan_id])}
-    except Exception as e:
-        print(f"❌ Error in update_active_voter: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+def update_active_voter(plan_id: str, data: dict):
+    voter_id = data.get("voter_id")
+    action   = data.get("action")
+    name     = data.get("name")
+    if not voter_id or action not in ("join", "leave"):
+        raise HTTPException(400, "Must provide voter_id and action='join' or 'leave'")
+    store = active_voters.setdefault(plan_id, {})
+    if action == "join":
+        now = datetime.utcnow().isoformat()
+        store[voter_id] = {
+            "name": name,
+            "joined_at": now,
+            "last_activity": now
+        }
+    else:  # action == "leave"
+        store.pop(voter_id, None)
+    return {
+        "plan_id": plan_id,
+        "active_count": len(store),
+        "active_ids": list(store.keys())
+    }
 
 @app.get("/api/plans/{plan_id}/active-voters")
 def get_active_voters(plan_id: str):

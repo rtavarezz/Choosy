@@ -84,6 +84,10 @@ export default function Onboarding() {
   const [showTopicSuggestion, setShowTopicSuggestion] = useState(false);
   const [suggestedTopic, setSuggestedTopic] = useState('');
   const [isClient, setIsClient] = useState(false);
+  // Add state for phone verification
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
 
   useEffect(() => setIsClient(true), []);
 
@@ -152,13 +156,54 @@ export default function Onboarding() {
     setShowVerification(true);
   };
 
-  // Step 2: Handle SMS verification
-  const handleVerifyCode = (e: React.FormEvent) => {
+  // Handler to send code
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verificationCode.trim()) return;
-    
-    // For demo purposes, accept any code
-    setStep(3);
+    setVerificationError('');
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (res.ok && data.session_id) {
+        setSessionId(data.session_id);
+        setShowVerification(true);
+      } else {
+        setVerificationError(data.message || 'Failed to send code.');
+      }
+    } catch (err) {
+      setVerificationError('Network error.');
+    }
+  };
+
+  // Handler to verify code
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerificationError('');
+    if (!sessionId) {
+      setVerificationError('No session. Please resend code.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/auth/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, code: verificationCode }),
+      });
+      const data = await res.json();
+      if (res.ok && data.access_token) {
+        localStorage.setItem('choosy_token', data.access_token);
+        setIsVerified(true);
+        setShowVerification(false);
+        setStep(3); // Advance to topic selection
+      } else {
+        setVerificationError(data.detail?.message || data.message || 'Invalid code.');
+      }
+    } catch (err) {
+      setVerificationError('Network error.');
+    }
   };
 
   // Step 3: Handle topic selection
@@ -180,12 +225,19 @@ export default function Onboarding() {
 
   // Final step: Create plan and redirect to voting
   const handleCreatePlan = async () => {
+    if (!isVerified) {
+      alert('Please verify your phone number first.');
+      return;
+    }
     try {
       // Clean and format phone number for backend
       const cleanPhone = phone.replace(/\D/g, '');
       const formattedPhone = cleanPhone.startsWith('1') && cleanPhone.length === 11 
         ? `+${cleanPhone}` 
         : `+1${cleanPhone}`;
+
+      // Get access token from localStorage
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('choosy_token') : null;
 
       console.log('🎯 Creating plan with data:', {
         topic: selectedTopic,
@@ -198,13 +250,16 @@ export default function Onboarding() {
       // Create a real plan
       const response = await fetch('/api/createPlan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        },
         body: JSON.stringify({
-          topic: selectedTopic,
-          groupSize: 'solo',
-          zipCode: zipcode.trim(),
-          userName: 'Host',
-          phoneNumber: formattedPhone
+          title: selectedTopic,
+          group_size: 'myself', // Always use 'myself' for MVP
+          zip_code: zipcode.trim(),
+          name: 'Host',
+          phone: formattedPhone
         })
       });
 
@@ -212,14 +267,48 @@ export default function Onboarding() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('🎯 Plan created successfully:', data);
-        
-        // Store creator info in sessionStorage for auto-authentication
+        const planId = data.plan_id || data.planId || data.id; // fallback for different keys
+        // Save creator info for voting page
         sessionStorage.setItem('creator_name', 'Host');
         sessionStorage.setItem('creator_phone', formattedPhone);
-        
-        // Redirect to voting page with real plan ID
-        router.push(`/voting?planId=${data.planId}&creator=true`);
+        localStorage.setItem(`creator_${planId}`, JSON.stringify({
+          name: 'Host',
+          phone: formattedPhone,
+          timestamp: Date.now()
+        }));
+
+        // Fetch real events for the selected topic and zipcode
+        try {
+          // 1. Geocode zipcode to lat/lng
+          const geocodeRes = await fetch(`/api/geocode?zipcode=${zipcode.trim()}`);
+          if (!geocodeRes.ok) throw new Error('Failed to geocode zipcode');
+          const geocodeData = await geocodeRes.json();
+          const { lat, lng } = geocodeData;
+          // 2. Fetch real events from API
+          const eventsRes = await fetch(`/api/events?lat=${lat}&lng=${lng}&category=${selectedTopic}&radius=5000&limit=20`);
+          if (!eventsRes.ok) throw new Error('Failed to fetch events');
+          const eventsData = await eventsRes.json();
+          const events = Array.isArray(eventsData) ? eventsData : (eventsData.events || eventsData.results || []);
+          if (!events || events.length === 0) {
+            alert('No events found for your topic and location. Please try a different topic or zipcode.');
+            return;
+          }
+          // 3. Attach events to the plan
+          const createEventsRes = await fetch('/api/createEvents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ planId, events })
+          });
+          if (!createEventsRes.ok) {
+            alert('Failed to attach events to your plan. Please try again.');
+            return;
+          }
+        } catch (err) {
+          alert('Error fetching or attaching events. Please try again.');
+          return;
+        }
+
+        router.push(`/voting?planId=${planId}&creator=true`);
       } else {
         const errorData = await response.json();
         console.error('🎯 Failed to create plan:', errorData);
@@ -258,7 +347,7 @@ export default function Onboarding() {
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-md mx-auto p-8 bg-white/80 dark:bg-slate-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-600/20"
           >
-            <form onSubmit={handleStart} className="space-y-6">
+            <form onSubmit={sessionId ? handleVerifyCode : handleSendCode}>
               <div className="flex flex-col gap-4">
                 <input
                   type="text"
@@ -295,6 +384,7 @@ export default function Onboarding() {
                       borderRadius: '12px 0 0 12px',
                       backgroundColor: '#f9fafb'
                     }}
+                    disabled={isVerified}
                   />
                   {phoneError && <div className="text-red-500 text-sm mt-1">{phoneError}</div>}
                 </div>
@@ -305,14 +395,34 @@ export default function Onboarding() {
                 >
                   📍 Use my location
                 </button>
+                {!sessionId && (
+                  <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg mt-4">
+                    Send Code
+                  </button>
+                )}
+                {sessionId && !isVerified && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Enter code (123456)"
+                      value={verificationCode}
+                      onChange={e => setVerificationCode(e.target.value)}
+                      className="w-full px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white mt-4"
+                      required
+                      maxLength={6}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!verificationCode.trim()}
+                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg mt-2"
+                    >
+                      Verify
+                    </button>
+                  </>
+                )}
+                {verificationError && <div className="text-red-500 text-sm mt-2">{verificationError}</div>}
+                {isVerified && <div className="text-green-600 text-sm mt-2">Phone verified!</div>}
               </div>
-              <button
-                type="submit"
-                disabled={!zipcode.trim() || !phone.trim()}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
-                Continue
-              </button>
             </form>
           </motion.div>
         )}

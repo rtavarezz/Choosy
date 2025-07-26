@@ -929,15 +929,14 @@ export default function VotingPage() {
 
     try {
       const voterId = voterPhone;
-      const response = await fetch('/api/voteOption', {
+      const response = await fetch('/api/votes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           plan_id: planId,
           event_id: eventId,
-          vote: direction === 'right' ? 'yes' : 'no',
           voter_id: voterId,
-          voter_name: voterName
+          vote_type: direction === 'right' ? 'like' : 'dislike'
         })
       });
 

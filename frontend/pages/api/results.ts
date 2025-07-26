@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { planId } = req.query;
 
   try {
-    const response = await fetch(`${BACKEND}/api/plans/${planId}/voting-status`, {
+    const response = await fetch(`${BACKEND}/api/plans/${planId}/results`, {
       method: req.method,
       headers: {
         'Content-Type': 'application/json',
@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (error) {
-    console.error('Error in voting-status API:', error);
-    res.status(500).json({ message: 'Failed to fetch voting status' });
+    console.error('Error in results API:', error);
+    res.status(500).json({ message: 'Failed to fetch results' });
   }
 } 
