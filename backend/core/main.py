@@ -538,16 +538,54 @@ def create_events_for_plan(plan_id: str, events: List[dict]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/plans/{plan_id}")
+def get_plan_details(plan_id: str):
+    """Get basic plan information"""
+    try:
+        with engine.connect() as conn:
+            plan_result = conn.execute(
+                text("SELECT id, title, description, zip_code, group_size, creator_id, created_at FROM plans WHERE id = :id"),
+                {"id": plan_id}
+            )
+            plan_row = plan_result.fetchone()
+            if not plan_row:
+                raise HTTPException(status_code=404, detail="Plan not found")
+            
+            return {
+                "id": plan_row[0],
+                "title": plan_row[1], 
+                "description": plan_row[2],
+                "zip_code": plan_row[3],
+                "group_size": plan_row[4],
+                "creator_id": plan_row[5],
+                "created_at": plan_row[6].isoformat() if plan_row[6] else None,
+                "topic": plan_row[1]  # title is the topic
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/plans/{plan_id}/events")
 def get_events_for_plan(plan_id: str):
     try:
         with engine.connect() as conn:
+            # Get plan details including topic
             plan_result = conn.execute(
-                text("SELECT id FROM plans WHERE id = :id"),
+                text("SELECT id, title, description FROM plans WHERE id = :id"),
                 {"id": plan_id}
             )
-            if not plan_result.fetchone():
+            plan_row = plan_result.fetchone()
+            if not plan_row:
                 raise HTTPException(status_code=404, detail="Plan not found")
+            
+            print(f"🎯 Plan details: ID={plan_row[0]}, Title/Topic={plan_row[1]}, Description={plan_row[2]}")
+            
+            # Debug: Check if this plan has any events
+            event_count_result = conn.execute(
+                text("SELECT COUNT(*) FROM events WHERE plan_id = :plan_id"),
+                {"plan_id": plan_id}
+            )
+            event_count = event_count_result.fetchone()[0]
+            print(f"🎯 Total events in database for plan {plan_id}: {event_count}")
             
             events_result = conn.execute(
                 text("""
@@ -558,6 +596,8 @@ def get_events_for_plan(plan_id: str):
                 """),
                 {"plan_id": plan_id}
             )
+            
+            print(f"🎯 Found {events_result.rowcount} events for plan {plan_id}")
             
             events = []
             for row in events_result:

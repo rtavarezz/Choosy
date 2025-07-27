@@ -354,7 +354,7 @@ export default function Onboarding() {
                   value={zipcode}
                   onChange={e => setZipcode(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
                   placeholder="ZIP code"
-                  className="px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                  className="px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                   required
                 />
                 <div className="w-full max-w-md">
@@ -377,7 +377,9 @@ export default function Onboarding() {
                       fontSize: '16px',
                       border: '1px solid #d1d5db',
                       borderRadius: '12px',
-                      paddingLeft: '48px'
+                      paddingLeft: '48px',
+                      backgroundColor: '#ffffff',
+                      color: '#111827'
                     }}
                     buttonStyle={{
                       border: '1px solid #d1d5db',
@@ -407,7 +409,7 @@ export default function Onboarding() {
                       placeholder="Enter code (123456)"
                       value={verificationCode}
                       onChange={e => setVerificationCode(e.target.value)}
-                      className="w-full px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white mt-4"
+                      className="w-full px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white mt-4"
                       required
                       maxLength={6}
                     />

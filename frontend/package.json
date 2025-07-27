@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@react-spring/web": "^9.7.5",
+    "@tanstack/react-query": "^5.83.0",
     "@vercel/analytics": "^1.5.0",
     "bad-words": "^4.0.0",
     "classnames": "^2.5.1",
@@ -15,10 +16,12 @@
     "next": "13.4.0",
     "profanity-filter": "^0.2.1",
     "react": "18.2.0",
+    "react-confetti": "^6.4.0",
     "react-dom": "18.2.0",
     "react-phone-input-2": "^2.15.1",
     "react-swipeable": "^7.0.1",
     "react-tinder-card": "^1.6.4",
+    "recharts": "^3.1.0",
     "uuid": "^9.0.0"
   },
   "devDependencies": {

@@ -384,6 +384,27 @@ export default function VotingPage() {
   const router = useRouter();
   const { planId, creator } = router.query;
   
+  // Redirect to new voting page
+  useEffect(() => {
+    if (router.isReady && planId) {
+      const newRoute = `/vote/${planId}${creator ? '?creator=true' : ''}`;
+      router.replace(newRoute);
+      return;
+    }
+  }, [router.isReady, planId, creator, router]);
+
+  // If redirecting, show loading
+  if (router.isReady && planId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p>Redirecting to new voting interface...</p>
+        </div>
+      </div>
+    );
+  }
+
   // State
   const [deck, setDeck] = useState<Event[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
