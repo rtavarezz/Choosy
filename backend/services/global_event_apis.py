@@ -154,7 +154,11 @@ class GlobalEventAPI:
         # Deduplicate and rank
         events = self._deduplicate_events(events)
         events = self._rank_events_by_relevance(events, category)
-        events = self.filter_events_by_topic(events, category)
+        
+        # Apply strong topic filtering
+        print(f"🎯 DEBUG: Applying topic filtering for category='{category}', {len(events)} events before filtering")
+        events = await self.filter_events_by_topic(events, category, limit)
+        print(f"✅ Topic filtering complete: {len(events)} events after filtering")
 
         # --- Fun Activities Fallback for low results ---
         if len(events) < topic_config.min_events_threshold and topic_config.fallback_activities:
@@ -1185,7 +1189,8 @@ class GlobalEventAPI:
             'drinks': [('amenity', 'bar'), ('amenity', 'pub')],
             'datenight': [('amenity', 'restaurant'), ('amenity', 'entertainment')],
             'racing': [('leisure', 'go_kart_track'), ('sport', 'karting'), ('leisure', 'race_track'), ('leisure', 'sports_centre'), ('amenity', 'entertainment')],
-            'adventure': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment'), ('tourism', 'attraction'), ('amenity', 'escape_room')]
+            'adventure': [('leisure', 'amusement_arcade'), ('amenity', 'entertainment'), ('tourism', 'attraction'), ('amenity', 'escape_room')],
+            'bored': [('amenity', 'cafe'), ('leisure', 'park'), ('leisure', 'garden'), ('amenity', 'library'), ('leisure', 'fitness_centre')]
         }
         return mappings.get(category, [('amenity', 'entertainment')])
     
@@ -1322,6 +1327,57 @@ class GlobalEventAPI:
         else:
             return "Local Area"
     
+    async def filter_events_by_topic(self, events: List, category: str, limit: int = 20) -> List:
+        """Filter events to match the selected topic more precisely"""
+        
+        # Topic-specific keywords for filtering
+        topic_keywords = {
+            'comedy': ['comedy', 'laugh', 'humor', 'stand-up', 'improv', 'funny', 'joke', 'entertainment'],
+            'foodie': ['restaurant', 'food', 'dining', 'cuisine', 'cook', 'chef', 'eat', 'taste', 'culinary'],
+            'adventure': ['adventure', 'climb', 'escape', 'outdoor', 'thrill', 'explore', 'active', 'challenge'],
+            'parks': ['park', 'garden', 'nature', 'outdoor', 'walk', 'trail', 'botanical', 'green'],
+            'concerts': ['music', 'concert', 'band', 'singer', 'performance', 'live music', 'venue'],
+            'art': ['art', 'gallery', 'museum', 'exhibit', 'painting', 'sculpture', 'creative', 'culture'],
+            'movies': ['movie', 'film', 'cinema', 'theater', 'screening', 'premiere'],
+            'sports': ['sport', 'game', 'team', 'athletic', 'fitness', 'competition', 'stadium'],
+            'nightlife': ['bar', 'club', 'night', 'drinks', 'party', 'lounge', 'cocktail'],
+            'shopping': ['shop', 'store', 'mall', 'boutique', 'market', 'retail', 'fashion'],
+            'bored': ['cafe', 'coffee', 'library', 'bookstore', 'park', 'walk', 'simple', 'easy']
+        }
+        
+        keywords = topic_keywords.get(category, [])
+        if not keywords:
+            return events[:limit]
+        
+        # Score events based on topic relevance
+        scored_events = []
+        for event in events:
+            score = 0
+            # Handle both GlobalEvent objects and dictionaries
+            if hasattr(event, 'name'):
+                # GlobalEvent object
+                event_name = getattr(event, 'name', '') or ''
+                event_description = getattr(event, 'description', '') or ''
+                event_venue = getattr(event, 'venue', '') or ''
+            else:
+                # Dictionary
+                event_name = event.get('name', '')
+                event_description = event.get('description', '')
+                event_venue = event.get('venue', '')
+            
+            text_to_search = f"{event_name} {event_description} {event_venue}".lower()
+            
+            # Count keyword matches
+            for keyword in keywords:
+                if keyword in text_to_search:
+                    score += 1
+            
+            scored_events.append((score, event))
+        
+        # Sort by score (highest first) and return top events
+        scored_events.sort(key=lambda x: x[0], reverse=True)
+        return [event for score, event in scored_events[:limit]]
+
     def _get_fun_activity_templates(self, category: str) -> List[dict]:
         """Get fun, free offline activities and TikTok trends based on category"""
         templates = {
@@ -2238,31 +2294,7 @@ class GlobalEventAPI:
             print(f"Error converting Ticketmaster event: {e}")
             return None
 
-    def filter_events_by_topic(self, events, topic):
-        """Filter events by topic using template-based configuration"""
-        topic_config = api_template_manager.get_topic_config(topic)
-        if not topic_config:
-            return events
-        
-        keywords = topic_config.search_keywords
-        neg_keywords = topic_config.exclude_keywords
-        
-        filtered = [
-            event for event in events
-            if (
-                any(
-                    kw.lower() in (getattr(event, 'name', '') or '').lower() or
-                    kw.lower() in (getattr(event, 'description', '') or '').lower()
-                    for kw in keywords
-                )
-                and not any(
-                    nkw in (getattr(event, 'name', '') or '').lower() or
-                    nkw in (getattr(event, 'description', '') or '').lower()
-                    for nkw in neg_keywords
-                )
-            )
-        ]
-        return filtered
+
 
 # Global instance
 global_event_api = GlobalEventAPI() 

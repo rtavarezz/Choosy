@@ -22,8 +22,13 @@ export default async function handler(
     return res.status(400).json({ error: 'Invalid coordinate format' });
   }
 
-  // Validate optional parameters
-  const validCategories = ['adventure', 'food', 'entertainment', 'culture', 'sports', 'nightlife'];
+  // Validate optional parameters - FIXED: Include ALL supported topics
+  const validCategories = [
+    'adventure', 'foodie', 'movies', 'art', 'comedy', 
+    'parks', 'concerts', 'bored', 'sports', 'nightlife', 
+    'shopping', 'wellness', 'family', 'datenight', 'racing', 
+    'swimming', 'drinks', 'food', 'entertainment', 'culture'
+  ];
   const cleanCategory = validCategories.includes(category as string) ? category : 'adventure';
   
   const cleanRadius = Math.min(Math.max(parseInt(radius as string) || 5000, 1000), 50000);

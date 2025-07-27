@@ -1,22 +1,37 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { validateVoteCreate, ValidationError, type EventResponse } from '../../lib/validation';
 
-// Type for a voting card (matches backend event)
+// Type for a voting card (matches backend event response exactly)
 interface EventCard {
   id: string;
   name: string;
   description: string;
-  image: string;
-  topic?: string;
+  image_url: string;        // Changed from 'image' to match backend
+  start_time?: string;      // ISO datetime string
+  end_time?: string;        // ISO datetime string
   venue?: string;
   address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
   price?: string;
+  category?: string;
+  source?: string;
+  external_id?: string;
+  external_url?: string;
+  organizer?: string;
+  attendees_count?: number;
+  max_attendees?: number;
+  is_free?: boolean;
+  is_featured?: boolean;
+  metadata?: any;
+  // Legacy fields for backwards compatibility
   rating?: number;
   reviewCount?: number;
   phone?: string;
   hours?: string;
-  organizer?: string;
 }
 
 const VotePage: React.FC = () => {
@@ -24,7 +39,7 @@ const VotePage: React.FC = () => {
   const { planId } = router.query;
 
   // Get voter info from localStorage/session (do not prompt for login)
-  const [voterId, setVoterId] = useState<string | null>(null);
+  const [voterId, setVoterId] = useState<string>('');
   const [deck, setDeck] = useState<EventCard[]>([]);
   const [leavingId, setLeavingId] = useState<string | null>(null);
   const [voteDirection, setVoteDirection] = useState<'like' | 'dislike' | null>(null);
@@ -37,6 +52,17 @@ const VotePage: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [totalEvents, setTotalEvents] = useState(0);
 
+  // Set voter ID from storage when component loads
+  useEffect(() => {
+    let voterId = localStorage.getItem('voterId') || sessionStorage.getItem('voterId');
+    if (!voterId) {
+      voterId = `host_${planId}`;
+      localStorage.setItem('voterId', voterId);
+      sessionStorage.setItem('voterId', voterId);
+    }
+    setVoterId(voterId);
+  }, [planId]);
+
   // Fetch events for this plan
   useEffect(() => {
     if (!planId) return;
@@ -45,12 +71,9 @@ const VotePage: React.FC = () => {
         const res = await fetch(`/api/plans/${planId}/events`);
         if (res.ok) {
           const data = await res.json();
-          console.log('🎯 Events data received:', data);
-          console.log('🎯 Raw API response type:', typeof data, Array.isArray(data) ? 'array' : 'object');
           
           // Handle both array response and object with events property
           const eventsArray = Array.isArray(data) ? data : (data.events || []);
-          console.log('🎯 Events array length:', eventsArray.length);
           
           const events = eventsArray.map((e: any) => {
             // Parse metadata if it's a string
@@ -69,21 +92,33 @@ const VotePage: React.FC = () => {
               id: e.id,
               name: e.name,
               description: e.description || metadata.description || "Experience the best local vibes. Perfect for fun activities and memorable moments.",
-              image: e.image || metadata.image_url || `https://picsum.photos/600/400?random=${e.id?.slice(-6)}`,
-              topic: e.topic || metadata.category || e.category,
+              image_url: e.image_url || metadata.image_url || `https://picsum.photos/600/400?random=${e.id?.slice(-6)}`,  // Use image_url from backend
+              start_time: e.start_time || metadata.start_time,
+              end_time: e.end_time || metadata.end_time,
               venue: metadata.venue || e.venue || 'Local Venue',
               address: metadata.address || e.address || 'Address not available',
+              city: metadata.city || e.city || 'City not available',
+              state: metadata.state || e.state || 'State not available',
+              zip_code: metadata.zip_code || e.zip_code || 'Zip not available',
               price: metadata.price || e.price || 'Free',
+              category: e.category || metadata.category,
+              source: e.source || metadata.source,
+              external_id: e.external_id || metadata.external_id,
+              external_url: e.external_url || metadata.external_url,
+              organizer: metadata.organizer || e.organizer || 'Local Organizer',
+              attendees_count: metadata.attendees_count || e.attendees_count,
+              max_attendees: metadata.max_attendees || e.max_attendees,
+              is_free: metadata.is_free || e.is_free,
+              is_featured: metadata.is_featured || e.is_featured,
+              metadata: metadata,
+              // Legacy fields for backwards compatibility
               rating: metadata.rating || e.rating || Math.floor(Math.random() * 2) + 4,
               reviewCount: metadata.review_count || e.reviewCount || Math.floor(Math.random() * 100) + 20,
               phone: metadata.phone || e.phone || '',
               hours: e.hours || metadata.hours || 'Hours not available',
-              organizer: metadata.organizer || e.organizer || 'Local Organizer',
             };
           });
           
-          console.log('🎯 Processed events:', events);
-          console.log('🎯 First event details:', events[0]);
           setDeck(events);
           setTotalEvents(events.length);
         } else {
@@ -109,7 +144,6 @@ const VotePage: React.FC = () => {
         const res = await fetch(`/api/plans/${planId}/voting-status`);
         if (res.ok) {
           const status = await res.json();
-          console.log('🎯 Voting status:', status);
           setExpectedVoters(status.max_voters || 1);
           setCompletedVoters(status.completed_voters || 0);
         }
@@ -138,49 +172,48 @@ const VotePage: React.FC = () => {
     return () => clearInterval(interval);
   }, [planId]);
 
-  // Debugging for plan details
-  useEffect(() => {
-    if (!planId) return;
-    (async () => {
-      try {
-        const res = await fetch(`/api/plans/${planId}`);
-        if (res.ok) {
-          const plan = await res.json();
-          console.log('🎯 Plan details for debugging:', plan);
-        }
-      } catch (error) {
-        console.error('Error fetching plan details:', error);
-      }
-    })();
-  }, [planId]);
-
   const onVote = async (eventId: string, direction: 'like' | 'dislike') => {
-    console.log(`🔄 Swiped ${direction === 'like' ? 'right' : 'left'} on event: ${eventId}`);
-    if (!voterId) {
-      console.warn('❌ No voter ID found');
+    if (!voterId || voterId === '') {
+      console.warn('❌ No voter ID found, waiting for initialization...');
       return;
     }
+    
     try {
+      // Validate vote data before sending
+      const voteData = {
+        plan_id: planId as string,
+        event_id: eventId,
+        voter_id: voterId,
+        vote_type: direction
+      };
+      
+      const validatedVote = validateVoteCreate(voteData);
+      
       const res = await fetch('/api/votes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          plan_id: planId,
-          event_id: eventId,
-          voter_id: voterId,
-          vote: direction === 'like' ? 1 : 0
-        })
+        body: JSON.stringify(validatedVote)
       });
       
       if (res.ok) {
-        console.log('✅ Vote recorded successfully');
+        const result = await res.json();
+        // Card removal is handled by Framer Motion animation
+        setDeck(prev => prev.filter(card => card.id !== eventId));
+        setCurrentIndex(prev => prev - 1);
       } else {
-        console.error('❌ Failed to record vote:', res.status);
+        console.error('Failed to submit vote:', res.status, res.statusText);
       }
     } catch (error) {
-      console.error('❌ Error recording vote:', error);
+      if (error instanceof ValidationError) {
+        console.error('❌ Vote validation error:', error.message);
+      } else {
+        console.error('❌ Error recording vote:', error);
+      }
     }
   };
+
+  // Check if this is solo voting (group size 'myself' or single active voter)
+  const isSoloVoting = expectedVoters === 1 || activeVoters.length <= 1;
 
   const removeTopCard = useCallback((id: string) => {
     setDeck(prevDeck => {
@@ -192,6 +225,46 @@ const VotePage: React.FC = () => {
     setVoteDirection(null);
     isAnimating.current = false;
   }, []);
+
+  if (deck.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-400 to-indigo-600 flex flex-col items-center justify-center text-white p-4">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🎉</div>
+          <h1 className="text-3xl font-bold mb-2">All done!</h1>
+          <p className="text-lg opacity-80 mb-6">You've voted on all events.</p>
+          
+          {/* Manual regeneration button for troubleshooting */}
+          <button
+            onClick={async () => {
+              try {
+                const planDetailsRes = await fetch(`/api/plans/${planId}`);
+                if (planDetailsRes.ok) {
+                  const planData = await planDetailsRes.json();
+                  alert(`🔄 Manually refreshing events for "${planData.topic}" topic...`);
+                  window.location.reload();
+                }
+              } catch (err) {
+                console.error('Manual refresh failed:', err);
+              }
+            }}
+            className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg mb-4 mr-4 transition-colors"
+          >
+            🔄 Refresh Events
+          </button>
+          
+          <div>
+            <button
+              onClick={() => router.push(`/results/${planId}`)}
+              className="bg-purple-500 hover:bg-purple-600 text-white px-8 py-3 rounded-lg transition-colors"
+            >
+              View Results
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-purple-100 to-blue-100">
@@ -421,7 +494,7 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
           {/* Card Image */}
           <div className="relative h-64 w-full">
             <img 
-              src={card.image || `https://picsum.photos/600/400?random=${card.id.slice(-6)}`}
+              src={card.image_url || `https://picsum.photos/600/400?random=${card.id.slice(-6)}`}
               alt={card.name}
               className="w-full h-full object-cover"
               onError={(e) => {

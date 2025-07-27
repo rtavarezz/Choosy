@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useDarkMode } from '../lib/darkMode';
 import PhoneInput from 'react-phone-input-2/lib/lib';
 import 'react-phone-input-2/lib/style.css';
+import { validatePlanCreate, ValidationError } from '../lib/validation';
 
 const COUNTRY_LIST = [
   { code: '+1', label: 'United States', flag: '🇺🇸', maxLength: 10, format: 'XXX-XXX-XXXX' },
@@ -68,6 +69,7 @@ const TOPICS = [
   { id: 'wellness', name: 'Wellness & Health', icon: '🧘', color: 'from-green-500 to-emerald-500' },
   { id: 'parks', name: 'Parks & Outdoors', icon: '🌳', color: 'from-green-500 to-teal-500' },
   { id: 'racing', name: 'Racing & Motorsports', icon: '🏎️', color: 'from-red-500 to-orange-500' },
+  { id: 'bored', name: 'I\'m Bored 🤷‍♀️', icon: '🤷‍♀️', color: 'from-gray-500 to-slate-500' },
 ];
 
 export default function Onboarding() {
@@ -212,6 +214,44 @@ export default function Onboarding() {
     setStep(4);
   };
 
+  // Choose For Me functionality - AI-powered topic selection
+  const handleChooseForMe = () => {
+    // Smart random selection with weights based on popularity and versatility
+    const topicWeights = [
+      { id: 'foodie', weight: 15 }, // Very popular, always fun
+      { id: 'parks', weight: 12 }, // Easy, accessible
+      { id: 'bored', weight: 12 }, // Perfect for indecision!
+      { id: 'movies', weight: 10 }, // Universal appeal
+      { id: 'shopping', weight: 10 }, // Versatile activity
+      { id: 'wellness', weight: 8 }, // Good for self-care
+      { id: 'adventure', weight: 8 }, // Exciting option
+      { id: 'comedy', weight: 7 }, // Mood booster
+      { id: 'concerts', weight: 6 }, // Depends on events available
+      { id: 'art', weight: 5 }, // Cultural option
+      { id: 'sports', weight: 4 }, // More specific interest
+      { id: 'nightlife', weight: 2 }, // Limited audience
+      { id: 'racing', weight: 1 }, // Very specific interest
+    ];
+
+    // Create weighted array
+    const weightedTopics = [];
+    for (const topic of topicWeights) {
+      for (let i = 0; i < topic.weight; i++) {
+        weightedTopics.push(topic.id);
+      }
+    }
+
+    // Select random topic
+    const randomIndex = Math.floor(Math.random() * weightedTopics.length);
+    const chosenTopic = weightedTopics[randomIndex];
+    
+    // Add a little animation delay for effect
+    setTimeout(() => {
+      setSelectedTopic(chosenTopic);
+      setStep(4);
+    }, 500);
+  };
+
   // Step 4: Handle topic suggestion
   const handleTopicSuggestion = (e: React.FormEvent) => {
     e.preventDefault();
@@ -239,81 +279,102 @@ export default function Onboarding() {
       // Get access token from localStorage
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('choosy_token') : null;
 
-      console.log('🎯 Creating plan with data:', {
+      const newPlan = {
         topic: selectedTopic,
-        groupSize: 'solo',
-        zipCode: zipcode.trim(),
-        userName: 'Host',
-        phoneNumber: formattedPhone
-      });
+        group_size: 'myself',
+        zip_code: zipcode,
+        host_name: 'Host',
+        host_phone: phone,
+        ...(selectedTopic === 'bored' ? { min_events: 6 } : {})
+      };
 
-      // Create a real plan
-      const response = await fetch('/api/createPlan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-        },
-        body: JSON.stringify({
-          title: selectedTopic,
-          group_size: 'myself', // Always use 'myself' for MVP
-          zip_code: zipcode.trim(),
-          name: 'Host',
-          phone: formattedPhone
-        })
-      });
+      try {
+        // Validate the plan data
+        const validatedPlan = validatePlanCreate(newPlan);
+        
+        // Create the plan
+        const response = await fetch('/api/createPlan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validatedPlan)
+        });
 
-      console.log('🎯 Plan creation response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        const planId = data.plan_id || data.planId || data.id; // fallback for different keys
-        // Save creator info for voting page
-        sessionStorage.setItem('creator_name', 'Host');
-        sessionStorage.setItem('creator_phone', formattedPhone);
-        localStorage.setItem(`creator_${planId}`, JSON.stringify({
-          name: 'Host',
-          phone: formattedPhone,
-          timestamp: Date.now()
-        }));
-
-        // Fetch real events for the selected topic and zipcode
-        try {
-          // 1. Geocode zipcode to lat/lng
-          const geocodeRes = await fetch(`/api/geocode?zipcode=${zipcode.trim()}`);
-          if (!geocodeRes.ok) throw new Error('Failed to geocode zipcode');
-          const geocodeData = await geocodeRes.json();
-          const { lat, lng } = geocodeData;
-          // 2. Fetch real events from API
-          const eventsRes = await fetch(`/api/events?lat=${lat}&lng=${lng}&category=${selectedTopic}&radius=5000&limit=20`);
-          if (!eventsRes.ok) throw new Error('Failed to fetch events');
-          const eventsData = await eventsRes.json();
-          const events = Array.isArray(eventsData) ? eventsData : (eventsData.events || eventsData.results || []);
-          if (!events || events.length === 0) {
-            alert('No events found for your topic and location. Please try a different topic or zipcode.');
-            return;
-          }
-          // 3. Attach events to the plan
-          const createEventsRes = await fetch('/api/createEvents', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ planId, events })
-          });
-          if (!createEventsRes.ok) {
-            alert('Failed to attach events to your plan. Please try again.');
-            return;
-          }
-        } catch (err) {
-          alert('Error fetching or attaching events. Please try again.');
-          return;
+        if (!response.ok) {
+          throw new Error(`Failed to create plan: ${response.status}`);
         }
 
-        router.push(`/voting?planId=${planId}&creator=true`);
-      } else {
-        const errorData = await response.json();
-        console.error('🎯 Failed to create plan:', errorData);
-        alert('Failed to create plan. Please try again.');
-      }
+        const result = await response.json();
+        const planId = result.plan_id;
+          // Save creator info for voting page
+          sessionStorage.setItem('creator_name', 'Host');
+          sessionStorage.setItem('creator_phone', formattedPhone);
+          
+          // Set voter ID for the voting system
+          const voterId = `host_${planId}`;
+          localStorage.setItem('voterId', voterId);
+          sessionStorage.setItem('voterId', voterId);
+          
+          // Also save creator info in the format expected by voting page
+          localStorage.setItem(`creator_${planId}`, JSON.stringify({
+            name: 'Host',
+            phone: formattedPhone,
+            timestamp: Date.now()
+          }));
+          
+          // Save voter info that voting page expects
+          localStorage.setItem('voterInfo', JSON.stringify({
+            name: 'Host',
+            phone: formattedPhone,
+            timestamp: Date.now(),
+            isCreator: true,
+            userId: voterId
+          }));
+
+          // Fetch real events for the selected topic and zipcode
+          try {
+            const geocodeRes = await fetch(`/api/geocode?zipcode=${zipcode.trim()}`);
+            if (!geocodeRes.ok) throw new Error('Failed to geocode zipcode');
+            const geocodeData = await geocodeRes.json();
+            const { lat, lng } = geocodeData;
+            
+            // Fetch real events from API with filtering
+            const eventsRes = await fetch(`/api/events?lat=${lat}&lng=${lng}&category=${selectedTopic}&radius=5000&limit=20`);
+            if (!eventsRes.ok) throw new Error('Failed to fetch events');
+            const eventsData = await eventsRes.json();
+            const events = Array.isArray(eventsData) ? eventsData : (eventsData.events || eventsData.results || []);
+            
+            if (!events || events.length === 0) {
+              alert('No events found for your topic and location. Please try a different topic or zipcode.');
+              return;
+            }
+            
+            // Attach events to the plan
+            const createEventsRes = await fetch('/api/createEvents', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ planId, events })
+            });
+            
+            if (!createEventsRes.ok) {
+              const errorText = await createEventsRes.text();
+              console.error('Failed to attach events:', errorText);
+              alert('Failed to attach events to your plan. Please try again.');
+              return;
+            }
+          } catch (err) {
+            console.error('Error in event fetching/attachment:', err);
+            alert('Error fetching or attaching events. Please try again.');
+            return;
+          }
+
+          router.push(`/vote/${planId}?creator=true`);
+        } catch (validationError) {
+          if (validationError instanceof ValidationError) {
+            setVerificationError(validationError.message);
+          } else {
+            setVerificationError('Validation failed. Please try again.');
+          }
+        }
     } catch (error) {
       console.error('🎯 Error creating plan:', error);
       alert('Error creating plan. Please try again.');
@@ -487,6 +548,12 @@ export default function Onboarding() {
                 </button>
               ))}
             </div>
+            <button
+              onClick={handleChooseForMe}
+              className="w-full p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 hover:border-purple-500 dark:hover:border-purple-400 transition-all duration-300 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400"
+            >
+              🎲 Choose For Me
+            </button>
             <button
               onClick={() => setShowTopicSuggestion(true)}
               className="w-full p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 hover:border-purple-500 dark:hover:border-purple-400 transition-all duration-300 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400"

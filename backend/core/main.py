@@ -369,6 +369,7 @@ async def geocode_zipcode(zipcode: str = Query(None), lat: float = Query(None), 
 async def get_events(lat: float, lng: float, category: str = "adventure", radius: int = 5000, limit: int = 20):
     """Get events near coordinates"""
     try:
+        print(f"🎯 DEBUG: get_events called with category='{category}', lat={lat}, lng={lng}")
         # Import the global event API
         from services.global_event_apis import global_event_api
         
@@ -431,16 +432,16 @@ async def create_plan(
         with engine.connect() as conn:
             conn.execute(
                 text("""
-                    INSERT INTO plans (id, title, description, zip_code, group_size, creator_id, created_at, updated_at)
-                    VALUES (:id, :title, :description, :zip_code, :group_size, :creator_id, NOW(), NOW())
+                    INSERT INTO plans (id, topic, group_size, zip_code, host_name, host_phone, created_at)
+                    VALUES (:id, :topic, :group_size, :zip_code, :host_name, :host_phone, NOW())
                 """),
                 {
                     "id": plan_id,
-                    "title": validated_data["title"],
-                    "description": validated_data.get("description", ""),
-                    "zip_code": validated_data["zip_code"],
+                    "topic": validated_data.get("title", validated_data.get("topic", "nightlife")),  # Use title as topic, fallback to nightlife
                     "group_size": validated_data["group_size"],
-                    "creator_id": current_user["id"]
+                    "zip_code": validated_data["zip_code"],
+                    "host_name": validated_data.get("userName", validated_data.get("name", "Host")),
+                    "host_phone": validated_data.get("phoneNumber", validated_data.get("phone", "+1234567890"))
                 }
             )
             conn.commit()
@@ -455,6 +456,57 @@ async def create_plan(
         if isinstance(e, ValidationError):
             raise ErrorHandler.handle_validation_error(e)
         raise HTTPException(status_code=500, detail="Failed to create plan")
+
+@app.post("/api/plans/simple")
+def create_plan_simple(plan_data: dict):
+    """Create a new plan without authentication (for onboarding flow)"""
+    try:
+        print(f"🎯 Creating simple plan with data: {plan_data}")
+        
+        # Extract and validate data
+        topic = plan_data.get("title", plan_data.get("topic", "nightlife"))
+        group_size = plan_data.get("groupSize", plan_data.get("group_size", "myself"))
+        zip_code = plan_data.get("zipCode", plan_data.get("zip_code", "10001"))
+        host_name = plan_data.get("userName", plan_data.get("name", "Host"))
+        host_phone = plan_data.get("phoneNumber", plan_data.get("phone", "+1234567890"))
+        
+        # Validate topic is in allowed list
+        allowed_topics = ['concerts', 'nightlife', 'foodie', 'datenight', 'sports', 'parks', 'racing', 'swimming', 'drinks', 'movies', 'comedy', 'art', 'shopping', 'wellness', 'adventure', 'family']
+        if topic not in allowed_topics:
+            print(f"⚠️ Invalid topic '{topic}', defaulting to 'nightlife'")
+            topic = "nightlife"
+        
+        plan_id = str(uuid.uuid4())
+        
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO plans (id, topic, group_size, zip_code, host_name, host_phone, created_at)
+                    VALUES (:id, :topic, :group_size, :zip_code, :host_name, :host_phone, NOW())
+                """),
+                {
+                    "id": plan_id,
+                    "topic": topic,
+                    "group_size": group_size,
+                    "zip_code": zip_code,
+                    "host_name": host_name,
+                    "host_phone": host_phone
+                }
+            )
+            conn.commit()
+        
+        print(f"✅ Created plan {plan_id} with topic '{topic}'")
+        
+        return {
+            "success": True,
+            "plan_id": plan_id,
+            "planId": plan_id,  # Alternative key for compatibility
+            "id": plan_id,      # Alternative key for compatibility
+            "message": "Plan created successfully"
+        }
+    except Exception as e:
+        print(f"❌ Error creating simple plan: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create plan: {str(e)}")
 
 @app.post("/api/plans/{plan_id}/vote")
 async def vote_on_option(
@@ -506,8 +558,10 @@ async def vote_on_option(
 
 @app.post("/api/plans/{plan_id}/events")
 def create_events_for_plan(plan_id: str, events: List[dict]):
+    """Replace all events for a plan with new events"""
     try:
         with engine.connect() as conn:
+            # First, verify the plan exists
             plan_result = conn.execute(
                 text("SELECT id FROM plans WHERE id = :id"),
                 {"id": plan_id}
@@ -515,6 +569,16 @@ def create_events_for_plan(plan_id: str, events: List[dict]):
             if not plan_result.fetchone():
                 raise HTTPException(status_code=404, detail="Plan not found")
             
+            # DELETE existing events for this plan
+            delete_result = conn.execute(
+                text("DELETE FROM events WHERE plan_id = :plan_id"),
+                {"plan_id": plan_id}
+            )
+            deleted_count = delete_result.rowcount
+            print(f"🗑️ Deleted {deleted_count} existing events for plan {plan_id}")
+            
+            # INSERT new events
+            created_count = 0
             for event in events:
                 event_id = str(uuid.uuid4())
                 conn.execute(
@@ -528,14 +592,17 @@ def create_events_for_plan(plan_id: str, events: List[dict]):
                         "name": event.get("name", "Event"),
                         "image": event.get("image"),
                         "hours": event.get("hours"),
-                        "source_type": event.get("source_type", "custom"),
+                        "source_type": event.get("source_type", "google"),  # Default to google instead of external
                         "metadata": json.dumps(event.get("metadata", {}))
                     }
                 )
+                created_count += 1
             
             conn.commit()
-            return {"message": f"Created {len(events)} events for plan {plan_id}"}
+            print(f"✅ Replaced {deleted_count} events with {created_count} new events for plan {plan_id}")
+            return {"message": f"Replaced events for plan {plan_id}: deleted {deleted_count}, created {created_count}"}
     except Exception as e:
+        print(f"❌ Error replacing events for plan {plan_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/plans/{plan_id}")
@@ -544,7 +611,7 @@ def get_plan_details(plan_id: str):
     try:
         with engine.connect() as conn:
             plan_result = conn.execute(
-                text("SELECT id, title, description, zip_code, group_size, creator_id, created_at FROM plans WHERE id = :id"),
+                text("SELECT id, topic, group_size, zip_code, host_name, host_phone, created_at FROM plans WHERE id = :id"),
                 {"id": plan_id}
             )
             plan_row = plan_result.fetchone()
@@ -553,13 +620,12 @@ def get_plan_details(plan_id: str):
             
             return {
                 "id": plan_row[0],
-                "title": plan_row[1], 
-                "description": plan_row[2],
+                "topic": plan_row[1],
+                "group_size": plan_row[2],
                 "zip_code": plan_row[3],
-                "group_size": plan_row[4],
-                "creator_id": plan_row[5],
-                "created_at": plan_row[6].isoformat() if plan_row[6] else None,
-                "topic": plan_row[1]  # title is the topic
+                "host_name": plan_row[4],
+                "host_phone": plan_row[5],
+                "created_at": plan_row[6].isoformat() if plan_row[6] else None
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -570,14 +636,14 @@ def get_events_for_plan(plan_id: str):
         with engine.connect() as conn:
             # Get plan details including topic
             plan_result = conn.execute(
-                text("SELECT id, title, description FROM plans WHERE id = :id"),
+                text("SELECT id, topic, group_size, zip_code, host_name, host_phone FROM plans WHERE id = :id"),
                 {"id": plan_id}
             )
             plan_row = plan_result.fetchone()
             if not plan_row:
                 raise HTTPException(status_code=404, detail="Plan not found")
             
-            print(f"🎯 Plan details: ID={plan_row[0]}, Title/Topic={plan_row[1]}, Description={plan_row[2]}")
+            print(f"🎯 Plan details: ID={plan_row[0]}, Topic={plan_row[1]}, Group={plan_row[2]}")
             
             # Debug: Check if this plan has any events
             event_count_result = conn.execute(
@@ -617,11 +683,35 @@ def get_events_for_plan(plan_id: str):
                 else:
                     print(f"⚠️ Empty metadata")
                 
+                # Get topic-specific image fallback
+                topic_image_map = {
+                    'concerts': 'music',
+                    'nightlife': 'nightlife',
+                    'foodie': 'food',
+                    'datenight': 'romance',
+                    'sports': 'sports',
+                    'parks': 'nature',
+                    'racing': 'cars',
+                    'swimming': 'sports',
+                    'drinks': 'bar',
+                    'movies': 'cinema',
+                    'comedy': 'entertainment',
+                    'art': 'art',
+                    'shopping': 'shopping',
+                    'wellness': 'spa',
+                    'adventure': 'adventure',
+                    'family': 'family'
+                }
+                
+                # Get the plan topic for image generation
+                image_category = topic_image_map.get(plan_row[1] if plan_row else 'nightlife', 'nightlife')
+                topic_specific_image = f"https://picsum.photos/600/400?random={str(row[0])[-6:]}&category={image_category}"
+                
                 # Format the event data for frontend
                 event_data = {
                     "id": row[0],
                     "name": row[1],
-                    "image": row[2] or metadata.get('image_url'),
+                    "image_url": row[2] or metadata.get('image_url') or topic_specific_image,  # Changed to image_url
                     "hours": row[3] or metadata.get('hours', 'Hours not available'),
                     "source_type": row[4],
                     "votes_count": row[5] or 0,
@@ -808,27 +898,63 @@ def get_plan_results(plan_id: str):
             
             events_result = conn.execute(
                 text("""
-                    SELECT e.id, e.name,
+                    SELECT e.id, e.name, e.image, e.metadata,
                            COUNT(v.id) as total_votes,
                            COUNT(CASE WHEN v.vote_type = 'like' THEN 1 END) as likes,
                            COUNT(CASE WHEN v.vote_type = 'dislike' THEN 1 END) as dislikes
                     FROM events e
                     LEFT JOIN votes v ON e.id = v.event_id
                     WHERE e.plan_id = :plan_id
-                    GROUP BY e.id, e.name
+                    GROUP BY e.id, e.name, e.image, e.metadata
                     ORDER BY likes DESC, e.name ASC
                 """),
                 {"plan_id": plan_id}
             )
             events = []
             for row in events_result:
-                total_votes = row[2] or 0
-                likes = row[3] or 0
-                dislikes = row[4] or 0
+                total_votes = row[4] or 0
+                likes = row[5] or 0
+                dislikes = row[6] or 0
                 percentage = (likes / total_votes * 100) if total_votes > 0 else 0
+                
+                # Parse metadata for additional info
+                metadata = {}
+                if row[3]:
+                    try:
+                        if isinstance(row[3], str):
+                            metadata = json.loads(row[3])
+                        else:
+                            metadata = row[3]
+                    except:
+                        metadata = {}
+                
+                # Get topic-specific image fallback
+                topic_image_map = {
+                    'concerts': 'music',
+                    'nightlife': 'nightlife', 
+                    'foodie': 'food',
+                    'datenight': 'romance',
+                    'sports': 'sports',
+                    'parks': 'nature',
+                    'racing': 'cars',
+                    'swimming': 'sports',
+                    'drinks': 'bar',
+                    'movies': 'cinema',
+                    'comedy': 'entertainment',
+                    'art': 'art',
+                    'shopping': 'shopping',
+                    'wellness': 'spa',
+                    'adventure': 'adventure',
+                    'family': 'family'
+                }
+                
+                image_category = topic_image_map.get(plan[0] if plan else 'nightlife', 'nightlife')
+                topic_specific_image = f"https://picsum.photos/600/400?random={str(row[0])[-6:]}&category={image_category}"
+                
                 event_data = {
-                    "id": row[0],
+                    "id": str(row[0]),
                     "name": row[1],
+                    "image_url": row[2] or metadata.get('image_url') or topic_specific_image,  # Changed to image_url
                     "votes": likes,
                     "total_votes": total_votes,
                     "percentage": round(percentage, 1)
@@ -843,13 +969,13 @@ def get_plan_results(plan_id: str):
             voters = [row[0] for row in voters_result]
             
             return {
-                "planId": plan_id,
+                "planId": plan_id,  # Keep this for backwards compatibility
                 "plan": {
                     "topic": plan[0],
-                    "groupSize": plan[1],
-                    "zipCode": plan[2],
-                    "userName": plan[3],
-                    "phoneNumber": plan[4]
+                    "group_size": plan[1],       # Changed from groupSize to group_size
+                    "zip_code": plan[2],         # Changed from zipCode to zip_code  
+                    "host_name": plan[3],        # Changed from userName to host_name
+                    "host_phone": plan[4]        # Changed from phoneNumber to host_phone
                 },
                 "totalVotes": len(voters),
                 "participants": voters,

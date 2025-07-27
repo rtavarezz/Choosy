@@ -12,6 +12,7 @@ class EventType(Enum):
     REAL_VENUE = "real_venue"      # Real venues from APIs  
     FUN_ACTIVITY = "fun_activity"  # Fun offline activities (clearly marked)
     IDEA = "idea"                  # Creative ideas (clearly marked)
+    MIXED = "mixed"               # Mixed activities (e.g., family fun, bored)
 
 @dataclass
 class APIConfig:
@@ -36,7 +37,7 @@ class TopicConfig:
     search_keywords: List[str]
     exclude_keywords: List[str]
     fallback_activities: bool = True
-    min_events_threshold: int = 10
+    min_events_threshold: int = 6  # Lowered from 10 to 6 for more responsive fun activities
 
 class APITemplateManager:
     """Template manager for easy API integration"""
@@ -255,15 +256,27 @@ class APITemplateManager:
             ),
             'family': TopicConfig(
                 key='family',
-                label='Family & Kids',
+                label='Family Fun',
                 icon='👨‍👩‍👧‍👦',
-                description='Family-friendly activities, kids events, and child-friendly experiences',
-                event_type=EventType.REAL_EVENT,
-                api_sources=['eventbrite', 'meetup', 'google_places', 'openstreetmap'],
-                search_keywords=['family', 'kids', 'children', 'parent', 'play', 'zoo', 'aquarium', 'museum', 'kid-friendly'],
-                exclude_keywords=['nightlife', 'club', 'bar', 'adult'],
+                description='Family-friendly activities and bonding experiences',
+                event_type=EventType.MIXED,
+                api_sources=['google_places', 'eventbrite', 'mock_local'],
+                search_keywords=['family', 'kids', 'children', 'playground', 'zoo', 'museum'],
+                exclude_keywords=['bar', 'club', 'adult', 'nightlife'],
                 fallback_activities=True,
-                min_events_threshold=10
+                min_events_threshold=8
+            ),
+            'bored': TopicConfig(
+                key='bored',
+                label='I\'m Bored 🤷‍♀️',
+                icon='🤷‍♀️',
+                description='Quick, easy activities when you don\'t know what to do',
+                event_type=EventType.MIXED,
+                api_sources=['google_places', 'mock_local'],
+                search_keywords=['park', 'walk', 'coffee', 'gym', 'library', 'bookstore'],
+                exclude_keywords=['expensive', 'reservation', 'formal'],
+                fallback_activities=True,
+                min_events_threshold=3  # Lower threshold for immediate suggestions
             ),
             'drinks': TopicConfig(
                 key='drinks',

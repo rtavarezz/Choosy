@@ -4,21 +4,22 @@ import { sanitizePlanData, validateName, validateZipCode, validatePhoneNumber } 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const apiBase = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
 
-  // Forward the Authorization header from the client if present
-  const authHeader = req.headers.authorization || (req.cookies && req.cookies['accessToken'] ? `Bearer ${req.cookies['accessToken']}` : undefined);
-
   try {
-    const response = await fetch(`${apiBase}/api/plans`, {
-      method: req.method,
+    // Use the simple plan creation endpoint that doesn't require authentication
+    const response = await fetch(`${apiBase}/api/plans/simple`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(authHeader ? { 'Authorization': authHeader } : {}),
       },
-      body: req.method === 'POST' ? JSON.stringify(req.body) : undefined,
+      body: JSON.stringify(req.body),
     });
+    
     const data = await response.json();
+    console.log('🎯 Backend plan creation response:', data);
+    
     res.status(response.status).json(data);
   } catch (error) {
+    console.error('❌ Plan creation error:', error);
     res.status(500).json({ message: 'Failed to create plan' });
   }
 }

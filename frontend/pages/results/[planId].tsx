@@ -26,7 +26,7 @@ interface ResultsData {
     id: string;
     name: string;
     votes: number;
-    image: string;
+    image_url: string;     // Changed from image to image_url
     hours: string;
     contact: { phone: string };
   };
@@ -45,7 +45,7 @@ interface ResultsData {
     votes: number;
     total_votes: number;
     percentage: number;
-    image: string;
+    image_url: string;     // Changed from image to image_url
     hours: string;
     contact: { phone: string };
   }>;
@@ -77,22 +77,22 @@ function useResults(planId: string) {
       return {
         planId,
         topic: data.plan.topic,
-        groupSize: data.plan.groupSize,
-        zip: data.plan.zipCode,
+        groupSize: data.plan.group_size,      // Updated to use group_size
+        zip: data.plan.zip_code,              // Updated to use zip_code
         winningEvent: data.events.length > 0 ? {
           id: data.events[0].id,
           name: data.events[0].name,
           votes: data.events[0].votes,
-          image: getTopicImageUrl(data.plan.topic),
+          image_url: data.events[0].image_url || getTopicImageUrl(data.plan.topic),  // Use image_url from backend
           hours: "2 hours",
           contact: { phone: '(555) 123-4567' }
         } : undefined,
         plan: {
-          userName: data.plan.userName,
-          phoneNumber: data.plan.phoneNumber,
+          userName: data.plan.host_name,      // Updated to use host_name
+          phoneNumber: data.plan.host_phone,  // Updated to use host_phone
           topic: data.plan.topic,
-          groupSize: data.plan.groupSize,
-          zipCode: data.plan.zipCode
+          groupSize: data.plan.group_size,    // Updated to use group_size
+          zipCode: data.plan.zip_code         // Updated to use zip_code
         },
         totalVotes: data.totalVotes,
         participants: data.participants,
@@ -102,7 +102,7 @@ function useResults(planId: string) {
           votes: event.votes,
           total_votes: event.total_votes,
           percentage: event.percentage,
-          image: getTopicImageUrl(data.plan.topic),
+          image_url: event.image_url || getTopicImageUrl(data.plan.topic),  // Use image_url from backend
           hours: "2 hours",
           contact: { phone: '(555) 123-4567' }
         }))
@@ -453,7 +453,7 @@ export default function ResultsPage() {
                       className="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl shadow-md border border-purple-100 dark:border-purple-800/30 hover:scale-[1.02] transition-all duration-200"
                     >
                       <img 
-                        src={event.image}
+                        src={event.image_url}
                         alt={event.name}
                         className="w-16 h-16 rounded-lg object-cover border-2 border-purple-200 dark:border-purple-700 shadow-sm"
                       />
