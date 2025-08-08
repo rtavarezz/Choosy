@@ -171,8 +171,9 @@ class MockSMSService:
     
     @staticmethod
     def send_verification_code(phone: str, code: str) -> bool:
-        """Mock SMS sending - always returns True for MVP"""
-        logger.info(f"Mock SMS sent to {phone}: Your verification code is {code}")
+        """Mock SMS sending - COMMENTED OUT FOR DEVELOPMENT"""
+        # logger.info(f"Mock SMS sent to {phone}: Your verification code is {code}")
+        logger.info(f"🚧 SMS sending disabled for development")
         return True
     
     @staticmethod

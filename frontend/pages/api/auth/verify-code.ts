@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+// SMS ENDPOINT - COMMENTED OUT FOR DEVELOPMENT (see onboarding.tsx)
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const apiBase = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
   try {

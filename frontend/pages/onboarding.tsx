@@ -158,10 +158,19 @@ export default function Onboarding() {
     setShowVerification(true);
   };
 
-  // Handler to send code
+  // Handler to send code - COMMENTED OUT FOR DEVELOPMENT
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError('');
+    
+    // Skip SMS verification for development - auto-advance to topic selection
+    console.log('🚧 SMS verification skipped for development');
+    setIsVerified(true);
+    setShowVerification(false);
+    setStep(3); // Advance to topic selection
+    
+    /* 
+    // SMS CODE COMMENTED OUT FOR DEVELOPMENT
     try {
       const res = await fetch('/api/auth/send-code', {
         method: 'POST',
@@ -178,12 +187,22 @@ export default function Onboarding() {
     } catch (err) {
       setVerificationError('Network error.');
     }
+    */
   };
 
-  // Handler to verify code
+  // Handler to verify code - COMMENTED OUT FOR DEVELOPMENT
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError('');
+    
+    // Skip SMS verification for development - auto-advance to topic selection
+    console.log('🚧 SMS code verification skipped for development');
+    setIsVerified(true);
+    setShowVerification(false);
+    setStep(3); // Advance to topic selection
+    
+    /*
+    // SMS VERIFICATION CODE COMMENTED OUT FOR DEVELOPMENT
     if (!sessionId) {
       setVerificationError('No session. Please resend code.');
       return;
@@ -206,6 +225,7 @@ export default function Onboarding() {
     } catch (err) {
       setVerificationError('Network error.');
     }
+    */
   };
 
   // Step 3: Handle topic selection

@@ -173,9 +173,16 @@ const VotePage: React.FC = () => {
   }, [planId]);
 
   const onVote = async (eventId: string, direction: 'like' | 'dislike') => {
-    if (!voterId || voterId === '') {
-      console.warn('❌ No voter ID found, waiting for initialization...');
-      return;
+    // Get voter ID directly from storage as fallback if state isn't ready yet
+    let currentVoterId = voterId;
+    if (!currentVoterId || currentVoterId === '') {
+      currentVoterId = localStorage.getItem('voterId') || sessionStorage.getItem('voterId') || '';
+      if (!currentVoterId) {
+        console.warn('❌ No voter ID found, waiting for initialization...');
+        return;
+      }
+      // Update state for next time
+      setVoterId(currentVoterId);
     }
     
     try {
@@ -183,7 +190,7 @@ const VotePage: React.FC = () => {
       const voteData = {
         plan_id: planId as string,
         event_id: eventId,
-        voter_id: voterId,
+        voter_id: currentVoterId,
         vote_type: direction
       };
       
