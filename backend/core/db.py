@@ -2,18 +2,32 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import declarative_base
+from config import env_config
 
 Base = declarative_base()
 
-# FORCE SQLite for development - bypass any existing DATABASE_URL
-print("🚧 Forcing SQLite for development (bypassing DATABASE_URL)")
+# Force SQLite for local development to avoid Supabase connection issues
 DATABASE_URL = "sqlite:///./test.db"
+print("🚧 Using SQLite for local development (bypassing remote database)")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},  # SQLite specific
-    echo=os.getenv("DEBUG", "false").lower() == "true"
-)
+if DATABASE_URL.startswith("sqlite"):
+    # SQLite configuration
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},  # SQLite specific
+        echo=os.getenv("DEBUG", "false").lower() == "true"
+    )
+else:
+    # PostgreSQL/Supabase configuration
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=20,
+        max_overflow=30,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        pool_timeout=30,
+        echo=os.getenv("DEBUG", "false").lower() == "true"
+    )
 
 # Comment out the original code temporarily
 """

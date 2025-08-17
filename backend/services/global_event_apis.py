@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 import hashlib
-from dotenv import load_dotenv
 from .api_config import api_template_manager, EventType
 
-load_dotenv()
+# Use centralized environment configuration
+from config.environment import env_config
 
 class EventSource(Enum):
     EVENTBRITE = "eventbrite"
@@ -55,14 +55,16 @@ class GlobalEvent:
 
 class GlobalEventAPI:
     def __init__(self):
-        # Initialize API keys from environment variables using template manager
-        self.api_keys = {}
+        # Initialize API keys from centralized configuration
+        self.api_keys = env_config.get_api_keys()
         self.rate_limits = {}
         
-        # Get API configurations from template manager
+        # Get API configurations from template manager and add rate limits
         for api_name, config in api_template_manager.api_configs.items():
             if config.enabled:
-                self.api_keys[api_name] = os.getenv(config.api_key_env) if config.api_key_env else None
+                # Use centralized config first, fallback to direct env lookup
+                if api_name not in self.api_keys:
+                    self.api_keys[api_name] = os.getenv(config.api_key_env) if config.api_key_env else None
                 self.rate_limits[api_name] = {
                     'requests': 0, 
                     'limit': config.rate_limit, 
@@ -161,7 +163,9 @@ class GlobalEventAPI:
         print(f"✅ Topic filtering complete: {len(events)} events after filtering")
 
         # --- Fun Activities Fallback for low results ---
-        if len(events) < topic_config.min_events_threshold and topic_config.fallback_activities:
+        # DISABLED: Prioritize real events over fallback activities
+        print(f"🚫 Fallback activities disabled - using only real events: {len(events)} found")
+        if False and len(events) < topic_config.min_events_threshold and topic_config.fallback_activities:
             print(f"🎮 Adding fun offline activities for {category} (only {len(events)} real events found)")
             
             # Add fun offline activities and TikTok trends
@@ -248,16 +252,17 @@ class GlobalEventAPI:
             except Exception as e:
                 print(f"Ticketmaster API error: {e}")
         
-        # For adventure category, always include local adventure templates
-        if category == 'adventure':
+        # DISABLED: Force real events only
+        print(f"🚫 Location-specific fallbacks disabled")
+        if False and category == 'adventure':
             local_adventure_events = self._create_location_specific_events(lat, lng, category)
             events.extend(local_adventure_events)
             print(f"🎯 Adventure: Added {len(local_adventure_events)} local adventure templates")
         
-        # LAST RESORT: Only create location-specific events if NO real events found
+        # DISABLED: Only use real API events
         if not events:
-            print(f"📍 No real events found from APIs, creating minimal location-specific suggestions")
-            events = self._create_location_specific_events(lat, lng, category)
+            print(f"📍 No real events found from APIs - returning empty list instead of fallbacks")
+            events = []
         else:
             print(f"✅ Total real events found: {len(events)}")
         
@@ -865,8 +870,9 @@ class GlobalEventAPI:
             return None
     
     def _convert_google_place_to_event(self, place: dict, category: str) -> Optional[GlobalEvent]:
-        """Convert Google Places result to GlobalEvent"""
+        """Convert Google Places result to GlobalEvent, with Unsplash fallback image"""
         try:
+            from services.unsplash_service import get_unsplash_fallback
             name = place.get('name', 'Unknown Venue')
             place_id = place.get('place_id', '')
             
@@ -912,11 +918,24 @@ class GlobalEventAPI:
             if place.get('vicinity'):
                 description += f"Located at {place.get('vicinity')}."
             
+            # Try to get a photo reference (if available)
+            image_url = None
+            photos = place.get('photos')
+            if photos and isinstance(photos, list) and len(photos) > 0:
+                photo_ref = photos[0].get('photo_reference')
+                if photo_ref and self.api_keys.get('google_places'):
+                    image_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&photoreference={photo_ref}&key={self.api_keys['google_places']}"
+            # If no image, use Unsplash fallback
+            if not image_url:
+                unsplash = get_unsplash_fallback(category)
+                if unsplash:
+                    image_url = unsplash.get('image_url')
+            
             return GlobalEvent(
                 id=f"google_{place_id}",
                 name=name,
                 description=description,
-                image_url=None,  # Google Places doesn't provide images
+                image_url=image_url,
                 start_time=None,
                 end_time=None,
                 venue=name,
@@ -946,9 +965,43 @@ class GlobalEventAPI:
             print(f"Error converting Google Place: {e}")
             return None
     
+    def _estimate_venue_price(self, tags: dict, amenity: str, leisure: str, shop: str, tourism: str) -> str:
+        """Estimate venue price based on OSM tags"""
+        # Check if there's an explicit fee tag
+        fee = tags.get('fee', '').lower()
+        if fee == 'no':
+            return 'Free'
+        elif fee == 'yes':
+            return 'Paid admission'
+        
+        # Estimate based on venue type
+        if amenity in ['library', 'place_of_worship', 'community_centre', 'park']:
+            return 'Free'
+        elif amenity in ['restaurant', 'cafe', 'bar', 'pub']:
+            return '$10-30 per person'
+        elif amenity in ['cinema', 'theatre']:
+            return '$8-15 per ticket'
+        elif leisure in ['park', 'playground', 'garden', 'nature_reserve']:
+            return 'Free'
+        elif leisure in ['fitness_centre', 'sports_centre']:
+            return '$5-20 per visit'
+        elif leisure in ['bowling_alley', 'miniature_golf']:
+            return '$8-25 per person'
+        elif shop:
+            return 'Varies by purchase'
+        elif tourism in ['museum', 'gallery']:
+            return '$5-15 per ticket'
+        elif tourism in ['attraction', 'theme_park']:
+            return '$10-50 per ticket'
+        elif tourism == 'viewpoint':
+            return 'Free'
+        else:
+            return 'Varies'
+    
     def _convert_osm_element_to_event(self, element: dict, category: str) -> Optional[GlobalEvent]:
-        """Convert OpenStreetMap element to GlobalEvent"""
+        """Convert OpenStreetMap element to GlobalEvent, with Unsplash fallback image"""
         try:
+            from services.unsplash_service import get_unsplash_fallback
             tags = element.get('tags', {})
             name = tags.get('name', tags.get('brand', 'Local Venue'))
             
@@ -969,16 +1022,80 @@ class GlobalEventAPI:
             # Get hours
             hours = tags.get('opening_hours', 'Hours not available')
             
-            # Create description
-            description = f"Visit {name} for {category} activities. "
+            # Create unique, diverse descriptions based on OSM tags
+            amenity = tags.get('amenity', '')
+            leisure = tags.get('leisure', '')
+            shop = tags.get('shop', '')
+            tourism = tags.get('tourism', '')
+            cuisine = tags.get('cuisine', '')
+            
+            # Generate varied description patterns
+            descriptions = []
+            
+            if amenity == 'restaurant':
+                if cuisine:
+                    descriptions.append(f"Enjoy authentic {cuisine.replace('_', ' ')} cuisine at {name}.")
+                    descriptions.append(f"Indulge in delicious {cuisine.replace('_', ' ')} dishes at this local favorite.")
+                else:
+                    descriptions.append(f"Savor great food and atmosphere at {name}.")
+                    descriptions.append(f"Experience quality dining at this popular restaurant.")
+            elif amenity == 'cafe':
+                descriptions.append(f"Relax with coffee and light bites at {name}.")
+                descriptions.append(f"Perfect spot for coffee dates and casual meetings.")
+            elif amenity == 'bar' or amenity == 'pub':
+                descriptions.append(f"Unwind with drinks and good vibes at {name}.")
+                descriptions.append(f"Local favorite for evening drinks and socializing.")
+            elif amenity == 'fast_food':
+                descriptions.append(f"Quick and tasty meals at {name}.")
+                descriptions.append(f"Convenient dining option for a fast bite.")
+            elif leisure:
+                descriptions.append(f"Enjoy {leisure.replace('_', ' ')} activities at {name}.")
+                descriptions.append(f"Great place for recreational fun and entertainment.")
+            elif tourism:
+                descriptions.append(f"Discover this {tourism.replace('_', ' ')} attraction.")
+                descriptions.append(f"Must-visit destination for culture and exploration.")
+            else:
+                descriptions.append(f"Visit {name} for a unique local experience.")
+                descriptions.append(f"Discover what makes {name} special.")
+            
+            # Pick a random description pattern to add variety
+            import random
+            base_description = random.choice(descriptions)
+            
+            # Add specific details
+            details = []
             if address:
-                description += f"Located at {address}."
+                details.append(f"Located at {address}")
+            if tags.get('outdoor_seating') == 'yes':
+                details.append("offers outdoor seating")
+            if tags.get('wifi') == 'yes':
+                details.append("provides free WiFi")
+            if tags.get('wheelchair') == 'yes':
+                details.append("wheelchair accessible")
+            if tags.get('takeaway') == 'yes':
+                details.append("takeaway available")
+            
+            if details:
+                if len(details) == 1:
+                    description = f"{base_description} {details[0].capitalize()}."
+                else:
+                    description = f"{base_description} {', '.join(details[:-1])}, and {details[-1]}."
+            else:
+                description = base_description
+            
+            # Try to get an image from tags (rare)
+            image_url = tags.get('image')
+            # If no image, use Unsplash fallback
+            if not image_url:
+                unsplash = get_unsplash_fallback(category)
+                if unsplash:
+                    image_url = unsplash.get('image_url')
             
             return GlobalEvent(
                 id=f"osm_{element.get('id', '')}",
                 name=name,
                 description=description,
-                image_url=None,
+                image_url=image_url,
                 start_time=None,
                 end_time=None,
                 venue=name,
@@ -986,7 +1103,7 @@ class GlobalEventAPI:
                 city=city,
                 state=state,
                 zip_code=zip_code,
-                price='Varies',
+                price=self._estimate_venue_price(tags, amenity, leisure, shop, tourism),
                 category=category,
                 source=EventSource.OPENSTREETMAP,
                 external_id=str(element.get('id', '')),
@@ -999,7 +1116,7 @@ class GlobalEventAPI:
                 metadata={
                     'phone': phone,
                     'hours': hours,
-                    'tags': tags
+                    'osm_tags': tags
                 }
             )
         except Exception as e:
@@ -1022,10 +1139,24 @@ class GlobalEventAPI:
             if event.get('time'):
                 start_time = datetime.fromtimestamp(event['time'] / 1000)
             
-            # Get description
-            description = event.get('description', '').replace('<p>', '').replace('</p>', '')[:200]
-            if not description:
-                description = f"Join us for this {category} meetup event!"
+            # Get description - create diverse patterns for meetups
+            import random
+            raw_description = event.get('description', '').replace('<p>', '').replace('</p>', '')[:200]
+            
+            if raw_description and len(raw_description) > 20:
+                description = raw_description
+            else:
+                # Generate varied meetup descriptions
+                meetup_patterns = [
+                    f"Connect with like-minded people at this {category} meetup.",
+                    f"Join fellow enthusiasts for an engaging {category} gathering.",
+                    f"Network and learn at this exciting {category} meetup event.",
+                    f"Discover new connections at this {category} community event.",
+                    f"Share experiences and ideas at this {category} meetup.",
+                    f"Meet amazing people who share your passion for {category}.",
+                    f"Build meaningful connections at this {category} social event."
+                ]
+                description = random.choice(meetup_patterns)
             
             # Get group info
             group = event.get('group', {})
@@ -2248,12 +2379,72 @@ class GlobalEventAPI:
                 if genre:
                     classification_names.append(genre)
             
-            # Create description
-            description = f"Join us for {name} at {venue_name}. "
-            if classification_names:
-                description += f"Category: {', '.join(classification_names[:3])}. "
-            if address_line:
-                description += f"Located at {address_line}."
+            # Create diverse descriptions for Ticketmaster events
+            import random
+            
+            # Generate varied description patterns based on event type
+            description_patterns = []
+            
+            # Check if it's a comedy event
+            is_comedy = any('comedy' in cls.lower() for cls in classification_names)
+            is_music = any(cls.lower() in ['music', 'concerts', 'pop', 'rock', 'jazz', 'classical'] for cls in classification_names)
+            is_sports = any('sports' in cls.lower() for cls in classification_names)
+            is_theatre = any(cls.lower() in ['theatre', 'theater', 'arts'] for cls in classification_names)
+            
+            if is_comedy:
+                description_patterns = [
+                    f"Get ready to laugh at {name}! An evening of hilarious comedy awaits.",
+                    f"Don't miss {name} - guaranteed laughs and great entertainment.",
+                    f"Join the fun at {name} for an unforgettable comedy experience.",
+                    f"Laugh out loud at {name} featuring top-notch comedic talent.",
+                    f"Experience side-splitting humor at {name}."
+                ]
+            elif is_music:
+                description_patterns = [
+                    f"Experience amazing live music at {name}.",
+                    f"Don't miss {name} - an incredible musical performance.",
+                    f"Enjoy fantastic live entertainment at {name}.",
+                    f"Immerse yourself in great music at {name}.",
+                    f"Catch {name} for an unforgettable musical journey."
+                ]
+            elif is_sports:
+                description_patterns = [
+                    f"Cheer on your team at {name}!",
+                    f"Experience the excitement of {name}.",
+                    f"Don't miss the action at {name}.",
+                    f"Join the crowd for {name} - sports at its finest.",
+                    f"Feel the energy at {name}."
+                ]
+            elif is_theatre:
+                description_patterns = [
+                    f"Be captivated by {name} - exceptional theatrical performance.",
+                    f"Experience the magic of {name}.",
+                    f"Don't miss this stunning production of {name}.",
+                    f"Immerse yourself in the artistry of {name}.",
+                    f"Witness brilliant performances at {name}."
+                ]
+            else:
+                description_patterns = [
+                    f"Join us for {name} - an exciting event you won't want to miss.",
+                    f"Experience {name} at its finest.",
+                    f"Don't miss out on {name}.",
+                    f"Be part of {name} - great entertainment awaits.",
+                    f"Discover what makes {name} special."
+                ]
+            
+            # Pick a random pattern
+            base_description = random.choice(description_patterns)
+            
+            # Add venue and location details
+            if venue_name and venue_name != 'Unknown Venue':
+                base_description += f" Taking place at {venue_name}"
+                if address_line:
+                    base_description += f" on {address_line}"
+                base_description += "."
+            elif address_line:
+                base_description += f" Located at {address_line}."
+            
+            description = base_description
             
             # Get external URL
             external_url = event_data.get('url', '')
@@ -2297,4 +2488,4 @@ class GlobalEventAPI:
 
 
 # Global instance
-global_event_api = GlobalEventAPI() 
+global_event_api = GlobalEventAPI()

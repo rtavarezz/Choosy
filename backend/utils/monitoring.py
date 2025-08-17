@@ -8,6 +8,7 @@ import time
 import json
 import logging
 import traceback
+from sqlalchemy import text
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from functools import wraps
@@ -167,13 +168,20 @@ class DatabaseMonitor:
     def get_pool_status(self) -> Dict[str, Any]:
         """Get database connection pool status"""
         try:
-            return {
+            pool_status = {
                 "pool_size": self.connection_pool.size(),
                 "checked_in": self.connection_pool.checkedin(),
                 "checked_out": self.connection_pool.checkedout(),
-                "overflow": self.connection_pool.overflow(),
-                "invalid": self.connection_pool.invalid()
+                "overflow": self.connection_pool.overflow()
             }
+            
+            # Only add invalid() for PostgreSQL pools (not available in SQLite)
+            if hasattr(self.connection_pool, 'invalid'):
+                pool_status["invalid"] = self.connection_pool.invalid()
+            else:
+                pool_status["invalid"] = 0  # SQLite doesn't track invalid connections
+                
+            return pool_status
         except Exception as e:
             logger.error(f"Error getting pool status: {e}")
             return {"error": str(e)}
@@ -182,7 +190,7 @@ class DatabaseMonitor:
         """Check if database connection is healthy"""
         try:
             with self.engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
             return True
         except Exception as e:
             logger.error(f"Database health check failed: {e}")

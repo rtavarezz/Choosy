@@ -1,1 +1,1 @@
-# Auto-generated __init__.py
+# Core module

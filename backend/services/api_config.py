@@ -37,7 +37,7 @@ class TopicConfig:
     search_keywords: List[str]
     exclude_keywords: List[str]
     fallback_activities: bool = True
-    min_events_threshold: int = 6  # Lowered from 10 to 6 for more responsive fun activities
+    min_events_threshold: int = 2  # Only fallback if we have 0-1 real events
 
 class APITemplateManager:
     """Template manager for easy API integration"""
@@ -120,7 +120,7 @@ class APITemplateManager:
                 search_keywords=['food', 'restaurant', 'dining', 'eat', 'cuisine', 'bistro', 'cafe', 'deli', 'brunch', 'dinner', 'lunch', 'food festival', 'cooking class'],
                 exclude_keywords=['gym', 'fitness', 'workout'],
                 fallback_activities=True,
-                min_events_threshold=10
+                min_events_threshold=2
             ),
             'datenight': TopicConfig(
                 key='datenight',
@@ -132,7 +132,7 @@ class APITemplateManager:
                 search_keywords=['date', 'romantic', 'couple', 'dinner', 'night', 'love', 'romance', 'intimate'],
                 exclude_keywords=['family', 'kids', 'children'],
                 fallback_activities=True,
-                min_events_threshold=8
+                min_events_threshold=2
             ),
             'concerts': TopicConfig(
                 key='concerts',
@@ -144,7 +144,7 @@ class APITemplateManager:
                 search_keywords=['concert', 'music', 'band', 'live', 'gig', 'show', 'performance', 'festival', 'musician'],
                 exclude_keywords=['movie', 'film', 'cinema'],
                 fallback_activities=True,
-                min_events_threshold=12
+                min_events_threshold=2
             ),
             'comedy': TopicConfig(
                 key='comedy',
@@ -156,7 +156,7 @@ class APITemplateManager:
                 search_keywords=['comedy', 'stand-up', 'improv', 'comic', 'laugh', 'humor', 'entertainment'],
                 exclude_keywords=['sport', 'fitness', 'workout'],
                 fallback_activities=True,
-                min_events_threshold=8
+                min_events_threshold=2
             ),
             'racing': TopicConfig(
                 key='racing',
@@ -168,7 +168,7 @@ class APITemplateManager:
                 search_keywords=['race', 'racing', 'motorsport', 'kart', 'go-kart', 'track', 'speedway', 'drag', 'auto', 'nascar', 'formula', 'indy', 'drift', 'motocross', 'monster truck', 'grand prix', 'f1', 'rally'],
                 exclude_keywords=['ymca', 'pool', 'fitness', 'gym', 'swim', 'aquatic', 'recreation', 'community center'],
                 fallback_activities=True,
-                min_events_threshold=6
+                min_events_threshold=2
             ),
             'movies': TopicConfig(
                 key='movies',
@@ -180,7 +180,7 @@ class APITemplateManager:
                 search_keywords=['movie', 'film', 'cinema', 'screening', 'theater', 'theatre'],
                 exclude_keywords=['live', 'concert', 'music'],
                 fallback_activities=True,
-                min_events_threshold=8
+                min_events_threshold=2
             ),
             'shopping': TopicConfig(
                 key='shopping',
@@ -192,7 +192,7 @@ class APITemplateManager:
                 search_keywords=['shop', 'shopping', 'mall', 'store', 'boutique', 'market', 'retail', 'fashion'],
                 exclude_keywords=['food', 'restaurant', 'dining'],
                 fallback_activities=True,
-                min_events_threshold=10
+                min_events_threshold=2
             ),
             'parks': TopicConfig(
                 key='parks',
@@ -204,7 +204,7 @@ class APITemplateManager:
                 search_keywords=['park', 'garden', 'nature', 'outdoor', 'trail', 'picnic', 'hiking', 'walking'],
                 exclude_keywords=['indoor', 'gym', 'fitness'],
                 fallback_activities=True,
-                min_events_threshold=12
+                min_events_threshold=2
             ),
             'adventure': TopicConfig(
                 key='adventure',
@@ -216,7 +216,7 @@ class APITemplateManager:
                 search_keywords=['adventure', 'escape', 'vr', 'virtual', 'arcade', 'climb', 'zipline', 'explore', 'thrill', 'adrenaline'],
                 exclude_keywords=['relax', 'spa', 'wellness'],
                 fallback_activities=True,
-                min_events_threshold=8
+                min_events_threshold=2
             ),
             'nightlife': TopicConfig(
                 key='nightlife',
@@ -228,7 +228,7 @@ class APITemplateManager:
                 search_keywords=['nightlife', 'club', 'bar', 'pub', 'dj', 'party', 'cocktail', 'lounge', 'night'],
                 exclude_keywords=['family', 'kids', 'children', 'day'],
                 fallback_activities=True,
-                min_events_threshold=10
+                min_events_threshold=2
             ),
             'sports': TopicConfig(
                 key='sports',
@@ -240,7 +240,7 @@ class APITemplateManager:
                 search_keywords=['sport', 'game', 'match', 'tournament', 'league', 'athletic', 'fitness', 'gym', 'workout', 'training'],
                 exclude_keywords=['food', 'restaurant', 'dining'],
                 fallback_activities=True,
-                min_events_threshold=15
+                min_events_threshold=2
             ),
             'wellness': TopicConfig(
                 key='wellness',
@@ -252,7 +252,7 @@ class APITemplateManager:
                 search_keywords=['wellness', 'yoga', 'spa', 'meditation', 'fitness', 'health', 'relax', 'mindfulness'],
                 exclude_keywords=['adventure', 'thrill', 'adrenaline'],
                 fallback_activities=True,
-                min_events_threshold=8
+                min_events_threshold=2
             ),
             'family': TopicConfig(
                 key='family',
@@ -264,7 +264,7 @@ class APITemplateManager:
                 search_keywords=['family', 'kids', 'children', 'playground', 'zoo', 'museum'],
                 exclude_keywords=['bar', 'club', 'adult', 'nightlife'],
                 fallback_activities=True,
-                min_events_threshold=8
+                min_events_threshold=2
             ),
             'bored': TopicConfig(
                 key='bored',
@@ -288,7 +288,7 @@ class APITemplateManager:
                 search_keywords=['drink', 'bar', 'cocktail', 'wine', 'beer', 'brewery', 'pub', 'liquor'],
                 exclude_keywords=['family', 'kids', 'children'],
                 fallback_activities=True,
-                min_events_threshold=10
+                min_events_threshold=2
             ),
             'art': TopicConfig(
                 key='art',
@@ -300,7 +300,7 @@ class APITemplateManager:
                 search_keywords=['art', 'gallery', 'museum', 'exhibit', 'exhibition', 'painting', 'sculpture', 'culture', 'creative'],
                 exclude_keywords=['sport', 'fitness', 'workout'],
                 fallback_activities=True,
-                min_events_threshold=8
+                min_events_threshold=2
             )
         }
     
