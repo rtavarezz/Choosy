@@ -32,6 +32,17 @@ export function maskPhoneNumber(phone: string): string {
   return phone; // Return original if can't mask
 }
 
+// Format phone number for display (e.g., (123) 456-7890)
+export function formatPhoneForDisplay(phone: string) {
+  if (!phone) return '';
+  // US format: (XXX) XXX-XXXX
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  return phone;
+}
+
 // Validate name (letters, spaces, hyphens, apostrophes only)
 export function validateName(name: string): boolean {
   if (!name || name.length < 2 || name.length > 30) return false;
@@ -110,4 +121,4 @@ export function hasPlanAccess(planId: string, userPhone: string): boolean {
   // In a real app, you'd check database permissions here
   // For now, we just validate the format
   return true;
-} 
+}

@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PhoneInput from 'react-phone-input-2/lib/lib';
 import 'react-phone-input-2/lib/style.css';
 import { Filter } from 'bad-words';
+import { EventCard } from '@/components/EventCard';
+import { Dialog, DialogTrigger, DialogContent, DialogClose } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 // Add CSS styles for swipe animations and gamification
 const swipeStyles = `
@@ -1368,20 +1371,66 @@ Join us: ${window.location.href}`;
               </div>
               {/* Right: Share and Feeling Lucky */}
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowPowerUpModal(true)}
-                  className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-full hover:from-pink-600 hover:to-purple-700 transition-all duration-300 text-xs font-medium"
-                >
-                  <span>⚡</span>
-                  <span>Power-ups</span>
-                </button>
-                <button
-                  onClick={shareResults}
-                  className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full hover:from-purple-700 hover:to-blue-700 transition-all duration-300 text-xs font-medium"
-                >
-                  <span>📤</span>
-                  <span>Share</span>
-                </button>
+                <Dialog open={showPowerUpModal} onOpenChange={setShowPowerUpModal}>
+                  <DialogTrigger asChild>
+                    <button
+                      className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-full hover:from-pink-600 hover:to-purple-700 transition-all duration-300 text-xs font-medium"
+                    >
+                      <span>⚡</span>
+                      <span>Power-ups</span>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-sm w-full">
+                    <div className="text-center">
+                      <h3 className="text-lg font-bold text-gray-800 mb-4">⚡ Choose Your Power-up!</h3>
+                      <p className="text-sm text-gray-600 mb-4">Use these special abilities once per session</p>
+                      <div className="space-y-3">
+                        {availablePowerUps.revealPopularity && (
+                          <button
+                            onClick={useRevealPopularity}
+                            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
+                          >
+                            🔍 Reveal Popularity
+                          </button>
+                        )}
+                        {availablePowerUps.luckyDraw && (
+                          <button
+                            onClick={useLuckyDraw}
+                            className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-3 rounded-lg hover:from-yellow-500 hover:to-orange-600 transition-all duration-200"
+                          >
+                            🎁 Lucky Draw
+                          </button>
+                        )}
+                      </div>
+                      <DialogClose asChild>
+                        <button
+                          className="mt-4 w-full bg-gray-300 text-gray-700 p-2 rounded-lg hover:bg-gray-400 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </DialogClose>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full hover:from-purple-700 hover:to-blue-700 transition-all duration-300 text-xs font-medium"
+                    >
+                      <span>📤</span>
+                      <span>Share</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64">
+                    <div className="text-sm text-gray-800 dark:text-gray-200">
+                      Share this voting session with your friends!
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button className="bg-blue-500 text-white px-3 py-1 rounded" onClick={shareResults}>Copy Link</button>
+                      <button className="bg-green-500 text-white px-3 py-1 rounded">Invite</button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <button
                   onClick={handleFeelingLucky}
                   className={`text-white text-xs font-semibold px-3 py-1 rounded-full hover:scale-105 transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500 ${isLuckySpinning ? 'lucky-spin' : ''}`}
@@ -1510,50 +1559,6 @@ Join us: ${window.location.href}`;
             </motion.div>
           )}
 
-          {/* Power-up Modal */}
-          {showPowerUpModal && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4"
-            >
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">⚡ Choose Your Power-up!</h3>
-                <p className="text-sm text-gray-600 mb-4">Use these special abilities once per session</p>
-                
-                <div className="space-y-3">
-                  {availablePowerUps.revealPopularity && (
-                    <button
-                      onClick={useRevealPopularity}
-                      className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
-                    >
-                      🔍 Reveal Popularity
-                    </button>
-                  )}
-                  
-                  {availablePowerUps.luckyDraw && (
-                    <button
-                      onClick={useLuckyDraw}
-                      className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-3 rounded-lg hover:from-yellow-500 hover:to-orange-600 transition-all duration-200"
-                    >
-                      🎁 Lucky Draw
-                    </button>
-                  )}
-                  
-
-                </div>
-                
-                <button
-                  onClick={() => setShowPowerUpModal(false)}
-                  className="mt-4 w-full bg-gray-300 text-gray-700 p-2 rounded-lg hover:bg-gray-400 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          )}
-
           {/* Card Deck */}
           <div className="flex-1 flex items-center justify-center p-4">
             <div className="relative w-full max-w-sm h-96 flex justify-center items-center">
@@ -1568,156 +1573,9 @@ Join us: ${window.location.href}`;
                   preventSwipe={['up', 'down']}
                   className="absolute w-full max-w-sm"
                 >
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ 
-                      scale: 0.8, 
-                      opacity: 0,
-                      x: lastDirection.current === 'right' ? 300 : -300,
-                      rotate: lastDirection.current === 'right' ? 15 : -15
-                    }}
-                    transition={{ duration: 0.3 }}
-                    className="bg-white rounded-2xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing w-full max-w-sm"
-                  >
-                    {/* Event image - optimized with loading */}
-                    <div className="relative h-48 bg-gradient-to-br from-purple-400 to-blue-500">
-                      <img 
-                        src={deck[currentIndex].image || getTopicImage(currentIndex, deck[currentIndex].topic)} 
-                        alt={deck[currentIndex].name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement;
-                          target.style.display = 'none';
-                          const nextElement = target.nextElementSibling as HTMLElement;
-                          if (nextElement) nextElement.style.display = 'flex';
-                        }}
-                      />
-                      
-                      {/* Trending Badge */}
-                      {getTrendingBadge(deck[currentIndex]) && (
-                        <div className="absolute top-3 left-3 trending-badge text-white text-xs font-bold px-2 py-1 rounded-full">
-                          {getTrendingBadge(deck[currentIndex])}
-                        </div>
-                      )}
-                      
-                      {/* Personalized Badge */}
-                      {showPersonalizedBadge && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -20 }}
-                          className="absolute top-3 right-3 personalized-badge text-white text-xs font-bold px-2 py-1 rounded-full"
-                        >
-                          {getPersonalizedSuggestion(deck[currentIndex])}
-                        </motion.div>
-                      )}
-                      
-                      {/* Compact hours badge */}
-                      <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-semibold text-gray-900">
-                        {deck[currentIndex].price || 'Varies'}
-                      </div>
-                      
-                      {/* Social Hint Overlay */}
-                      {showSocialHint && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -20 }}
-                          className="absolute bottom-3 left-3 right-3 social-hint text-white text-xs font-medium px-3 py-2 rounded-lg text-center"
-                        >
-                          {currentSocialHint}
-                        </motion.div>
-                      )}
-                    </div>
-                    {/* Event details */}
-                    <div className="p-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-xl font-bold text-gray-900">{deck[currentIndex].name}</h2>
-                        <div className="flex gap-1">
-                          {deck[currentIndex].metadata?.offline_activity && (
-                            <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
-                              FREE
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3">
-                        {deck[currentIndex].metadata?.offline_activity 
-                          ? deck[currentIndex].description
-                          : deck[currentIndex].description || `Cozy ${deck[currentIndex].topic || 'comedy'} spot with ${deck[currentIndex].reviews?.count || 42} happy customers`
-                        }
-                      </p>
-                      <div className="flex gap-1 mb-4">
-                        <span className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">
-                          #{deck[currentIndex].topic || 'comedy'}
-                        </span>
-                        <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full">
-                          {deck[currentIndex].metadata?.offline_activity ? '#Indoor' : '#Local'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-4">
-                        {deck[currentIndex].metadata?.offline_activity ? (
-                          <span className="text-green-600 text-sm font-medium">🎯 Perfect for {deck[currentIndex].metadata?.difficulty || 'Easy'} fun!</span>
-                        ) : (
-                          <>
-                            <span className="text-yellow-400">{renderStars(deck[currentIndex].reviews?.stars || 0)}</span>
-                            <span className="text-sm text-gray-600">({deck[currentIndex].reviews?.count || 0} reviews)</span>
-                          </>
-                        )}
-                      </div>
-                      <div className="space-y-2 mb-4">
-                        {deck[currentIndex].metadata?.offline_activity ? (
-                          <div className="bg-green-50 rounded-xl p-3">
-                            <div className="text-sm font-medium text-green-800">
-                              🛠️ Materials: {deck[currentIndex].metadata?.materials_needed || 'Just your creativity!'}
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <span>📞</span>
-                              <span className="truncate">{deck[currentIndex].contact?.phone || 'N/A'}</span>
-                            </div>
-
-                          </>
-                        )}
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-gray-200">
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>{currentIndex + 1} of {deck.length}</span>
-                          <span>{Math.max(0, deck.length - currentIndex - 1)} left</span>
-                        </div>
-                        <div className="mt-1 bg-gray-200 rounded-full h-1">
-                          <div 
-                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min(((currentIndex + 1) / deck.length) * 100, 100)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      <div className="flex justify-center space-x-4 mt-6">
-                        <button
-                          onClick={() => {
-                            console.log('🔴 Red button clicked, currentIndex:', currentIndex, 'deck.length:', deck.length);
-                            swipe('left');
-                          }}
-                          className="bg-red-500 text-white p-4 rounded-full hover:bg-red-600 transition-colors duration-200 transform hover:scale-110"
-                        >
-                          ❌
-                        </button>
-                        <button
-                          onClick={() => {
-                            console.log('🟢 Green button clicked, currentIndex:', currentIndex, 'deck.length:', deck.length);
-                            swipe('right');
-                          }}
-                          className="bg-green-500 text-white p-4 rounded-full hover:bg-green-600 transition-colors duration-200 transform hover:scale-110"
-                        >
-                          ❤️
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
+                  <EventCard event={deck[currentIndex]}>
+                    {/* You can add voting buttons or actions here as children if needed */}
+                  </EventCard>
                 </TinderCard>
               )}
             </div>
@@ -1726,4 +1584,4 @@ Join us: ${window.location.href}`;
       )}
     </div>
   );
-} 
+}

@@ -1,75 +1,37 @@
 import Head from 'next/head';
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useDarkMode } from '../lib/darkMode';
 import PhoneInput from 'react-phone-input-2/lib/lib';
 import 'react-phone-input-2/lib/style.css';
-import { validatePlanCreate, ValidationError } from '../lib/validation';
+import { validatePhoneNumber, formatPhoneForDisplay } from "@/lib/security";
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader as ShadDialogHeader,
+  DialogTitle as ShadDialogTitle,
+  DialogDescription as ShadDialogDescription,
+  DialogFooter as ShadDialogFooter,
+  DialogClose as ShadDialogClose,
+} from '../components/ui/dialog';
+import { BackgroundGradient } from "@/components/BackgroundGradient";
 
-const COUNTRY_LIST = [
-  { code: '+1', label: 'United States', flag: '🇺🇸', maxLength: 10, format: 'XXX-XXX-XXXX' },
-  { code: '+1', label: 'Canada', flag: '🇨🇦', maxLength: 10, format: 'XXX-XXX-XXXX' },
-  { code: '+44', label: 'United Kingdom', flag: '🇬🇧', maxLength: 10, format: 'XXXXX-XXXXX' },
-  { code: '+52', label: 'Mexico', flag: '🇲🇽', maxLength: 10, format: 'XXX-XXX-XXXX' },
-  { code: '+91', label: 'India', flag: '🇮🇳', maxLength: 10, format: 'XXXXX-XXXXX' },
-  { code: '+61', label: 'Australia', flag: '🇦🇺', maxLength: 9, format: 'X-XXXX-XXXX' },
-  { code: '+81', label: 'Japan', flag: '🇯🇵', maxLength: 10, format: 'XX-XXXX-XXXX' },
-  { code: '+49', label: 'Germany', flag: '🇩🇪', maxLength: 11, format: 'XXXX-XXXXXXX' },
-  { code: '+33', label: 'France', flag: '🇫🇷', maxLength: 9, format: 'X-XX-XX-XX-XX' },
-  { code: '+34', label: 'Spain', flag: '🇪🇸', maxLength: 9, format: 'XXX-XXX-XXX' },
-  { code: '+39', label: 'Italy', flag: '🇮🇹', maxLength: 10, format: 'XXX-XXXXXXX' },
-  { code: '+86', label: 'China', flag: '🇨🇳', maxLength: 11, format: 'XXX-XXXX-XXXX' },
-  { code: '+7', label: 'Russia', flag: '🇷🇺', maxLength: 10, format: 'XXX-XXX-XX-XX' },
-  { code: '+55', label: 'Brazil', flag: '🇧🇷', maxLength: 11, format: 'XX-XXXXX-XXXX' },
-  { code: '+27', label: 'South Africa', flag: '🇿🇦', maxLength: 9, format: 'XX-XXX-XXXX' },
-  { code: '+82', label: 'South Korea', flag: '🇰🇷', maxLength: 10, format: 'XX-XXXX-XXXX' },
-  { code: '+62', label: 'Indonesia', flag: '🇮🇩', maxLength: 10, format: 'XXX-XXXX-XXX' },
-  { code: '+63', label: 'Philippines', flag: '🇵🇭', maxLength: 10, format: 'XXX-XXX-XXXX' },
-  { code: '+90', label: 'Turkey', flag: '🇹🇷', maxLength: 10, format: 'XXX-XXX-XXXX' },
-  { code: '+31', label: 'Netherlands', flag: '🇳🇱', maxLength: 9, format: 'X-XXX-XXXXX' },
-  { code: '+46', label: 'Sweden', flag: '🇸🇪', maxLength: 9, format: 'XX-XXX-XXXX' },
-  { code: '+47', label: 'Norway', flag: '🇳🇴', maxLength: 8, format: 'XXX-XX-XXX' },
-  { code: '+48', label: 'Poland', flag: '🇵🇱', maxLength: 9, format: 'XXX-XXX-XXX' },
-  { code: '+351', label: 'Portugal', flag: '🇵🇹', maxLength: 9, format: 'XXX-XXX-XXX' },
-  { code: '+358', label: 'Finland', flag: '🇫🇮', maxLength: 9, format: 'XX-XXX-XXXX' },
-  { code: '+43', label: 'Austria', flag: '🇦🇹', maxLength: 10, format: 'XXX-XXXXXXX' },
-  { code: '+41', label: 'Switzerland', flag: '🇨🇭', maxLength: 9, format: 'XX-XXX-XXXX' },
-  { code: '+420', label: 'Czech Republic', flag: '🇨🇿', maxLength: 9, format: 'XXX-XXX-XXX' },
-  { code: '+421', label: 'Slovakia', flag: '🇸🇰', maxLength: 9, format: 'XXX-XXX-XXX' },
-  { code: '+353', label: 'Ireland', flag: '🇮🇪', maxLength: 9, format: 'XX-XXX-XXXX' },
-  { code: '+45', label: 'Denmark', flag: '🇩🇰', maxLength: 8, format: 'XX-XX-XX-XX' },
-  { code: '+32', label: 'Belgium', flag: '🇧🇪', maxLength: 9, format: 'XXX-XX-XX-XX' },
-  { code: '+972', label: 'Israel', flag: '🇮🇱', maxLength: 9, format: 'XX-XXX-XXXX' },
-  { code: '+65', label: 'Singapore', flag: '🇸🇬', maxLength: 8, format: 'XXXX-XXXX' },
-  { code: '+60', label: 'Malaysia', flag: '🇲🇾', maxLength: 9, format: 'XXX-XXXXXX' },
-  { code: '+66', label: 'Thailand', flag: '🇹🇭', maxLength: 9, format: 'XXX-XXX-XXX' },
-  { code: '+64', label: 'New Zealand', flag: '🇳🇿', maxLength: 9, format: 'XXX-XXX-XXX' },
-  { code: '+20', label: 'Egypt', flag: '🇪🇬', maxLength: 10, format: 'X-XXX-XXX-XXX' },
-  { code: '+212', label: 'Morocco', flag: '🇲🇦', maxLength: 9, format: 'XX-XXXX-XXX' },
-  { code: '+234', label: 'Nigeria', flag: '🇳🇬', maxLength: 10, format: 'XXX-XXX-XXXX' },
-  { code: '+92', label: 'Pakistan', flag: '🇵🇰', maxLength: 10, format: 'XXX-XXXXXXX' },
-  { code: '+880', label: 'Bangladesh', flag: '🇧🇩', maxLength: 10, format: 'XXX-XXXXXXX' },
-  { code: '+84', label: 'Vietnam', flag: '🇻🇳', maxLength: 9, format: 'XXX-XXX-XXX' },
-];
-
-// Sort alphabetically by label
-const SORTED_COUNTRIES = [...COUNTRY_LIST].sort((a, b) => a.label.localeCompare(b.label));
-
-const TOPICS = [
-  { id: 'concerts', name: 'Concerts & Music', icon: '🎵', color: 'from-purple-500 to-pink-500' },
-  { id: 'foodie', name: 'Food & Dining', icon: '🍕', color: 'from-orange-500 to-red-500' },
-  { id: 'sports', name: 'Sports & Fitness', icon: '⚽', color: 'from-green-500 to-blue-500' },
-  { id: 'art', name: 'Arts & Culture', icon: '🎨', color: 'from-indigo-500 to-purple-500' },
-  { id: 'nightlife', name: 'Nightlife', icon: '🍸', color: 'from-pink-500 to-purple-500' },
-  { id: 'adventure', name: 'Adventure', icon: '🏔️', color: 'from-green-500 to-teal-500' },
-  { id: 'shopping', name: 'Shopping', icon: '🛍️', color: 'from-blue-500 to-indigo-500' },
-  { id: 'comedy', name: 'Comedy', icon: '😂', color: 'from-yellow-500 to-orange-500' },
-  { id: 'movies', name: 'Movies & Entertainment', icon: '🎬', color: 'from-red-500 to-pink-500' },
-  { id: 'wellness', name: 'Wellness & Health', icon: '🧘', color: 'from-green-500 to-emerald-500' },
-  { id: 'parks', name: 'Parks & Outdoors', icon: '🌳', color: 'from-green-500 to-teal-500' },
-  { id: 'racing', name: 'Racing & Motorsports', icon: '🏎️', color: 'from-red-500 to-orange-500' },
-  { id: 'bored', name: 'I\'m Bored 🤷‍♀️', icon: '🤷‍♀️', color: 'from-gray-500 to-slate-500' },
+const CATEGORIES = [
+  { id: 'concerts',  label: 'Concerts & Music',        emoji: '🎵' },
+  { id: 'foodie',    label: 'Food & Dining',           emoji: '🍕' },
+  { id: 'sports',    label: 'Sports & Fitness',        emoji: '⚽️' },
+  { id: 'art',      label: 'Arts & Culture',          emoji: '🎨' },
+  { id: 'nightlife', label: 'Nightlife',               emoji: '🍸' },
+  { id: 'adventure', label: 'Adventure',               emoji: '🏔️' },
+  { id: 'shopping',  label: 'Shopping',                emoji: '🛍️' },
+  { id: 'comedy',    label: 'Comedy',                  emoji: '😂' },
+  { id: 'movies',    label: 'Movies & Entertainment',  emoji: '🎬' },
+  { id: 'wellness',  label: 'Wellness & Health',       emoji: '🧘' },
+  { id: 'parks',     label: 'Parks & Outdoors',        emoji: '🌳' },
+  { id: 'racing',    label: 'Racing & Motorsports',    emoji: '🏎️' },
+  { id: 'bored',     label: "I'm Bored 🤷‍♀️",         emoji: '🤷‍♀️' },
 ];
 
 export default function Onboarding() {
@@ -77,329 +39,212 @@ export default function Onboarding() {
   const { isDarkMode } = useDarkMode();
   const [step, setStep] = useState(1);
   const [zipcode, setZipcode] = useState('');
-  const [country, setCountry] = useState(SORTED_COUNTRIES[0]);
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [showVerification, setShowVerification] = useState(false);
-  const [selectedTopic, setSelectedTopic] = useState('');
-  const [showTopicSuggestion, setShowTopicSuggestion] = useState(false);
-  const [suggestedTopic, setSuggestedTopic] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [isClient, setIsClient] = useState(false);
-  // Add state for phone verification
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [verificationError, setVerificationError] = useState('');
 
   useEffect(() => setIsClient(true), []);
+  useEffect(() => {
+    // Fix dark mode: set class on <html>
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
 
-  // Geolocation detection
-  const handleGeolocate = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const response = await fetch(`/api/geocode?lat=${latitude}&lng=${longitude}`);
-            if (response.ok) {
-              const data = await response.json();
-              setZipcode(data.zipcode || '');
-            }
-          } catch (error) {
-            console.error('Error reverse geocoding:', error);
-          }
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-        }
-      );
-    }
-  };
+  // Optional: keep last pick
+  useEffect(() => {
+    const last = localStorage.getItem('choosy:lastCategory');
+    if (last && CATEGORIES.some(c => c.id === last)) setSelectedCategory(last);
+  }, []);
+  useEffect(() => {
+    if (selectedCategory) localStorage.setItem('choosy:lastCategory', selectedCategory);
+  }, [selectedCategory]);
 
-  // Format phone number for display
-  const formatPhoneForDisplay = (phoneNumber: string) => {
-    if (!phoneNumber) return '';
-    
-    // Remove all non-digits
-    const digits = phoneNumber.replace(/\D/g, '');
-    
-    // If it starts with country code (e.g., 1 for US), format accordingly
-    if (digits.length === 11 && digits.startsWith('1')) {
-      // US format: +1 (333) 222-1111
-      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-    } else if (digits.length === 10) {
-      // US format without country code: (333) 222-1111
-      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-    } else if (digits.length > 10) {
-      // International format: +XX XXX XXX XXXX
-      const countryCode = digits.slice(0, digits.length - 10);
-      const localNumber = digits.slice(digits.length - 10);
-      return `+${countryCode} (${localNumber.slice(0, 3)}) ${localNumber.slice(3, 6)}-${localNumber.slice(6)}`;
-    }
-    
-    // Fallback: just add dashes
-    return digits.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
-  };
-
-  // Step 1: Handle form submission
-  const handleStart = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!zipcode.trim() || !phone.trim()) return;
-    
-    // Validate phone number
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length < 10) {
-      setPhoneError('Please enter a valid phone number');
+  const handleGeolocate = async () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by this browser.');
       return;
     }
-    
-    setPhoneError('');
-    setStep(2);
-    setShowVerification(true);
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      
+      // Use the backend geocoding service to convert coordinates to zipcode
+      const response = await fetch(`/api/geocode?lat=${latitude}&lng=${longitude}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.zipcode) {
+          setZipcode(data.zipcode);
+        } else {
+          alert('Could not determine your ZIP code from location.');
+        }
+      } else {
+        alert('Failed to get ZIP code from location.');
+      }
+    } catch (error) {
+      console.error('Geolocation error:', error);
+      if (error.code === 1) {
+        alert('Location access denied. Please allow location access and try again.');
+      } else if (error.code === 2) {
+        alert('Location unavailable. Please enter your ZIP code manually.');
+      } else if (error.code === 3) {
+        alert('Location request timeout. Please try again or enter your ZIP code manually.');
+      } else {
+        alert('Unable to get your location. Please enter your ZIP code manually.');
+      }
+    }
   };
 
-  // Handler to send code - COMMENTED OUT FOR DEVELOPMENT
-  const handleSendCode = async (e: React.FormEvent) => {
+  const handleSendCode = async (e) => {
     e.preventDefault();
-    setVerificationError('');
-    
-    // Skip SMS verification for development - auto-advance to topic selection
-    console.log('🚧 SMS verification skipped for development');
-    setIsVerified(true);
-    setShowVerification(false);
-    setStep(3); // Advance to topic selection
-    
-    /* 
-    // SMS CODE COMMENTED OUT FOR DEVELOPMENT
+    setPhoneError('');
+    if (!validatePhoneNumber(phone)) {
+      setPhoneError('Invalid phone number');
+      return;
+    }
     try {
-      const res = await fetch('/api/auth/send-code', {
+      const response = await fetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
       });
-      const data = await res.json();
-      if (res.ok && data.session_id) {
-        setSessionId(data.session_id);
-        setShowVerification(true);
-      } else {
-        setVerificationError(data.message || 'Failed to send code.');
+      if (!response.ok) {
+        setPhoneError('Failed to send code.');
+        return;
       }
+      const data = await response.json();
+      setSessionId(data.session_id || data.sessionId || data.session);
+      setShowVerification(true);
+      setStep(2);
     } catch (err) {
-      setVerificationError('Network error.');
+      setPhoneError('Network error. Please try again.');
     }
-    */
   };
 
-  // Handler to verify code - COMMENTED OUT FOR DEVELOPMENT
-  const handleVerifyCode = async (e: React.FormEvent) => {
+  const handleVerifyCode = async (e) => {
     e.preventDefault();
     setVerificationError('');
-    
-    // Skip SMS verification for development - auto-advance to topic selection
-    console.log('🚧 SMS code verification skipped for development');
-    setIsVerified(true);
-    setShowVerification(false);
-    setStep(3); // Advance to topic selection
-    
-    /*
-    // SMS VERIFICATION CODE COMMENTED OUT FOR DEVELOPMENT
-    if (!sessionId) {
-      setVerificationError('No session. Please resend code.');
+    if (!verificationCode.trim()) {
+      setVerificationError('Please enter the verification code');
       return;
     }
     try {
-      const res = await fetch('/api/auth/verify-code', {
+      const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, code: verificationCode }),
       });
-      const data = await res.json();
-      if (res.ok && data.access_token) {
-        localStorage.setItem('choosy_token', data.access_token);
+      if (!response.ok) {
+        setVerificationError('Invalid code.');
+        return;
+      }
+      const data = await response.json();
+      if (data.success) {
         setIsVerified(true);
-        setShowVerification(false);
-        setStep(3); // Advance to topic selection
+        setStep(3);
       } else {
-        setVerificationError(data.detail?.message || data.message || 'Invalid code.');
+        setVerificationError('Invalid code.');
       }
     } catch (err) {
-      setVerificationError('Network error.');
+      setVerificationError('Network error. Please try again.');
     }
-    */
   };
 
-  // Step 3: Handle topic selection
-  const handleTopicSelect = (topicId: string) => {
-    setSelectedTopic(topicId);
-    setStep(4);
-  };
-
-  // Choose For Me functionality - AI-powered topic selection
-  const handleChooseForMe = () => {
-    // Smart random selection with weights based on popularity and versatility
-    const topicWeights = [
-      { id: 'foodie', weight: 15 }, // Very popular, always fun
-      { id: 'parks', weight: 12 }, // Easy, accessible
-      { id: 'bored', weight: 12 }, // Perfect for indecision!
-      { id: 'movies', weight: 10 }, // Universal appeal
-      { id: 'shopping', weight: 10 }, // Versatile activity
-      { id: 'wellness', weight: 8 }, // Good for self-care
-      { id: 'adventure', weight: 8 }, // Exciting option
-      { id: 'comedy', weight: 7 }, // Mood booster
-      { id: 'concerts', weight: 6 }, // Depends on events available
-      { id: 'art', weight: 5 }, // Cultural option
-      { id: 'sports', weight: 4 }, // More specific interest
-      { id: 'nightlife', weight: 2 }, // Limited audience
-      { id: 'racing', weight: 1 }, // Very specific interest
-    ];
-
-    // Create weighted array
-    const weightedTopics = [];
-    for (const topic of topicWeights) {
-      for (let i = 0; i < topic.weight; i++) {
-        weightedTopics.push(topic.id);
-      }
-    }
-
-    // Select random topic
-    const randomIndex = Math.floor(Math.random() * weightedTopics.length);
-    const chosenTopic = weightedTopics[randomIndex];
-    
-    // Add a little animation delay for effect
-    setTimeout(() => {
-      setSelectedTopic(chosenTopic);
-      setStep(4);
-    }, 500);
-  };
-
-  // Step 4: Handle topic suggestion
-  const handleTopicSuggestion = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!suggestedTopic.trim()) return;
-    
-    // Store the suggested topic (no backend integration yet)
-    console.log('Suggested topic:', suggestedTopic);
-    setShowTopicSuggestion(false);
-    setStep(4);
-  };
-
-  // Final step: Create plan and redirect to voting
-  const handleCreatePlan = async () => {
-    if (!isVerified) {
-      alert('Please verify your phone number first.');
-      return;
-    }
+  const handleCreatePlan = async (catId) => {
     try {
-      // Clean and format phone number for backend
-      const cleanPhone = phone.replace(/\D/g, '');
-      const formattedPhone = cleanPhone.startsWith('1') && cleanPhone.length === 11 
-        ? `+${cleanPhone}` 
-        : `+1${cleanPhone}`;
-
-      // Get access token from localStorage
-      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('choosy_token') : null;
-
-      const newPlan = {
-        topic: selectedTopic,
+      // Step 1: Create the plan
+      const planData = {
+        topic: catId,
         group_size: 'myself',
         zip_code: zipcode,
         host_name: 'Host',
         host_phone: phone,
-        ...(selectedTopic === 'bored' ? { min_events: 6 } : {})
       };
+      const planResponse = await fetch('/api/plans/simple', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(planData),
+      });
+      if (!planResponse.ok) {
+        throw new Error('Failed to create plan');
+      }
+      const planResult = await planResponse.json();
+      const planId = planResult.plan_id || planResult.planId || planResult.id;
 
+      // Step 2: Get coordinates from ZIP code for event fetching
+      let lat = 34.0522, lng = -118.2437; // Default to LA
       try {
-        // Validate the plan data
-        const validatedPlan = validatePlanCreate(newPlan);
-        
-        // Create the plan
-        const response = await fetch('/api/createPlan', {
+        const geoResponse = await fetch(`/api/geocode?zipcode=${zipcode}`);
+        if (geoResponse.ok) {
+          const geoData = await geoResponse.json();
+          lat = geoData.lat;
+          lng = geoData.lng;
+        }
+      } catch (geoError) {
+        console.warn('Failed to geocode, using default location');
+      }
+
+      // Step 3: Fetch events for the location and category
+      const eventsResponse = await fetch(`/api/events?lat=${lat}&lng=${lng}&category=${catId}&limit=20`);
+      if (!eventsResponse.ok) {
+        throw new Error('Failed to fetch events');
+      }
+      const events = await eventsResponse.json();
+
+      // Step 4: Create events for the plan
+      if (events && events.length > 0) {
+        const createEventsResponse = await fetch('/api/createEvents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(validatedPlan)
+          body: JSON.stringify({ planId, events }),
         });
-
-        if (!response.ok) {
-          throw new Error(`Failed to create plan: ${response.status}`);
+        if (!createEventsResponse.ok) {
+          console.warn('Failed to create events, proceeding anyway');
         }
+      }
 
-        const result = await response.json();
-        const planId = result.plan_id;
-          // Save creator info for voting page
-          sessionStorage.setItem('creator_name', 'Host');
-          sessionStorage.setItem('creator_phone', formattedPhone);
-          
-          // Set voter ID for the voting system
-          const voterId = `host_${planId}`;
-          localStorage.setItem('voterId', voterId);
-          sessionStorage.setItem('voterId', voterId);
-          
-          // Also save creator info in the format expected by voting page
-          localStorage.setItem(`creator_${planId}`, JSON.stringify({
-            name: 'Host',
-            phone: formattedPhone,
-            timestamp: Date.now()
-          }));
-          
-          // Save voter info that voting page expects
-          localStorage.setItem('voterInfo', JSON.stringify({
-            name: 'Host',
-            phone: formattedPhone,
-            timestamp: Date.now(),
-            isCreator: true,
-            userId: voterId
-          }));
-
-          // Fetch real events for the selected topic and zipcode
-          try {
-            const geocodeRes = await fetch(`/api/geocode?zipcode=${zipcode.trim()}`);
-            if (!geocodeRes.ok) throw new Error('Failed to geocode zipcode');
-            const geocodeData = await geocodeRes.json();
-            const { lat, lng } = geocodeData;
-            
-            // Fetch real events from API with filtering
-            const eventsRes = await fetch(`/api/events?lat=${lat}&lng=${lng}&category=${selectedTopic}&radius=5000&limit=20`);
-            if (!eventsRes.ok) throw new Error('Failed to fetch events');
-            const eventsData = await eventsRes.json();
-            const events = Array.isArray(eventsData) ? eventsData : (eventsData.events || eventsData.results || []);
-            
-            if (!events || events.length === 0) {
-              alert('No events found for your topic and location. Please try a different topic or zipcode.');
-              return;
-            }
-            
-            // Attach events to the plan
-            const createEventsRes = await fetch('/api/createEvents', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ planId, events })
-            });
-            
-            if (!createEventsRes.ok) {
-              const errorText = await createEventsRes.text();
-              console.error('Failed to attach events:', errorText);
-              alert('Failed to attach events to your plan. Please try again.');
-              return;
-            }
-          } catch (err) {
-            console.error('Error in event fetching/attachment:', err);
-            alert('Error fetching or attaching events. Please try again.');
-            return;
-          }
-
-          router.push(`/vote/${planId}?creator=true`);
-        } catch (validationError) {
-          if (validationError instanceof ValidationError) {
-            setVerificationError(validationError.message);
-          } else {
-            setVerificationError('Validation failed. Please try again.');
-          }
-        }
+      // Step 5: Redirect to voting page
+      router.push(`/vote/${planId}?creator=true`);
     } catch (error) {
-      console.error('🎯 Error creating plan:', error);
+      console.error('Error creating plan:', error);
       alert('Error creating plan. Please try again.');
     }
   };
+
+  // Step 3: Only select, do not auto-advance
+  const handleCategorySelect = (catId: string) => {
+    setSelectedCategory(catId);
+  };
+
+  const handleChooseForMe = () => {
+    const available = CATEGORIES.map(c => c.id).filter(id => id !== selectedCategory);
+    const random = available[Math.floor(Math.random() * available.length)];
+    setSelectedCategory(random);
+  };
+
+  // Add keyboard shortcut for continue on Step 3
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (step === 3 && (e.key === 'Enter' || e.key === ' ')) {
+        if (selectedCategory) handleCreatePlan(selectedCategory);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [step, selectedCategory]);
 
   if (!isClient) return null;
 
@@ -409,244 +254,244 @@ export default function Onboarding() {
         <title>Choosy Onboarding</title>
         <meta name="description" content="Get started with Choosy" />
       </Head>
-      <div className="min-h-screen bg-gradient-to-br from-violet-100 via-blue-100 to-cyan-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex flex-col items-center justify-center">
-        {/* App name and pitch - only show on first step */}
-        {step === 1 && (
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">Choosy</h1>
-            <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg max-w-xl mx-auto">
-              Plan less. Live more.<br />
-              From solo hangs to group outings, just swipe to decide.
-            </p>
+      {/* Full-page glass/gradient background, dark mode ready */}
+      <BackgroundGradient />
+      {/* Sticky header with navy/transparent blend */}
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-gradient-to-b from-black/20 to-transparent backdrop-blur-sm">
+        <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
+          <div className="font-semibold text-white/90 text-lg">Choosy</div>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="px-2 py-1 rounded-full bg-black/10 text-white/80">Step {step} of 3</span>
+            <span className="text-white/60 hidden sm:inline">{step === 3 ? 'Pick a vibe' : step === 2 ? 'Verify phone' : 'Start'}</span>
           </div>
-        )}
-        
+        </div>
+      </header>
+      <main className="relative z-10 flex flex-col min-h-[calc(100vh-56px)] mx-auto max-w-5xl px-4 pt-8 pb-32">
         {/* Step 1: ZIP and Phone */}
         {step === 1 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md mx-auto p-8 bg-white/80 dark:bg-slate-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-600/20"
-          >
-            <form onSubmit={sessionId ? handleVerifyCode : handleSendCode}>
-              <div className="flex flex-col gap-4">
-                <input
-                  type="text"
-                  value={zipcode}
-                  onChange={e => setZipcode(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
-                  placeholder="ZIP code"
-                  className="px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                  required
-                />
-                <div className="w-full max-w-md">
-                  <PhoneInput
-                    country={'us'}
-                    value={phone}
-                    onChange={setPhone}
-                    enableAreaCodes={true}
-                    autoFormat={true}
-                    inputProps={{
-                      name: 'phone',
-                      required: true,
-                      autoFocus: false,
-                      placeholder: 'Enter phone number'
-                    }}
-                    containerStyle={{ width: '100%' }}
-                    inputStyle={{
-                      width: '100%',
-                      height: '48px',
-                      fontSize: '16px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '12px',
-                      paddingLeft: '48px',
-                      backgroundColor: '#ffffff',
-                      color: '#111827'
-                    }}
-                    buttonStyle={{
-                      border: '1px solid #d1d5db',
-                      borderRadius: '12px 0 0 12px',
-                      backgroundColor: '#f9fafb'
-                    }}
-                    disabled={isVerified}
-                  />
-                  {phoneError && <div className="text-red-500 text-sm mt-1">{phoneError}</div>}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleGeolocate}
-                  className="text-purple-600 dark:text-purple-400 hover:underline text-sm self-end"
-                >
-                  📍 Use my location
-                </button>
-                {!sessionId && (
-                  <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg mt-4">
-                    Send Code
-                  </button>
-                )}
-                {sessionId && !isVerified && (
-                  <>
+          <div className="flex flex-1 items-center justify-center">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto">
+              <Card className="p-6 sm:p-8 bg-[#181f3a]/90 dark:bg-[#181f3a]/90 rounded-2xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.5)]">
+                <form onSubmit={sessionId ? handleVerifyCode : handleSendCode} className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-white/90 mb-1">ZIP code</label>
                     <input
                       type="text"
-                      placeholder="Enter code (123456)"
-                      value={verificationCode}
-                      onChange={e => setVerificationCode(e.target.value)}
-                      className="w-full px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white mt-4"
+                      value={zipcode}
+                      onChange={e => setZipcode(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
+                      placeholder="ZIP code"
+                      className="w-full px-4 py-3 rounded-xl bg-white/90 dark:bg-slate-700 border border-white/20 dark:border-white/10 text-neutral-900 dark:text-white"
                       required
-                      maxLength={6}
                     />
-                    <button
-                      type="submit"
-                      disabled={!verificationCode.trim()}
-                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg mt-2"
-                    >
-                      Verify
+                    <p className="text-xs text-white/70 mt-1">We use this only to find nearby options.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-white/90 mb-1">Your phone (optional)</label>
+                    <PhoneInput
+                      country={'us'}
+                      value={phone}
+                      onChange={setPhone}
+                      enableAreaCodes={true}
+                      autoFormat={true}
+                      inputProps={{
+                        name: 'phone',
+                        required: false,
+                        autoFocus: false,
+                        placeholder: 'Enter phone number'
+                      }}
+                      containerStyle={{ width: '100%' }}
+                      inputStyle={{
+                        width: '100%',
+                        height: '48px',
+                        fontSize: '16px',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px',
+                        paddingLeft: '48px',
+                        backgroundColor: '#fff',
+                        color: '#111827'
+                      }}
+                      buttonStyle={{
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px 0 0 12px',
+                        backgroundColor: '#f9fafb'
+                      }}
+                      disabled={isVerified}
+                    />
+                    <p className="text-xs text-white/70 mt-1">Add a phone to get a link by SMS. You can skip it.</p>
+                    {phoneError && (
+                      <div role="alert" aria-live="polite" className="text-red-400 text-sm mt-1">{phoneError}</div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <button type="button" onClick={handleGeolocate} className="text-purple-200 hover:text-purple-100 text-sm">
+                      📍 Use my location <span className="text-white/50">(we only store a ZIP)</span>
                     </button>
-                  </>
-                )}
-                {verificationError && <div className="text-red-500 text-sm mt-2">{verificationError}</div>}
-                {isVerified && <div className="text-green-600 text-sm mt-2">Phone verified!</div>}
-              </div>
-            </form>
-          </motion.div>
-        )}
-
-        {/* Step 2: SMS Verification */}
-        {step === 2 && showVerification && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md mx-auto p-8 bg-white/80 dark:bg-slate-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-600/20"
-          >
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Verify Your Phone</h2>
-              <p className="text-gray-600 dark:text-gray-300">We sent a code to {formatPhoneForDisplay(phone)}</p>
-            </div>
-            <form onSubmit={handleVerifyCode} className="space-y-6">
-              <input
-                type="text"
-                value={verificationCode}
-                onChange={e => setVerificationCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-                placeholder="Enter 6-digit code"
-                className="w-full px-4 py-3 text-lg border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white text-center tracking-widest"
-                required
-                maxLength={6}
-              />
-              <button
-                type="submit"
-                disabled={!verificationCode.trim()}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
-                Verify
-              </button>
-            </form>
-            <div className="mt-4 text-center text-sm text-gray-500">
-              <p>💡 Demo mode: Enter any 6-digit code</p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Step 3: Topic Selection */}
-        {step === 3 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-2xl mx-auto p-8 bg-white/80 dark:bg-slate-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-600/20"
-          >
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">What sounds fun?</h2>
-              <p className="text-gray-600 dark:text-gray-300">Choose a category to start discovering events</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-              {TOPICS.map((topic) => (
-                <button
-                  key={topic.id}
-                  onClick={() => handleTopicSelect(topic.id)}
-                  className="p-4 rounded-xl border-2 border-gray-200 dark:border-slate-600 hover:border-purple-500 dark:hover:border-purple-400 transition-all duration-300 hover:scale-105 bg-white/50 dark:bg-slate-700/50"
-                >
-                  <div className="text-3xl mb-2">{topic.icon}</div>
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">{topic.name}</div>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={handleChooseForMe}
-              className="w-full p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 hover:border-purple-500 dark:hover:border-purple-400 transition-all duration-300 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400"
-            >
-              🎲 Choose For Me
-            </button>
-            <button
-              onClick={() => setShowTopicSuggestion(true)}
-              className="w-full p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 hover:border-purple-500 dark:hover:border-purple-400 transition-all duration-300 text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400"
-            >
-              💡 Suggest a topic
-            </button>
-          </motion.div>
-        )}
-
-        {/* Topic Suggestion Modal */}
-        {showTopicSuggestion && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="w-full max-w-md mx-4 p-6 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl"
-            >
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Suggest a Topic</h3>
-              <form onSubmit={handleTopicSuggestion} className="space-y-4">
-                <input
-                  type="text"
-                  value={suggestedTopic}
-                  onChange={e => setSuggestedTopic(e.target.value)}
-                  placeholder="Enter your topic idea..."
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                  required
-                />
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowTopicSuggestion(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700"
-                  >
-                    Submit
-                  </button>
-                </div>
-              </form>
+                    {!sessionId ? (
+                      <button type="submit" className="btn-primary">Send Code</button>
+                    ) : !isVerified ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="6-digit code"
+                          value={verificationCode}
+                          onChange={e => setVerificationCode(e.target.value)}
+                          className="code-input"
+                          maxLength={6}
+                        />
+                        <button type="submit" className="btn-primary">Verify</button>
+                      </div>
+                    ) : (
+                      <span className="text-green-300 text-sm">Verified ✓</span>
+                    )}
+                  </div>
+                  {verificationError && (
+                    <div role="alert" aria-live="polite" className="text-red-400 text-sm mt-2">{verificationError}</div>
+                  )}
+                  {isVerified && <div className="text-green-600 text-sm mt-2">Phone verified!</div>}
+                  <div className="pt-2">
+                    <button type="button" onClick={() => setStep(3)} className="w-full px-4 py-3 rounded-xl bg-white/10 text-white hover:bg-white/15">
+                      Skip for now
+                    </button>
+                  </div>
+                </form>
+              </Card>
             </motion.div>
           </div>
         )}
-
-        {/* Step 4: Create Plan and Redirect */}
-        {step === 4 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md mx-auto p-8 bg-white/80 dark:bg-slate-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-600/20"
-          >
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Ready to Start!</h2>
-              <p className="text-gray-600 dark:text-gray-300">
-                You selected: <span className="font-semibold">{TOPICS.find(t => t.id === selectedTopic)?.name}</span>
-              </p>
-            </div>
-            <button
-              onClick={handleCreatePlan}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-            >
-              🎮 Start Swiping!
-            </button>
-          </motion.div>
+        {/* Step 2: SMS Verification */}
+        {step === 2 && showVerification && (
+          <div className="flex flex-1 items-center justify-center">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-neutral-50 mb-2">Verify Your Phone</h2>
+                <p className="text-white/80">We sent a code to {formatPhoneForDisplay(phone)}</p>
+              </div>
+              <form onSubmit={handleVerifyCode} className="space-y-6">
+                <input
+                  type="text"
+                  value={verificationCode}
+                  onChange={e => setVerificationCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                  placeholder="Enter 6-digit code"
+                  className="code-input w-full"
+                  required
+                  maxLength={6}
+                />
+                <button
+                  type="submit"
+                  disabled={!verificationCode.trim()}
+                  className="btn-primary w-full"
+                >
+                  Verify
+                </button>
+              </form>
+              <div className="mt-4 text-center text-sm text-white/60">
+                <p>💡 Demo mode: Enter any 6-digit code</p>
+              </div>
+              {verificationError && (
+                <div role="alert" aria-live="polite" className="text-red-400 text-sm mt-2">{verificationError}</div>
+              )}
+            </motion.div>
+          </div>
         )}
-      </div>
+        {/* Step 3: Category Selection (modern grid) */}
+        {step === 3 && (
+          <div className="flex flex-1 flex-col items-center justify-start w-full py-4">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-4xl mx-auto">
+              {/* Hero */}
+              <div className="text-center mb-8 sm:mb-10">
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-50 drop-shadow-[0_1px_0_rgba(0,0,0,0.3)]">What sounds fun?</h1>
+                <p className="mt-2 text-base sm:text-lg text-white/80">Pick a vibe. We’ll handle the options.</p>
+              </div>
+              {/* Quick controls */}
+              <div className="flex items-center justify-center gap-2 mb-6">
+                <button
+                  className="px-3 py-1.5 rounded-full bg-white/85 dark:bg-white/10 text-sm text-neutral-800 dark:text-neutral-200 border border-white/20 dark:border-white/10 hover:scale-[1.02] transition"
+                  onClick={handleGeolocate}
+                >
+                  📍 {zipcode ? `${zipcode} • change` : 'Use current location'}
+                </button>
+                <button
+                  className="px-3 py-1.5 rounded-full bg-white/85 dark:bg-white/10 text-sm text-neutral-800 dark:text-neutral-200 border border-white/20 dark:border-white/10 hover:scale-[1.02] transition"
+                  onClick={() => handleChooseForMe()}
+                  title="Surprise me"
+                >
+                  🎲 Surprise me
+                </button>
+              </div>
+              {/* Category grid (accessible radio group) */}
+              <section
+                role="radiogroup"
+                aria-label="Categories"
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 w-full"
+              >
+                {CATEGORIES.map((cat) => (
+                  <label
+                    key={cat.id}
+                    className={`group relative isolate rounded-2xl p-4 sm:p-5 cursor-pointer bg-white/85 dark:bg-neutral-900/80 border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.5)] hover:scale-[1.02] transition will-change-transform ${selectedCategory===cat.id ? 'ring-4 ring-purple-400/50 border-purple-400' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="category"
+                      value={cat.id}
+                      checked={selectedCategory===cat.id}
+                      onChange={() => setSelectedCategory(cat.id)}
+                      className="sr-only"
+                    />
+                    <div className="relative z-10 flex items-center gap-3">
+                      <div className="text-2xl sm:text-3xl">{cat.emoji}</div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-neutral-900 dark:text-neutral-100 leading-snug">{cat.label}</div>
+                        <div className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Tap to choose</div>
+                      </div>
+                      <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${selectedCategory===cat.id ? 'border-transparent bg-gradient-to-br from-purple-500 to-blue-500 text-white' : 'border-white/30 text-transparent'}`}>✓</div>
+                    </div>
+                  </label>
+                ))}
+              </section>
+            </motion.div>
+          </div>
+        )}
+      </main>
+      {/* Sticky bottom bar CTA */}
+      {step === 3 && (
+        <div className="fixed bottom-0 inset-x-0 z-30 bg-gradient-to-t from-black/20 via-black/10 to-transparent">
+          <div className="mx-auto max-w-5xl px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+            <div className="rounded-2xl bg-black/40 backdrop-blur-md border border-white/20 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.6)] p-3 sm:p-4 flex gap-3">
+              <button
+                onClick={() => setStep(1)}
+                className="flex-1 sm:flex-none px-4 py-3 rounded-xl bg-white/10 text-white hover:bg-white/15 border border-white/10 transition-all"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => selectedCategory && handleCreatePlan(selectedCategory)}
+                disabled={!selectedCategory}
+                className={`px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold shadow-lg transition-all flex-1 sm:flex-none ${!selectedCategory ? 'opacity-60 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
-} 
+}
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  swcMinify: true,
+}
 
 export async function getServerSideProps() {
   return { props: {} };
-} 
+}
+
+// Tailwind utilities for .btn-primary and .code-input (add to your global CSS or Tailwind config)
+// .btn-primary {
+//   @apply bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold px-5 py-3 rounded-xl shadow-lg transition;
+// }
+// .code-input {
+//   @apply w-28 text-center tracking-[0.3em] rounded-xl bg-white/90 dark:bg-slate-700 border border-white/20 dark:border-white/10;
+// }

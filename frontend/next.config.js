@@ -1,7 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
+  swcMinify: false,
+  experimental: {
+    forceSwcTransforms: false,
+  },
+  
+  // API Proxy to backend
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://127.0.0.1:8000/api/:path*',
+      },
+    ]
+  },
   
   // Security headers
   async headers() {
