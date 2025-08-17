@@ -365,4 +365,18 @@ CREATE POLICY "Users can update own data" ON users
 - **Sharding**: Horizontal scaling
 - **Read Replicas**: Load distribution
 - **Caching Layer**: Redis integration
-- **CDN**: Static asset delivery 
+- **CDN**: Static asset delivery
+
+# Database
+
+SQL migrations, schemas, and queries for Choosy.
+
+- `migrations/`: SQL migration scripts.
+- `schemas/`: Database schema definitions.
+- `queries/`: Common SQL queries.
+- `test/`: Test data/scripts.
+
+## Usage
+
+- Run migrations as needed for DB updates.
+- See `fix_missing_tables.sql` for repair scripts.

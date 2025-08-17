@@ -16,9 +16,15 @@ coverage/
 .DS_Store
 *.swp
 
-# Env/Secrets
+# Env/Secrets - CRITICAL: Never commit these!
 .env
 .env.*
+main.env
+backend/main.env
+frontend/.env.local
+*.env.local
+*.env.production
+*.env.staging
 
 # Deployment/Build Artifacts
 .vercel/
