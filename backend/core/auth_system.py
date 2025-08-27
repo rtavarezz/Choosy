@@ -1,6 +1,12 @@
 """
-Authentication and Authorization System for Choosy
-Handles user authentication, JWT tokens, and authorization checks
+Choosy Authentication System
+Copyright (c) 2024 rtavarezz
+
+Advanced authentication and authorization system.
+Licensed under MIT License - see LICENSE file.
+
+This proprietary system handles secure user authentication,
+JWT token management, and fine-grained access controls.
 """
 
 import os

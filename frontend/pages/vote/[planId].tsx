@@ -1,10 +1,21 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+/**
+ * Choosy Voting Interface
+ * Copyright (c) 2024 rtavarezz
+ * 
+ * Real-time group voting interface with swipe mechanics.
+ * Licensed under MIT License - see LICENSE file.
+ * 
+ * This proprietary interface handles group voting dynamics,
+ * real-time synchronization, and user experience optimization.
+ */
+
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { validateVoteCreate, ValidationError, type EventResponse } from '../../lib/validation';
 import { BackgroundGradient } from '@/components/BackgroundGradient';
 import Head from 'next/head';
-import SwipeCard from '@/components/SwipeCard'; // Import SwipeCard component
+import CarouselVoting from '@/components/CarouselVoting';
 
 // Type for a voting card (matches backend event response exactly)
 interface EventCard {
@@ -44,15 +55,12 @@ const VotePage: React.FC = () => {
   // Get voter info from localStorage/session (do not prompt for login)
   const [voterId, setVoterId] = useState<string>('');
   const [deck, setDeck] = useState<EventCard[]>([]);
-  const [leavingId, setLeavingId] = useState<string | null>(null);
-  const [voteDirection, setVoteDirection] = useState<'like' | 'dislike' | null>(null);
-  const isAnimating = useRef(false);
+  const [votedEventIds, setVotedEventIds] = useState<Set<string>>(new Set());
   
   // Voting status and progress
   const [activeVoters, setActiveVoters] = useState<any[]>([]);
   const [completedVoters, setCompletedVoters] = useState(0);
   const [expectedVoters, setExpectedVoters] = useState(1);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [totalEvents, setTotalEvents] = useState(0);
 
   // Set voter ID from storage when component loads
@@ -175,7 +183,7 @@ const VotePage: React.FC = () => {
     return () => clearInterval(interval);
   }, [planId]);
 
-  const onVote = async (eventId: string, direction: 'like' | 'dislike') => {
+  const handleVote = async (eventId: string, direction: 'like' | 'dislike') => {
     // Get voter ID directly from storage as fallback if state isn't ready yet
     let currentVoterId = voterId;
     if (!currentVoterId || currentVoterId === '') {
@@ -207,9 +215,12 @@ const VotePage: React.FC = () => {
       
       if (res.ok) {
         const result = await res.json();
-        // Card removal is handled by Framer Motion animation
-        setDeck(prev => prev.filter(card => card.id !== eventId));
-        setCurrentIndex(prev => prev - 1);
+        // Track voted events instead of removing from deck
+        setVotedEventIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(eventId);
+          return newSet;
+        });
       } else {
         console.error('Failed to submit vote:', res.status, res.statusText);
       }
@@ -222,21 +233,10 @@ const VotePage: React.FC = () => {
     }
   };
 
-  // Check if this is solo voting (group size 'myself' or single active voter)
-  const isSoloVoting = expectedVoters === 1 || activeVoters.length <= 1;
 
-  const removeTopCard = useCallback((id: string) => {
-    setDeck(prevDeck => {
-      const newDeck = prevDeck.filter(card => card.id !== id);
-      return newDeck;
-    });
-    setCurrentIndex(prev => prev + 1);
-    setLeavingId(null);
-    setVoteDirection(null);
-    isAnimating.current = false;
-  }, []);
 
-  if (deck.length === 0) {
+  // Check if all events are voted on instead of deck length
+  if (deck.length > 0 && votedEventIds.size >= deck.length) {
     return (
       <>
         <Head>
@@ -286,35 +286,6 @@ const VotePage: React.FC = () => {
       </Head>
       <BackgroundGradient />
       <div className="min-h-screen w-full flex flex-col">
-        {/* Header - Progress and Status */}
-        {deck.length > 0 && (
-          <div className="bg-white/75 dark:bg-neutral-900/80 backdrop-blur-md rounded-2xl p-4 shadow-lg mx-auto mt-6 mb-4 border border-white/40 dark:border-white/10 max-w-2xl w-full">
-            <div className="flex items-center justify-between">
-              {/* Left: Progress */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🎯</span>
-                  <span className="text-sm font-semibold text-neutral-900 dark:text-white">
-                    {currentIndex + 1} of {totalEvents} events
-                  </span>
-                </div>
-                <div className="text-sm text-neutral-700 dark:text-neutral-200">
-                  Voting for activities 🎲
-                </div>
-              </div>
-              {/* Right: Actions */}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => router.push(`/results/${planId}`)}
-                  className="px-3 py-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full hover:from-purple-700 hover:to-blue-700 transition-all duration-300 text-xs font-medium"
-                >
-                  <span>📊</span>
-                  <span>Results</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
         {/* Active Voters Display */}
         {activeVoters.length > 0 && (
           <div className="mx-auto mb-4 max-w-2xl w-full">
@@ -353,76 +324,16 @@ const VotePage: React.FC = () => {
             </div>
           </div>
         )}
-        {/* Main Card Display Area */}
-        <div className="relative w-full max-w-md h-auto mx-auto">
-          <AnimatePresence mode="wait">
-            {deck.length > 0 ? (
-              <SwipeCard
-                key={deck[deck.length - 1].id}
-                card={deck[deck.length - 1]}
-                isTop={true}
-                leavingId={leavingId}
-                voteDirection={voteDirection}
-                onVote={onVote}
-                onRemove={removeTopCard}
-                setLeavingId={setLeavingId}
-                setVoteDirection={setVoteDirection}
-                isAnimating={isAnimating}
-              />
-            ) : (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="w-full h-[500px] flex flex-col items-center justify-center bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-3xl shadow-2xl border border-white/40 dark:border-white/10"
-              >
-                <span className="text-4xl mb-4">🎉</span>
-                <span className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">All done!</span>
-                <span className="text-lg text-neutral-700 dark:text-neutral-200">You've voted on all events.</span>
-                <button
-                  onClick={() => router.push(`/results/${planId}`)}
-                  className="mt-6 btn-primary"
-                >
-                  View Results
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {/* Action Buttons - Fixed Position Below Cards */}
-          {deck.length > 0 && (
-            <div className="flex gap-8 justify-center mt-12 px-4">
-              <button
-                onClick={() => {
-                  if (isAnimating.current || deck.length === 0) return;
-                  isAnimating.current = true;
-                  setVoteDirection('dislike');
-                  setLeavingId(deck[deck.length - 1].id);
-                  onVote(deck[deck.length - 1].id, 'dislike');
-                  setTimeout(() => removeTopCard(deck[deck.length - 1].id), 100);
-                }}
-                className="w-16 h-16 bg-white dark:bg-neutral-900 border-2 border-red-400 text-red-500 rounded-full font-semibold hover:bg-red-50 dark:hover:bg-red-900 active:bg-red-100 dark:active:bg-red-800 transition-all duration-100 flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <button
-                onClick={() => {
-                  if (isAnimating.current || deck.length === 0) return;
-                  isAnimating.current = true;
-                  setVoteDirection('like');
-                  setLeavingId(deck[deck.length - 1].id);
-                  onVote(deck[deck.length - 1].id, 'like');
-                  setTimeout(() => removeTopCard(deck[deck.length - 1].id), 100);
-                }}
-                className="w-16 h-16 bg-white dark:bg-neutral-900 border-2 border-green-400 text-green-500 rounded-full font-semibold hover:bg-green-50 dark:hover:bg-green-900 active:bg-green-100 dark:active:bg-green-800 transition-all duration-100 flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                </svg>
-              </button>
-            </div>
-          )}
+        {/* Carousel Voting Area */}
+        <div className="relative w-full h-screen">
+          <CarouselVoting
+            key={`${planId}-${deck.slice(0, 3).map(e => e.id).join('-')}`}
+            events={deck}
+            onVote={handleVote}
+            onComplete={() => router.push(`/results/${planId}`)}
+            className="h-full"
+            initialVotedEventIds={votedEventIds}
+          />
         </div>
       </div>
     </>

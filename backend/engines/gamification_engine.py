@@ -1,6 +1,12 @@
 """
-Gamification Engine for Choosy
-Rewards users with points, levels, and achievements for engagement
+Choosy Gamification Engine
+Copyright (c) 2024 rtavarezz
+
+Advanced gamification system for user engagement and retention.
+Licensed under MIT License - see LICENSE file.
+
+This proprietary system provides intelligent reward mechanisms,
+achievement tracking, and user progression analytics.
 """
 
 import json

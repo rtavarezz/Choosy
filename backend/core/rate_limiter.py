@@ -13,9 +13,9 @@ class RateLimiter:
         self.requests = defaultdict(list)
         self.lock = threading.Lock()
         
-        # Rate limits
-        self.requests_per_minute = 100
-        self.requests_per_hour = 1000
+        # Rate limits - Increased for development
+        self.requests_per_minute = 1000  # Increased from 100 for development
+        self.requests_per_hour = 10000   # Increased from 1000 for development
         
     def is_allowed(self, client_id: str) -> Tuple[bool, Dict]:
         """Check if request is allowed based on rate limits"""

@@ -1,3 +1,14 @@
+/**
+ * Choosy SwipeCard Component
+ * Copyright (c) 2024 rtavarezz
+ * 
+ * Interactive swipe card component for group voting.
+ * Licensed under MIT License - see LICENSE file.
+ * 
+ * This proprietary component provides smooth swipe animations
+ * and gesture handling for the voting interface.
+ */
+
 import React from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 

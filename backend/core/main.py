@@ -1,3 +1,14 @@
+"""
+Choosy Core API Server
+Copyright (c) 2024 rtavarezz
+
+Main application server for group decision-making platform.
+Licensed under MIT License - see LICENSE file.
+
+This proprietary system handles event discovery, voting mechanics,
+and real-time group coordination for activity planning.
+"""
+
 from fastapi import FastAPI, HTTPException, Depends, status, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -24,7 +35,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from services.geocoding_service import geocoding_service
 from services.api_config import api_template_manager
-from core.cache_manager import cached
+from core.cache_manager import cached, cache_manager
 from core.db import engine
 from utils.validation import ValidationError
 from core.user_endpoints import router as user_router
@@ -46,21 +57,36 @@ active_voters = {}
 
 # Name validation function
 def validate_name(name: str) -> bool:
-    """Validate name for appropriateness and format"""
+    """
+    Validates user names to ensure they meet community standards and safety requirements.
+    
+    This function performs comprehensive validation including:
+    - Basic format checking (length, character types)
+    - Content filtering (profanity, system names, spam patterns)
+    - Security checks (prevent injection attacks, bot detection)
+    
+    Args:
+        name (str): The name to validate
+        
+    Returns:
+        bool: True if name passes all validation checks, False otherwise
+    """
+    # Basic null and type checking - prevent empty or invalid input
     if not name or not isinstance(name, str):
         return False
     
     trimmed_name = name.strip()
     
-    # Check length (2-30 characters)
+    # Enforce reasonable length limits to prevent database issues and ensure readability
     if len(trimmed_name) < 2 or len(trimmed_name) > 30:
         return False
     
-    # Check for only letters, spaces, hyphens, and apostrophes
+    # Allow only safe characters: letters, spaces, hyphens, and apostrophes
+    # This prevents SQL injection and XSS attacks through name fields
     if not re.match(r'^[a-zA-Z\s\-\']+$', trimmed_name):
         return False
     
-    # Check for system/test names
+    # Block common system and test account names to maintain platform integrity
     system_words = [
         'admin', 'moderator', 'system', 'test', 'fake', 'spam', 'bot', 'robot',
         'anonymous', 'anon', 'unknown', 'nobody', 'someone', 'anyone', 'everyone'
@@ -71,15 +97,15 @@ def validate_name(name: str) -> bool:
         if word in lower_name:
             return False
     
-    # Use profanity filter for comprehensive profanity detection
+    # Apply comprehensive profanity filtering to maintain community standards
     if profanity.contains_profanity(trimmed_name):
         return False
     
-    # Check for excessive repetition (like "aaaaaa")
+    # Detect spam patterns - excessive character repetition (like "aaaaaa")
     if re.search(r'(.)\1{4,}', trimmed_name):
         return False
     
-    # Check for excessive spaces
+    # Prevent double spaces which could indicate formatting manipulation
     if '  ' in trimmed_name:
         return False
     
@@ -789,44 +815,73 @@ def get_voting_status(plan_id: str):
             ).fetchone()
             total_voters = total_voters_result[0] if total_voters_result else 0
             
-            # Get active voters count from the active voters system
+            # Get active voters count from Redis cache
             active_voters_count = 0
             active_voter_ids = []
-            if plan_id in active_voters:
-                # Clean up inactive voters (more than 5 minutes since last activity)
-                current_time = datetime.now(timezone.utc)
-                active_voters_clean = {}
+            
+            try:
+                # Get active voters from Redis with TTL-based cleanup
+                redis_key = f"active_voters:{plan_id}"
+                active_voters_data = cache_manager.get(redis_key)
                 
-                for voter_id, voter_data in active_voters[plan_id].items():
-                    try:
-                        # Handle timezone-aware datetime parsing
-                        last_activity_str = voter_data['last_activity']
-                        if 'T' in last_activity_str and '+' in last_activity_str:
-                            # ISO format with timezone
-                            last_activity = datetime.fromisoformat(last_activity_str)
-                        else:
-                            # UTC format without timezone - treat as UTC
-                            last_activity = datetime.fromisoformat(last_activity_str).replace(tzinfo=timezone.utc)
-                        
-                        if (current_time - last_activity.replace(tzinfo=None)).total_seconds() < 300:  # 5 minutes
-                            active_voters_clean[voter_id] = voter_data
-                            active_voter_ids.append(voter_id)
-                        else:
-                            print(f"Removing inactive voter: {voter_id}")
-                    except Exception as e:
-                        print(f"Error parsing last_activity for voter {voter_id}: {e}")
-                        # Remove voter with invalid timestamp
-                        continue
-                
-                active_voters[plan_id] = active_voters_clean
-                active_voters_count = len(active_voters[plan_id])
+                if active_voters_data:
+                    current_time = datetime.now(timezone.utc)
+                    active_voters_clean = {}
+                    
+                    for voter_id, voter_data in active_voters_data.items():
+                        try:
+                            # Handle timezone-aware datetime parsing
+                            last_activity_str = voter_data['last_activity']
+                            if 'T' in last_activity_str and '+' in last_activity_str:
+                                # ISO format with timezone
+                                last_activity = datetime.fromisoformat(last_activity_str)
+                            else:
+                                # UTC format without timezone - treat as UTC
+                                last_activity = datetime.fromisoformat(last_activity_str).replace(tzinfo=timezone.utc)
+                            
+                            # Check if voter is still active (within 5 minutes)
+                            # Ensure both timestamps are timezone-aware for proper comparison
+                            if last_activity.tzinfo is None:
+                                last_activity = last_activity.replace(tzinfo=timezone.utc)
+                            if (current_time - last_activity).total_seconds() < 300:
+                                active_voters_clean[voter_id] = voter_data
+                                active_voter_ids.append(voter_id)
+                            else:
+                                print(f"Removing inactive voter: {voter_id}")
+                        except Exception as e:
+                            print(f"Error parsing last_activity for voter {voter_id}: {e}")
+                            continue
+                    
+                    # Filter out voters who have already completed all events
+                    completed_voter_ids = [row[0] for row in completed_voters_result]
+                    active_voters_filtered = {}
+                    for voter_id, voter_data in active_voters_clean.items():
+                        if voter_id not in completed_voter_ids:
+                            active_voters_filtered[voter_id] = voter_data
+                            if voter_id not in active_voter_ids:
+                                active_voter_ids.append(voter_id)
+                    
+                    # Update Redis with cleaned data
+                    if active_voters_filtered:
+                        cache_manager.set(redis_key, active_voters_filtered, ttl=600)  # 10 minute TTL
+                    else:
+                        cache_manager.delete(redis_key)
+                    
+                    active_voters_count = len(active_voters_filtered)
+                else:
+                    active_voters_count = 0
+                    
+            except Exception as e:
+                print(f"Redis error in voting status: {e}")
+                # Fallback to in-memory if Redis fails
+                if plan_id in active_voters:
+                    active_voters_count = len(active_voters[plan_id])
+                    active_voter_ids = list(active_voters[plan_id].keys())
             
             # Get completed voter IDs
             completed_voter_ids = [row[0] for row in completed_voters_result]
 
-            # Get active voter IDs
-            active_voter_ids = list(active_voters[plan_id].keys()) if plan_id in active_voters else []
-            active_voters_count = len(active_voter_ids)
+            # active_voter_ids and active_voters_count are already set above from Redis
 
             # Group size is always the number of unique voters (active or completed)
             unique_voter_ids = set(active_voter_ids + completed_voter_ids)
@@ -1035,6 +1090,33 @@ def create_vote(vote: VoteCreate):
                         }
                     )
                     print(f"✅ Vote saved for voter_id={vote.voter_id}")
+                
+                # Register voter as active in Redis
+                try:
+                    redis_key = f"active_voters:{vote.plan_id}"
+                    active_voters_data = cache_manager.get(redis_key) or {}
+                    
+                    # Add or update voter activity
+                    active_voters_data[vote.voter_id] = {
+                        'voter_id': vote.voter_id,
+                        'last_activity': datetime.now(timezone.utc).isoformat(),
+                        'current_session_votes': active_voters_data.get(vote.voter_id, {}).get('current_session_votes', 0) + 1
+                    }
+                    
+                    # Save to Redis with TTL
+                    cache_manager.set(redis_key, active_voters_data, ttl=600)  # 10 minute TTL
+                    print(f"✅ Registered voter {vote.voter_id} as active in Redis")
+                except Exception as redis_error:
+                    print(f"⚠️ Redis error registering active voter: {redis_error}")
+                    # Fallback to in-memory storage
+                    if vote.plan_id not in active_voters:
+                        active_voters[vote.plan_id] = {}
+                    active_voters[vote.plan_id][vote.voter_id] = {
+                        'voter_id': vote.voter_id,
+                        'last_activity': datetime.now(timezone.utc).isoformat(),
+                        'current_session_votes': 1
+                    }
+                
                 # Update voter participation with audit timestamps
                 conn.execute(
                     text("""
@@ -1055,6 +1137,45 @@ def create_vote(vote: VoteCreate):
             return {"success": True, "message": "Vote recorded with audit trail"}
     except Exception as e:
         print(f"❌ Error creating vote: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/plans/{plan_id}/votes/{voter_id}")
+def get_voter_votes(plan_id: str, voter_id: str):
+    """Get all votes for a specific voter in a plan"""
+    try:
+        with engine.connect() as conn:
+            votes_result = conn.execute(
+                text("""
+                    SELECT event_id, vote_type, created_at, updated_at
+                    FROM votes 
+                    WHERE plan_id = :plan_id AND voter_id = :voter_id
+                    ORDER BY created_at
+                """),
+                {
+                    "plan_id": plan_id,
+                    "voter_id": voter_id
+                }
+            )
+            
+            votes = []
+            for row in votes_result:
+                votes.append({
+                    "event_id": row[0],
+                    "vote_type": row[1],
+                    "created_at": row[2].isoformat() if row[2] else None,
+                    "updated_at": row[3].isoformat() if row[3] else None
+                })
+            
+            return {
+                "plan_id": plan_id,
+                "voter_id": voter_id,
+                "votes": votes,
+                "total_votes": len(votes)
+            }
+            
+    except Exception as e:
+        print(f"❌ Error fetching votes: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

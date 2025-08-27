@@ -1,7 +1,12 @@
 """
-Global Event Discovery APIs for Choosy
-Comprehensive event discovery system using industry-standard APIs
-NO MOCK DATA - Only real events from global APIs
+Choosy Global Event Discovery System
+Copyright (c) 2024 rtavarezz
+
+Comprehensive real-time event discovery using multiple API sources.
+Licensed under MIT License - see LICENSE file.
+
+This proprietary system aggregates events from multiple global APIs
+with intelligent deduplication and ranking algorithms.
 """
 
 import os

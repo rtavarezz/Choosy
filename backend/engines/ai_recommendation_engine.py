@@ -1,6 +1,12 @@
 """
-Event Recommendation Engine
-Suggests events to users based on their preferences and past interactions
+Choosy AI Recommendation Engine
+Copyright (c) 2024 rtavarezz
+
+Advanced recommendation engine for personalized event discovery.
+Licensed under MIT License - see LICENSE file.
+
+This proprietary algorithm provides intelligent event recommendations
+based on user behavior, preferences, and group dynamics.
 """
 
 import json
