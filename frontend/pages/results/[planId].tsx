@@ -10,7 +10,7 @@ import 'react-phone-input-2/lib/style.css';
 import ProfanityFilter from 'profanity-filter';
 import { ReservationDialog } from '@/components/ReservationDialog';
 import { BackgroundGradient } from '@/components/BackgroundGradient';
-import { Star, MapPin, Phone, Trophy, Medal, Timer, Share2, Plus } from 'lucide-react';
+import { Star, MapPin, Phone, Trophy, Medal, Timer, Share2, Plus, Ticket, Map as MapIcon, ExternalLink } from 'lucide-react';
 
 type EventRow = {
   id: string;
@@ -21,6 +21,10 @@ type EventRow = {
   hours?: string;
   contact?: { phone?: string };
   needs_reservation?: boolean;
+  tickets_required?: boolean;
+  external_url?: string;
+  seatmap_url?: string;
+  source_type?: string;
 };
 
 interface VotingStatus {
@@ -68,21 +72,58 @@ function useResults(planId: string) {
       const response = await fetch(`/api/plans/${planId}/results`);
       if (!response.ok) throw new Error('Failed to fetch results');
       const data = await response.json();
-      
+
+      // Determine winning event with tie-breaking and optional preselected winner
+      const eventsArr: any[] = Array.isArray(data.events) ? data.events : [];
+      let selectedWinner: any | undefined;
+      try {
+        if (typeof window !== 'undefined') {
+          const pre = sessionStorage.getItem(`choosy:selectedWinner:${planId}`);
+          if (pre) {
+            selectedWinner = eventsArr.find(e => e.id === pre);
+          }
+        }
+      } catch { /* ignore */ }
+      if (!selectedWinner && eventsArr.length > 0) {
+        const maxVotes = Math.max(...eventsArr.map(e => e.votes || 0));
+        const top = eventsArr.filter(e => (e.votes || 0) === maxVotes);
+        selectedWinner = top[Math.floor(Math.random() * top.length)] || eventsArr[0];
+      }
+
+      // Build enriched events list with ticketing and venue details
+      const events = (data.events || []).map((event: any) => {
+        const meta = event.metadata || {};
+        let hours: string | undefined;
+        if (Array.isArray(meta.opening_hours)) {
+          hours = meta.opening_hours.join(' • ');
+        } else if (typeof meta.opening_hours === 'string') {
+          hours = meta.opening_hours;
+        } else if (meta.hours) {
+          hours = meta.hours;
+        }
+        const phone = meta.phone || meta.display_phone || '';
+        return {
+          id: event.id,
+          name: event.name,
+          votes: event.votes,
+          percentage: event.percentage,
+          image_url: event.image_url,
+          hours,
+          contact: { phone },
+          tickets_required: !!event.tickets_required,
+          external_url: event.external_url || meta.purchase_url,
+          seatmap_url: meta.seatmap_url,
+          source_type: event.source_type
+        } as EventRow;
+      });
+
       return {
         planId,
         topic: data.plan.topic,
         groupSize: data.plan.group_size,
         zip: data.plan.zip_code,
-        winningEvent: data.events.length > 0 ? {
-          id: data.events[0].id,
-          name: data.events[0].name,
-          votes: data.events[0].votes,
-          image_url: data.events[0].image_url,
-          hours: "2 hours",
-          contact: { phone: '(555) 123-4567' },
-          needs_reservation: data.events[0].needs_reservation ?? true
-        } : undefined,
+        // If preselected winner exists, override with enriched event shape
+        winningEvent: selectedWinner ? events.find(e => e.id === selectedWinner.id) || events[0] : (events[0] || undefined),
         plan: {
           userName: data.plan.host_name,
           phoneNumber: data.plan.host_phone,
@@ -92,15 +133,7 @@ function useResults(planId: string) {
         },
         totalVotes: data.totalVotes,
         participants: data.participants,
-        allEvents: data.events.map((event: any) => ({
-          id: event.id,
-          name: event.name,
-          votes: event.votes,
-          percentage: event.percentage,
-          image_url: event.image_url,
-          hours: "2 hours",
-          contact: { phone: '(555) 123-4567' }
-        }))
+        allEvents: events
       };
     },
     refetchInterval: 3000,
@@ -163,6 +196,50 @@ export default function Results() {
     () => (results?.allEvents ?? []).slice().sort((a, b) => (b.votes || 0) - (a.votes || 0)),
     [results]
   );
+
+  const vendorLabel = (s?: string) => {
+    const key = (s || '').toLowerCase();
+    const map: Record<string, string> = {
+      ticketmaster: 'Ticketmaster',
+      eventbrite: 'Eventbrite',
+      google: 'Google Places',
+      yelp: 'Yelp',
+      local: 'Meetup/Local'
+    };
+    return map[key] || (s || '');
+  };
+
+  const WinningCTAs = () => {
+    const w = results?.winningEvent;
+    if (!w) return null;
+    const showTickets = w.tickets_required && !!w.external_url;
+    const showSeatmap = !!w.seatmap_url;
+    if (!showTickets && !showSeatmap) return null;
+    return (
+      <div className="mt-3 flex gap-3">
+        {showTickets && (
+          <a
+            href={w.external_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-semibold"
+          >
+            <Ticket className="w-4 h-4" /> Get Tickets
+          </a>
+        )}
+        {showSeatmap && (
+          <a
+            href={w.seatmap_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
+          >
+            <MapIcon className="w-4 h-4" /> Seat Map
+          </a>
+        )}
+      </div>
+    );
+  };
 
   const validateName = (name: string): boolean => {
     const trimmedName = name.trim();
@@ -517,6 +594,30 @@ export default function Results() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-col sm:flex-row gap-4">
+                      {winnerEvent.tickets_required && results?.winningEvent?.external_url && (
+                        <motion.a
+                          href={results.winningEvent.external_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="flex-1 inline-flex items-center justify-center gap-2 bg-yellow-600 text-white font-semibold py-4 px-6 rounded-xl hover:bg-yellow-700 hover:shadow-lg transition-all duration-300"
+                        >
+                          <Ticket className="w-5 h-5" /> Get Tickets
+                        </motion.a>
+                      )}
+                      {results?.winningEvent?.seatmap_url && (
+                        <motion.a
+                          href={results.winningEvent.seatmap_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all duration-300"
+                        >
+                          <MapIcon className="w-5 h-5" /> Seat Map
+                        </motion.a>
+                      )}
                       {winnerEvent.needs_reservation && (
                         <motion.button
                           onClick={handleReservation}
@@ -604,6 +705,11 @@ export default function Results() {
                         <div className="flex items-center gap-4 text-sm text-white/70">
                           <span>{event.votes} {event.votes === 1 ? 'vote' : 'votes'}</span>
                           <span>{event.percentage?.toFixed(0) || 0}%</span>
+                          {event.source_type && (
+                            <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white/80 text-xs">
+                              {vendorLabel(event.source_type)}
+                            </span>
+                          )}
                         </div>
                       </div>
 

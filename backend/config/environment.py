@@ -76,6 +76,18 @@ class EnvironmentConfig:
     @property
     def unsplash_secret_key(self) -> Optional[str]:
         return os.getenv('UNSPLASH_SECRET_KEY')
+
+    @property
+    def google_places_api_key(self) -> Optional[str]:
+        return os.getenv('GOOGLE_PLACES_API_KEY')
+
+    @property
+    def meetup_api_key(self) -> Optional[str]:
+        return os.getenv('MEETUP_API_KEY')
+
+    @property
+    def yelp_api_key(self) -> Optional[str]:
+        return os.getenv('YELP_API_KEY')
     
     @property
     def backend_url(self) -> str:
@@ -91,6 +103,9 @@ class EnvironmentConfig:
             'eventbrite': self.eventbrite_api_key,
             'ticketmaster': self.ticketmaster_api_key,
             'unsplash': self.unsplash_access_key,
+            'google_places': self.google_places_api_key,
+            'meetup': self.meetup_api_key,
+            'yelp': self.yelp_api_key,
         }
 
 # Global configuration instance

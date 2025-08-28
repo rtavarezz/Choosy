@@ -410,6 +410,8 @@ async def get_events(lat: float, lng: float, category: str = "adventure", radius
         # Convert GlobalEvent objects to dictionaries for JSON serialization
         event_dicts = []
         for event in events:
+            # Tickets flag: Eventbrite/Ticketmaster with external_url implies ticket purchase
+            tickets_required = True if (event.external_url and (event.source and event.source.value in ["eventbrite", "ticketmaster"])) else False
             event_dict = {
                 'id': event.id,
                 'name': event.name,
@@ -432,7 +434,8 @@ async def get_events(lat: float, lng: float, category: str = "adventure", radius
                 'max_attendees': event.max_attendees,
                 'is_free': event.is_free,
                 'is_featured': event.is_featured,
-                'metadata': event.metadata
+                'metadata': event.metadata,
+                'tickets_required': tickets_required
             }
             event_dicts.append(event_dict)
         
@@ -606,6 +609,18 @@ def create_events_for_plan(plan_id: str, events: List[dict]):
             created_count = 0
             for event in events:
                 event_id = str(uuid.uuid4())
+                # Map incoming source to DB constraint values
+                raw_source = (event.get("source") or event.get("source_type") or "").lower()
+                if raw_source in ("eventbrite", "ticketmaster", "yelp", "custom", "google", "local"):
+                    source_type = raw_source
+                elif raw_source in ("google_places", "openstreetmap", "osm", "places"):
+                    source_type = "google"
+                elif raw_source in ("meetup",):
+                    source_type = "local"
+                elif not raw_source:
+                    source_type = "local"
+                else:
+                    source_type = "local"
                 conn.execute(
                     text("""
                         INSERT INTO events (id, plan_id, name, image, hours, source_type, votes_count, metadata)
@@ -617,7 +632,7 @@ def create_events_for_plan(plan_id: str, events: List[dict]):
                         "name": event.get("name", "Event"),
                         "image": event.get("image_url") or event.get("image"),  # Support both field names
                         "hours": event.get("hours"),
-                        "source_type": event.get("source_type", "google"),  # Default to google instead of external
+                        "source_type": source_type,
                         "metadata": json.dumps(event.get("metadata", {}))
                     }
                 )
@@ -747,6 +762,8 @@ def get_events_for_plan(plan_id: str):
                     "description": metadata.get('description', '') or f"Experience the best {metadata.get('category', 'local')} vibes at {row[1]}. Perfect for {metadata.get('category', 'fun')} activities and memorable moments.",
                     "organizer": metadata.get('organizer', ''),
                     "external_url": metadata.get('external_url'),
+                    "tickets_required": bool(metadata.get('tickets_required')),
+                    "reservations_accepted": bool(metadata.get('reservations_accepted')),
                     "reviews": {
                         "count": metadata.get('review_count', metadata.get('user_ratings_total', 42)),
                         "stars": metadata.get('rating', metadata.get('stars', 4.2))
@@ -968,33 +985,33 @@ def get_plan_results(plan_id: str):
             
             events_result = conn.execute(
                 text("""
-                    SELECT e.id, e.name, e.image, e.metadata,
+                    SELECT e.id, e.name, e.image, e.source_type, e.metadata,
                            COUNT(v.id) as total_votes,
                            COUNT(CASE WHEN v.vote_type = 'like' THEN 1 END) as likes,
                            COUNT(CASE WHEN v.vote_type = 'dislike' THEN 1 END) as dislikes
                     FROM events e
                     LEFT JOIN votes v ON e.id = v.event_id
                     WHERE e.plan_id = :plan_id
-                    GROUP BY e.id, e.name, e.image, e.metadata
+                    GROUP BY e.id, e.name, e.image, e.source_type, e.metadata
                     ORDER BY likes DESC, e.name ASC
                 """),
                 {"plan_id": plan_id}
             )
             events = []
             for row in events_result:
-                total_votes = row[4] or 0
-                likes = row[5] or 0
-                dislikes = row[6] or 0
+                total_votes = row[5] or 0
+                likes = row[6] or 0
+                dislikes = row[7] or 0
                 percentage = (likes / total_votes * 100) if total_votes > 0 else 0
                 
                 # Parse metadata for additional info
                 metadata = {}
-                if row[3]:
+                if row[4]:
                     try:
-                        if isinstance(row[3], str):
-                            metadata = json.loads(row[3])
+                        if isinstance(row[4], str):
+                            metadata = json.loads(row[4])
                         else:
-                            metadata = row[3]
+                            metadata = row[4]
                     except:
                         metadata = {}
                 
@@ -1021,13 +1038,25 @@ def get_plan_results(plan_id: str):
                 image_category = topic_image_map.get(plan[0] if plan else 'nightlife', 'nightlife')
                 topic_specific_image = f"https://picsum.photos/600/400?random={str(row[0])[-6:]}&category={image_category}"
                 
+                # Extract ticketing/reservation info from metadata when present
+                tickets_required = bool(metadata.get('tickets_required'))
+                reservations_accepted = bool(metadata.get('reservations_accepted'))
+                external_url = metadata.get('external_url') or metadata.get('purchase_url')
+                seatmap_url = metadata.get('seatmap_url')
+
                 event_data = {
                     "id": str(row[0]),
                     "name": row[1],
                     "image_url": row[2] or metadata.get('image_url') or topic_specific_image,  # Changed to image_url
+                    "source_type": row[3],
                     "votes": likes,
                     "total_votes": total_votes,
-                    "percentage": round(percentage, 1)
+                    "percentage": round(percentage, 1),
+                    "tickets_required": tickets_required,
+                    "reservations_accepted": reservations_accepted,
+                    "external_url": external_url,
+                    "seatmap_url": seatmap_url,
+                    "metadata": metadata
                 }
                 events.append(event_data)
                 print(f"📊 Event: {row[1]}, Votes: {likes}, Total: {total_votes}")
