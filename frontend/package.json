@@ -17,6 +17,8 @@
     "classnames": "^2.5.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.5",
+    "fuse.js": "^7.1.0",
+    "keen-slider": "^6.8.6",
     "lucide-react": "^0.539.0",
     "next": "13.4.0",
     "profanity-filter": "^0.2.1",

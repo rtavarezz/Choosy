@@ -1,38 +1,38 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useDarkMode } from '../lib/darkMode';
 import PhoneInput from 'react-phone-input-2/lib/lib';
 import 'react-phone-input-2/lib/style.css';
 import { validatePhoneNumber, formatPhoneForDisplay } from "@/lib/security";
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader as ShadDialogHeader,
-  DialogTitle as ShadDialogTitle,
-  DialogDescription as ShadDialogDescription,
-  DialogFooter as ShadDialogFooter,
-  DialogClose as ShadDialogClose,
-} from '../components/ui/dialog';
+import { Card } from '../components/ui/card';
 import { BackgroundGradient } from "@/components/BackgroundGradient";
+import { Search, Shuffle, MapPin, Sparkles, TrendingUp, Zap } from 'lucide-react';
+import Fuse from 'fuse.js';
 
 const CATEGORIES = [
-  { id: 'concerts',  label: 'Concerts & Music',        emoji: '🎵' },
-  { id: 'foodie',    label: 'Food & Dining',           emoji: '🍕' },
-  { id: 'sports',    label: 'Sports & Fitness',        emoji: '⚽️' },
-  { id: 'art',      label: 'Arts & Culture',          emoji: '🎨' },
-  { id: 'nightlife', label: 'Nightlife',               emoji: '🍸' },
-  { id: 'adventure', label: 'Adventure',               emoji: '🏔️' },
-  { id: 'shopping',  label: 'Shopping',                emoji: '🛍️' },
-  { id: 'comedy',    label: 'Comedy',                  emoji: '😂' },
-  { id: 'movies',    label: 'Movies & Entertainment',  emoji: '🎬' },
-  { id: 'wellness',  label: 'Wellness & Health',       emoji: '🧘' },
-  { id: 'parks',     label: 'Parks & Outdoors',        emoji: '🌳' },
-  { id: 'racing',    label: 'Racing & Motorsports',    emoji: '🏎️' },
-  { id: 'bored',     label: "I'm Bored 🤷‍♀️",         emoji: '🤷‍♀️' },
+  { id: 'concerts',  label: 'Concerts & Music',        emoji: '🎵', group: 'entertainment', trending: true },
+  { id: 'foodie',    label: 'Food & Dining',           emoji: '🍕', group: 'lifestyle', trending: true },
+  { id: 'sports',    label: 'Sports & Fitness',        emoji: '⚽️', group: 'active', trending: false },
+  { id: 'art',      label: 'Arts & Culture',          emoji: '🎨', group: 'culture', trending: false },
+  { id: 'nightlife', label: 'Nightlife',               emoji: '🍸', group: 'entertainment', trending: true },
+  { id: 'adventure', label: 'Adventure',               emoji: '🏔️', group: 'active', trending: false },
+  { id: 'shopping',  label: 'Shopping',                emoji: '🛍️', group: 'lifestyle', trending: false },
+  { id: 'comedy',    label: 'Comedy',                  emoji: '😂', group: 'entertainment', trending: false },
+  { id: 'movies',    label: 'Movies & Entertainment',  emoji: '🎬', group: 'entertainment', trending: false },
+  { id: 'wellness',  label: 'Wellness & Health',       emoji: '🧘', group: 'lifestyle', trending: false },
+  { id: 'parks',     label: 'Parks & Outdoors',        emoji: '🌳', group: 'active', trending: false },
+  { id: 'racing',    label: 'Racing & Motorsports',    emoji: '🏎️', group: 'active', trending: false }
 ];
+
+const CATEGORY_GROUPS = {
+  trending: { label: 'Trending Now', icon: TrendingUp },
+  entertainment: { label: 'Entertainment', icon: Sparkles },
+  lifestyle: { label: 'Lifestyle', icon: MapPin },
+  active: { label: 'Active & Sports', icon: Shuffle },
+  culture: { label: 'Arts & Culture', icon: Sparkles }
+};
 
 export default function Onboarding() {
   const router = useRouter();
@@ -48,6 +48,9 @@ export default function Onboarding() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [verificationError, setVerificationError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState<string>('all');
+  const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => setIsClient(true), []);
   useEffect(() => {
@@ -108,7 +111,7 @@ export default function Onboarding() {
     }
   };
 
-  const handleSendCode = async (e) => {
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setPhoneError('');
     if (!validatePhoneNumber(phone)) {
@@ -134,7 +137,7 @@ export default function Onboarding() {
     }
   };
 
-  const handleVerifyCode = async (e) => {
+  const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError('');
     if (!verificationCode.trim()) {
@@ -163,7 +166,7 @@ export default function Onboarding() {
     }
   };
 
-  const handleCreatePlan = async (catId) => {
+  const handleCreatePlan = async (catId: string) => {
     try {
       // Step 1: Create the plan
       const planData = {
@@ -224,16 +227,104 @@ export default function Onboarding() {
     }
   };
 
-  // Step 3: Only select, do not auto-advance
-  const handleCategorySelect = (catId: string) => {
-    setSelectedCategory(catId);
+  const handleChooseForMe = () => {
+    setIsAnimating(true);
+    
+    // Create dramatic animation sequence
+    const animationSteps = 8;
+    let currentStep = 0;
+    
+    const animate = () => {
+      if (currentStep < animationSteps) {
+        const tempCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)].id;
+        setSelectedCategory(tempCategory);
+        currentStep++;
+        setTimeout(animate, 150 - (currentStep * 15)); // Speed up each step
+      } else {
+        // Final selection with weight towards trending
+        const trendingWeight = 0.4; // 40% chance for trending
+        const shouldPickTrending = Math.random() < trendingWeight;
+        
+        let finalCategories: typeof CATEGORIES;
+        if (shouldPickTrending) {
+          finalCategories = CATEGORIES.filter(c => c.trending);
+        } else {
+          finalCategories = CATEGORIES;
+        }
+        
+        const finalChoice = finalCategories[Math.floor(Math.random() * finalCategories.length)];
+        setSelectedCategory(finalChoice.id);
+        setIsAnimating(false);
+      }
+    };
+    
+    animate();
+  };
+  
+  const handleBoredAction = () => {
+    // "I'm bored" creates a mixed bag plan with multiple categories
+    const mixedCategories = ['concerts', 'foodie', 'nightlife', 'adventure', 'comedy'];
+    const randomMix = mixedCategories[Math.floor(Math.random() * mixedCategories.length)];
+    setSelectedCategory(randomMix);
+    
+    // Auto-continue after short delay for "surprise me" effect
+    setTimeout(() => {
+      if (zipcode) {
+        handleCreatePlan(randomMix);
+      }
+    }, 1000);
   };
 
-  const handleChooseForMe = () => {
-    const available = CATEGORIES.map(c => c.id).filter(id => id !== selectedCategory);
-    const random = available[Math.floor(Math.random() * available.length)];
-    setSelectedCategory(random);
+  // Step 3: Handle category selection with haptic-like feedback
+  const handleCategorySelect = (catId: string) => {
+    if (isAnimating) return;
+    
+    // Add subtle animation on select
+    setSelectedCategory(catId);
+    
+    // Store selection for quick access next time
+    localStorage.setItem('choosy:recentCategory', catId);
   };
+  
+  // Search and filter logic
+  const fuse = useMemo(() => new Fuse(CATEGORIES, {
+    keys: ['label', 'id'],
+    threshold: 0.3,
+    includeScore: true
+  }), []);
+  
+  const filteredCategories = useMemo(() => {
+    let filtered = CATEGORIES;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const results = fuse.search(searchQuery);
+      filtered = results.map(result => result.item);
+    }
+    
+    // Apply group filter
+    if (selectedGroup !== 'all') {
+      if (selectedGroup === 'trending') {
+        filtered = filtered.filter(cat => cat.trending);
+      } else {
+        filtered = filtered.filter(cat => cat.group === selectedGroup);
+      }
+    }
+    
+    return filtered;
+  }, [searchQuery, selectedGroup, fuse]);
+  
+  const groupedCategories = useMemo(() => {
+    const groups: Record<string, typeof CATEGORIES> = {
+      trending: CATEGORIES.filter(cat => cat.trending),
+      entertainment: CATEGORIES.filter(cat => cat.group === 'entertainment'),
+      lifestyle: CATEGORIES.filter(cat => cat.group === 'lifestyle'),
+      active: CATEGORIES.filter(cat => cat.group === 'active'),
+      culture: CATEGORIES.filter(cat => cat.group === 'culture')
+    };
+    
+    return groups;
+  }, []);
 
   // Add keyboard shortcut for continue on Step 3
   useEffect(() => {
@@ -393,61 +484,169 @@ export default function Onboarding() {
             </motion.div>
           </div>
         )}
-        {/* Step 3: Category Selection (modern grid) */}
+        {/* Step 3: Modern Category Selection */}
         {step === 3 && (
-          <div className="flex flex-1 flex-col items-center justify-start w-full py-4">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-4xl mx-auto">
+          <div className="flex flex-1 flex-col w-full py-4 space-y-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl mx-auto">
               {/* Hero */}
-              <div className="text-center mb-8 sm:mb-10">
+              <div className="text-center mb-6">
                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-50 drop-shadow-[0_1px_0_rgba(0,0,0,0.3)]">What sounds fun?</h1>
-                <p className="mt-2 text-base sm:text-lg text-white/80">Pick a vibe. We’ll handle the options.</p>
+                <p className="mt-2 text-base sm:text-lg text-white/80">Pick a vibe. We'll handle the options.</p>
               </div>
-              {/* Quick controls */}
-              <div className="flex items-center justify-center gap-2 mb-6">
-                <button
-                  className="px-3 py-1.5 rounded-full bg-white/85 dark:bg-white/10 text-sm text-neutral-800 dark:text-neutral-200 border border-white/20 dark:border-white/10 hover:scale-[1.02] transition"
-                  onClick={handleGeolocate}
-                >
-                  📍 {zipcode ? `${zipcode} • change` : 'Use current location'}
-                </button>
-                <button
-                  className="px-3 py-1.5 rounded-full bg-white/85 dark:bg-white/10 text-sm text-neutral-800 dark:text-neutral-200 border border-white/20 dark:border-white/10 hover:scale-[1.02] transition"
-                  onClick={() => handleChooseForMe()}
-                  title="Surprise me"
-                >
-                  🎲 Surprise me
-                </button>
-              </div>
-              {/* Category grid (accessible radio group) */}
-              <section
-                role="radiogroup"
-                aria-label="Categories"
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 w-full"
-              >
-                {CATEGORIES.map((cat) => (
-                  <label
-                    key={cat.id}
-                    className={`group relative isolate rounded-2xl p-4 sm:p-5 cursor-pointer bg-white/85 dark:bg-neutral-900/80 border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.5)] hover:scale-[1.02] transition will-change-transform ${selectedCategory===cat.id ? 'ring-4 ring-purple-400/50 border-purple-400' : ''}`}
+              
+              {/* Search + Quick Actions */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Search vibes..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-full bg-white/90 dark:bg-neutral-800/90 border border-white/20 text-neutral-900 dark:text-white placeholder-neutral-500 text-sm focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400 transition-all"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className="px-3 py-2.5 rounded-full bg-white/90 dark:bg-white/10 text-sm text-neutral-800 dark:text-neutral-200 border border-white/20 hover:scale-[1.02] transition flex items-center gap-2"
+                    onClick={handleGeolocate}
                   >
-                    <input
-                      type="radio"
-                      name="category"
-                      value={cat.id}
-                      checked={selectedCategory===cat.id}
-                      onChange={() => setSelectedCategory(cat.id)}
-                      className="sr-only"
-                    />
-                    <div className="relative z-10 flex items-center gap-3">
-                      <div className="text-2xl sm:text-3xl">{cat.emoji}</div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-neutral-900 dark:text-neutral-100 leading-snug">{cat.label}</div>
-                        <div className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Tap to choose</div>
+                    <MapPin className="w-4 h-4" />
+                    {zipcode || 'Location'}
+                  </button>
+                  <button
+                    className={`px-4 py-2.5 rounded-full text-sm font-medium border transition-all flex items-center gap-2 ${
+                      isAnimating 
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-transparent animate-pulse' 
+                        : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-transparent hover:scale-[1.02]'
+                    }`}
+                    onClick={handleChooseForMe}
+                    disabled={isAnimating}
+                  >
+                    <Shuffle className={`w-4 h-4 ${isAnimating ? 'animate-spin' : ''}`} />
+                    {isAnimating ? 'Choosing...' : 'Surprise Me'}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Filter Tabs */}
+              <div className="flex justify-center mb-6">
+                <div className="flex bg-black/20 rounded-full p-1 backdrop-blur-sm border border-white/10">
+                  <button
+                    onClick={() => setSelectedGroup('all')}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      selectedGroup === 'all' 
+                        ? 'bg-white/20 text-white shadow-lg' 
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setSelectedGroup('trending')}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
+                      selectedGroup === 'trending' 
+                        ? 'bg-white/20 text-white shadow-lg' 
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    Trending
+                  </button>
+                  <button
+                    onClick={() => setSelectedGroup('entertainment')}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      selectedGroup === 'entertainment' 
+                        ? 'bg-white/20 text-white shadow-lg' 
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    Fun
+                  </button>
+                  <button
+                    onClick={() => setSelectedGroup('lifestyle')}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      selectedGroup === 'lifestyle' 
+                        ? 'bg-white/20 text-white shadow-lg' 
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    Chill
+                  </button>
+                  <button
+                    onClick={() => setSelectedGroup('active')}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      selectedGroup === 'active' 
+                        ? 'bg-white/20 text-white shadow-lg' 
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    Active
+                  </button>
+                </div>
+              </div>
+              
+              {/* I'm Bored Special Button */}
+              <div className="flex justify-center mb-6">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleBoredAction}
+                  className="px-6 py-3 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold text-lg shadow-lg border-2 border-yellow-400/50 backdrop-blur-sm flex items-center gap-2"
+                >
+                  <Zap className="w-5 h-5" />
+                  🤷‍♀️ I'm Bored - Pick Something Fun!
+                </motion.button>
+              </div>
+              
+              {/* Dynamic Categories Display */}
+              {selectedGroup === 'all' && !searchQuery ? (
+                // Grouped view for "all"
+                <div className="space-y-8">
+                  {Object.entries(groupedCategories).map(([groupKey, categories]) => (
+                    categories.length > 0 && (
+                      <div key={groupKey}>
+                        <div className="flex items-center gap-2 mb-4">
+                          <h3 className="text-lg font-semibold text-white/90">{CATEGORY_GROUPS[groupKey]?.label}</h3>
+                          {groupKey === 'trending' && <TrendingUp className="w-4 h-4 text-yellow-400" />}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                          {categories.map((cat) => (
+                            <CategoryCard 
+                              key={cat.id} 
+                              category={cat} 
+                              isSelected={selectedCategory === cat.id}
+                              isAnimating={isAnimating}
+                              onClick={() => handleCategorySelect(cat.id)}
+                            />
+                          ))}
+                        </div>
                       </div>
-                      <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${selectedCategory===cat.id ? 'border-transparent bg-gradient-to-br from-purple-500 to-blue-500 text-white' : 'border-white/30 text-transparent'}`}>✓</div>
-                    </div>
-                  </label>
-                ))}
-              </section>
+                    )
+                  ))}
+                </div>
+              ) : (
+                // Grid view for filtered results
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                  {filteredCategories.map((cat) => (
+                    <CategoryCard 
+                      key={cat.id} 
+                      category={cat} 
+                      isSelected={selectedCategory === cat.id}
+                      isAnimating={isAnimating}
+                      onClick={() => handleCategorySelect(cat.id)}
+                    />
+                  ))}
+                </div>
+              )}
+              
+              {filteredCategories.length === 0 && searchQuery && (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-4">🔍</div>
+                  <p className="text-white/70 text-lg mb-2">No vibes found for "{searchQuery}"</p>
+                  <p className="text-white/50 text-sm">Try a different search or browse all categories</p>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
@@ -478,11 +677,61 @@ export default function Onboarding() {
   );
 }
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
+// Modern Category Card Component
+interface CategoryCardProps {
+  category: typeof CATEGORIES[0];
+  isSelected: boolean;
+  isAnimating: boolean;
+  onClick: () => void;
 }
+
+function CategoryCard({ category, isSelected, isAnimating, onClick }: CategoryCardProps) {
+  return (
+    <motion.button
+      onClick={onClick}
+      disabled={isAnimating}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      className={`
+        group relative isolate rounded-2xl p-3 sm:p-4 cursor-pointer 
+        bg-white/90 dark:bg-neutral-900/80 border border-white/10 
+        shadow-lg hover:shadow-xl transition-all duration-200 will-change-transform
+        ${isSelected 
+          ? 'ring-2 ring-purple-400/70 border-purple-400/50 bg-gradient-to-br from-purple-50/90 to-blue-50/90 dark:from-purple-900/20 dark:to-blue-900/20' 
+          : 'hover:border-white/30'
+        }
+        ${isAnimating && isSelected ? 'animate-pulse' : ''}
+      `}
+    >
+      <div className="relative z-10 flex flex-col items-center text-center gap-2">
+        <div className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform duration-200">
+          {category.emoji}
+        </div>
+        <div className="flex-1">
+          <div className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm sm:text-base leading-tight">
+            {category.label}
+          </div>
+          {category.trending && (
+            <div className="mt-1 flex items-center justify-center gap-1">
+              <TrendingUp className="w-3 h-3 text-yellow-500" />
+              <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">Trending</span>
+            </div>
+          )}
+        </div>
+        <div className={`
+          absolute -top-2 -right-2 h-6 w-6 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all
+          ${isSelected 
+            ? 'border-transparent bg-gradient-to-br from-purple-500 to-blue-500 text-white scale-100' 
+            : 'border-white/30 text-transparent scale-0'
+          }
+        `}>
+          ✓
+        </div>
+      </div>
+    </motion.button>
+  );
+}
+
 
 export async function getServerSideProps() {
   return { props: {} };
