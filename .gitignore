@@ -1,22 +1,15 @@
-# Python
 *.pyc
 __pycache__/
 venv/
 *.db
-
-# Node/Next.js
 node_modules/
 .next/
 out/
 dist/
 build/
 coverage/
-
-# OS/Editor
 .DS_Store
 *.swp
-
-# Env/Secrets - CRITICAL: Never commit these!
 .env
 .env.*
 main.env
@@ -25,8 +18,6 @@ frontend/.env.local
 *.env.local
 *.env.production
 *.env.staging
-
-# Deployment/Build Artifacts
 .vercel/
 logs/
 backend/logs/
@@ -35,8 +26,7 @@ frontend/out/
 frontend/dist/
 frontend/build/
 frontend/coverage/
-
-# Test/coverage
 .pytest_cache/
 .coverage
 htmlcov/
+*.log

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiFetch } from '@/lib/api';
 
 interface Voter {
   id: string;
@@ -56,18 +57,19 @@ export function FriendsVotingBar({ planId, maxVoters, completedVoters, className
   // Fetch active voters from API
   const fetchVoters = async () => {
     try {
-      const response = await fetch(`/api/plans/${planId}/active-voters`);
+      if (!planId) return;
+      const response = await apiFetch(`/api/plans/${planId}/active-voters`);
       if (response.ok) {
         const data = await response.json();
-        
+        const list = Array.isArray(data) ? data : (data?.active_voters || []);
         // Transform the data into our voter format
-        const activeVoters: Voter[] = (data || []).map((voter: any, index: number) => ({
-          id: voter.id || `voter_${index}`,
+        const activeVoters: Voter[] = list.map((voter: any, index: number) => ({
+          id: voter.id || voter.voter_id || `voter_${index}`,
           name: voter.name || generateRandomName(`voter_${index}`),
           phone: voter.phone,
           isVoting: true,
           isCompleted: false,
-          avatar: generateEmojiAvatar(voter.id || `voter_${index}`),
+          avatar: generateEmojiAvatar(voter.id || voter.voter_id || `voter_${index}`),
           timeRemaining: voter.time_remaining
         }));
 

@@ -10,6 +10,7 @@ import { Card } from '../components/ui/card';
 import { BackgroundGradient } from "@/components/BackgroundGradient";
 import { Search, Shuffle, MapPin, Sparkles, TrendingUp, Zap } from 'lucide-react';
 import Fuse from 'fuse.js';
+import { apiFetch } from '@/lib/api';
 
 const CATEGORIES = [
   { id: 'concerts',  label: 'Concerts & Music',        emoji: '🎵', group: 'entertainment', trending: true },
@@ -85,7 +86,7 @@ export default function Onboarding() {
       const { latitude, longitude } = position.coords;
       
       // Use the backend geocoding service to convert coordinates to zipcode
-      const response = await fetch(`/api/geocode?lat=${latitude}&lng=${longitude}`);
+      const response = await apiFetch(`/api/geocode?lat=${latitude}&lng=${longitude}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -119,7 +120,7 @@ export default function Onboarding() {
       return;
     }
     try {
-      const response = await fetch('/api/auth/send-code', {
+      const response = await apiFetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
@@ -145,7 +146,7 @@ export default function Onboarding() {
       return;
     }
     try {
-      const response = await fetch('/api/auth/verify-code', {
+      const response = await apiFetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, code: verificationCode }),
@@ -176,7 +177,7 @@ export default function Onboarding() {
         host_name: 'Host',
         host_phone: phone,
       };
-      const planResponse = await fetch('/api/plans/simple', {
+      const planResponse = await apiFetch('/api/plans/simple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(planData),
@@ -190,29 +191,34 @@ export default function Onboarding() {
       // Step 2: Get coordinates from ZIP code for event fetching
       let lat = 34.0522, lng = -118.2437; // Default to LA
       try {
-        const geoResponse = await fetch(`/api/geocode?zipcode=${zipcode}`);
-        if (geoResponse.ok) {
-          const geoData = await geoResponse.json();
-          lat = geoData.lat;
-          lng = geoData.lng;
+        if (zipcode && zipcode.trim().length >= 5) {
+          const geoResponse = await apiFetch(`/api/geocode?zipcode=${encodeURIComponent(zipcode.trim())}`);
+          if (geoResponse.ok) {
+            const geoData = await geoResponse.json();
+            if (typeof geoData?.lat === 'number' && typeof geoData?.lng === 'number') {
+              lat = geoData.lat;
+              lng = geoData.lng;
+            }
+          }
         }
       } catch (geoError) {
         console.warn('Failed to geocode, using default location');
       }
 
       // Step 3: Fetch events for the location and category
-      const eventsResponse = await fetch(`/api/events?lat=${lat}&lng=${lng}&category=${catId}&limit=20`);
+      const eventsResponse = await apiFetch(`/api/events?lat=${lat}&lng=${lng}&category=${catId}&limit=20`);
       if (!eventsResponse.ok) {
         throw new Error('Failed to fetch events');
       }
       const events = await eventsResponse.json();
 
-      // Step 4: Create events for the plan
-      if (events && events.length > 0) {
-        const createEventsResponse = await fetch('/api/createEvents', {
+      // Step 4: Create events for the plan (proxy to backend)
+      if (Array.isArray(events) && events.length > 0) {
+        const createEventsResponse = await apiFetch(`/api/plans/${planId}/events`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planId, events }),
+          // FastAPI expects a raw array body for List[dict]
+          body: JSON.stringify(events),
         });
         if (!createEventsResponse.ok) {
           console.warn('Failed to create events, proceeding anyway');

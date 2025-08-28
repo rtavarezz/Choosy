@@ -90,20 +90,25 @@ const CarouselVotingPage: React.FC = () => {
   }, [isLoading, isAuthenticated, isCreator]);
 
   // Generate a persistent voter ID for this browser/session (legacy - now using authenticated user ID)
-  const [voterId] = useState(() => {
-    // Try to get existing voter ID from localStorage
-    const existingVoterId = localStorage.getItem(`voter_id_${planId}`);
+  const [voterId, setVoterId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!planId) return;
+    if (typeof window === 'undefined') return; // SSR guard
+
+    const key = `voter_id_${planId}`;
+    const existingVoterId = window.localStorage.getItem(key);
     if (existingVoterId) {
       console.log(`🔄 Using existing voter ID: ${existingVoterId}`);
-      return existingVoterId;
+      setVoterId(existingVoterId);
+      return;
     }
-    
-    // Generate new voter ID and store it
+
     const newVoterId = `voter_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem(`voter_id_${planId}`, newVoterId);
+    window.localStorage.setItem(key, newVoterId);
     console.log(`🆕 Generated new voter ID: ${newVoterId}`);
-    return newVoterId;
-  });
+    setVoterId(newVoterId);
+  }, [planId]);
 
   // Fetch events and voting status
   useEffect(() => {
@@ -151,6 +156,7 @@ const CarouselVotingPage: React.FC = () => {
 
         // Fetch existing votes for this voter
         try {
+          if (!voterId) return; // wait until voterId is ready on client
           console.log(`🔍 Fetching existing votes for voter: ${voterId}`);
           const votesResponse = await fetch(`http://localhost:8000/api/plans/${planId}/votes/${voterId}`);
           console.log(`📡 Votes API response status: ${votesResponse.status}`);
@@ -193,7 +199,7 @@ const CarouselVotingPage: React.FC = () => {
     }, 3000);
 
     return () => clearInterval(statusInterval);
-  }, [planId]);
+  }, [planId, voterId]);
 
   // Handle voting
   const handleVote = useCallback(async (eventId: string, voteType: 'like' | 'dislike') => {

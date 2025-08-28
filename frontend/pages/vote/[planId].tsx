@@ -15,6 +15,7 @@ import { motion } from 'framer-motion';
 import { validateVoteCreate, ValidationError, type EventResponse } from '../../lib/validation';
 import { BackgroundGradient } from '@/components/BackgroundGradient';
 import { useAuth } from '@/lib/auth';
+import { apiFetch } from '@/lib/api';
 import { LoginModal } from '@/components/LoginModal';
 import Head from 'next/head';
 import CarouselVoting from '@/components/CarouselVoting';
@@ -67,12 +68,47 @@ const VotePage: React.FC = () => {
   const [completedVoters, setCompletedVoters] = useState(0);
   const [expectedVoters, setExpectedVoters] = useState(1);
 
+  // Join/leave active voters for live presence
+  useEffect(() => {
+    if (!planId || !creatorValidationChecked) return;
+    const voterId = (isCreator ? `host_${planId}` : (user?.id as string | undefined)) || undefined;
+    const name = isCreator ? 'Host' : (user?.name || 'Friend');
+    if (!voterId) return;
+    let left = false;
+    (async () => {
+      try {
+        await apiFetch(`/api/plans/${planId}/active-voters`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voter_id: voterId, action: 'join', name })
+        });
+      } catch (e) {
+        console.warn('Active voter join failed', e);
+      }
+    })();
+    return () => {
+      if (left) return;
+      left = true;
+      (async () => {
+        try {
+          await apiFetch(`/api/plans/${planId}/active-voters`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ voter_id: voterId, action: 'leave', name })
+          });
+        } catch (e) {
+          // ignore
+        }
+      })();
+    };
+  }, [planId, isCreator, user?.id, user?.name, creatorValidationChecked]);
+
   // Validate creator claim if creator=true is in URL
   useEffect(() => {
     if (creator === 'true' && planId && !creatorValidationChecked) {
       (async () => {
         try {
-          const res = await fetch(`/api/plans/${planId}/validate-creator`, {
+          const res = await apiFetch(`/api/plans/${planId}/validate-creator`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -110,7 +146,7 @@ const VotePage: React.FC = () => {
     if (isAuthenticated && !isCreator && user && planId && creatorValidationChecked) {
       (async () => {
         try {
-          const res = await fetch(`/api/plans/${planId}/add-voter`, {
+          const res = await apiFetch(`/api/plans/${planId}/add-voter`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -135,7 +171,7 @@ const VotePage: React.FC = () => {
     if (!planId) return;
     (async () => {
       try {
-        const res = await fetch(`/api/plans/${planId}/events`);
+        const res = await apiFetch(`/api/plans/${planId}/events`);
         if (res.ok) {
           const data = await res.json();
           
@@ -203,7 +239,7 @@ const VotePage: React.FC = () => {
     
     const fetchVotingStatus = async () => {
       try {
-        const res = await fetch(`/api/plans/${planId}/voting-status`);
+        const res = await apiFetch(`/api/plans/${planId}/voting-status`);
         if (res.ok) {
           const status = await res.json();
           setExpectedVoters(status.max_voters || 1);
@@ -248,7 +284,7 @@ const VotePage: React.FC = () => {
       
       const validatedVote = validateVoteCreate(voteData);
       
-      const res = await fetch('/api/votes', {
+      const res = await apiFetch('/api/votes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(validatedVote)
@@ -317,7 +353,7 @@ const VotePage: React.FC = () => {
             <button
               onClick={async () => {
                 try {
-                  const planDetailsRes = await fetch(`/api/plans/${planId}`);
+                  const planDetailsRes = await apiFetch(`/api/plans/${planId}`);
                   if (planDetailsRes.ok) {
                     const planData = await planDetailsRes.json();
                     alert(`🔄 Manually refreshing events for "${planData.topic}" topic...`);

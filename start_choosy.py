@@ -156,7 +156,11 @@ def setup_frontend(frontend_dir):
     # Install npm dependencies
     if (frontend_dir / "package.json").exists():
         print_status("Installing Node.js dependencies...")
-        subprocess.run(["npm", "install"], cwd=frontend_dir, check=True)
+        try:
+            subprocess.run(["npm", "install"], cwd=frontend_dir, check=True)
+        except subprocess.CalledProcessError:
+            print_status("npm install failed; retrying with --legacy-peer-deps", "WARNING")
+            subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=frontend_dir, check=True)
         print_status("Frontend dependencies installed!", "SUCCESS")
     
     # Start frontend server
