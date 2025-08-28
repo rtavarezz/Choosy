@@ -1,0 +1,50 @@
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  const { zipcode, lat, lng } = req.query;
+
+  try {
+    // Use BACKEND_URL for backend calls (works locally and on Render)
+    const apiBase = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    let backendUrl = '';
+    if (lat && lng) {
+      backendUrl = `${apiBase}/api/geocode?lat=${lat}&lng=${lng}`;
+    } else if (zipcode) {
+      backendUrl = `${apiBase}/api/geocode?zipcode=${zipcode}`;
+    } else {
+      return res.status(400).json({ message: 'Zipcode or lat/lng required' });
+    }
+
+    const response = await fetch(backendUrl);
+    if (!response.ok) {
+      if (response.status === 502) {
+        console.log('🔧 Backend geocoding server is down (502 Bad Gateway)');
+        return res.status(502).json({ 
+          error: 'Geocoding service temporarily unavailable',
+          message: 'Please try again in a few minutes'
+        });
+      }
+      throw new Error(`Backend geocoding failed: ${response.status}`);
+    }
+    try {
+      const data = await response.json();
+      res.status(200).json(data);
+    } catch (parseError) {
+      console.log('🔧 Could not parse geocoding response:', parseError);
+      return res.status(500).json({ 
+        error: 'Invalid response from geocoding service',
+        message: 'Service returned malformed data'
+      });
+    }
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    res.status(500).json({ message: 'Failed to geocode' });
+  }
+} 

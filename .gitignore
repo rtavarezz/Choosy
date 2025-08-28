@@ -1,13 +1,32 @@
-# dependencies
+*.pyc
+__pycache__/
+venv/
+*.db
 node_modules/
-
-# next.js
 .next/
-
-# env files
+out/
+dist/
+build/
+coverage/
+.DS_Store
+*.swp
 .env
-.env.local
-
-# misc
-.DS_Store 
-.vercel
+.env.*
+main.env
+backend/main.env
+frontend/.env.local
+*.env.local
+*.env.production
+*.env.staging
+.vercel/
+logs/
+backend/logs/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/build/
+frontend/coverage/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log

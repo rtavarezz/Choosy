@@ -1,156 +1,166 @@
-# Choosy - Group Decision Making App
+# Choosy 🎉
 
-A social group decision-making app inspired by Tinder/Hinge swipe mechanics. Friends create plans, add activity options, and vote by swiping through curated local events.
+> **The future of group decision-making**  
+> Plan events together, vote with style, discover amazing local experiences.
 
-## 🚀 Features
+A modern group decision-making platform that makes planning activities with friends effortless and fun. No more endless group chats trying to decide where to go!
 
-- **Smart Event Recommendations** - Location-based event suggestions per topic
-- **Group Size Optimization** - Solo, date night (2 people), or group (3+ people) experiences
-- **Swipe Interface** - Tinder-style card swiping for voting
-- **Random Generators** - "Choose for me" buttons for topic and event selection
-- **Contact Integration** - Direct phone calls and contact info for winning events
-- **15-Minute Timer** - Creates urgency and time pressure
-- **Anonymous Voting** - localStorage-based voter IDs
+## ✨ Features
+
+- 🗳️ **Smart Group Voting** - Choose between single-card or multi-card carousel interfaces
+- 🎬 **Multiple Voting Styles** - Single-card focus OR multi-card carousel preview
+- 🌍 **Real Event Discovery** - Live events from Eventbrite, Meetup, and local APIs  
+- 📱 **Mobile-First Design** - Responsive interface that works everywhere
+- ⚡ **Real-Time Results** - See votes update instantly across all devices
+- 🎯 **Location-Based** - Find events and activities near you
+- 🏆 **Gamification** - Points, achievements, and streaks for active voters
+- 🤖 **AI Recommendations** - Learns your preferences over time
+
+## 🚀 **5-Second Setup**
+
+**Prerequisites**: Python 3.8+ and Node.js 16+
+
+```bash
+# Clone the repository
+git clone https://github.com/rtavarezz/choosy.git
+cd choosy
+
+# Launch everything with one command! 🎊
+python3 start_choosy.py
+```
+
+**That's it!** The script will:
+- ✅ Check all dependencies 
+- 📦 Set up virtual environments
+- 🔧 Install Python and Node.js packages
+- 🗄️ Initialize the SQLite database
+- 🚀 Start both backend and frontend servers
+- 🌈 Show beautiful colored progress updates
+
+**Open your browser:**
+- 🌐 **Frontend**: http://localhost:3000 (main app)
+- 📊 **Backend API**: http://localhost:8000 (API docs)
+
+## 🔧 Manual Setup (If Needed)
+
+<details>
+<summary>Click to expand manual setup instructions</summary>
+
+### Backend Setup
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python init_sqlite.py     # Initialize database
+python start_server.py    # Start backend
+```
+
+### Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+</details>
+
+## ⚙️ Configuration (Optional)
+
+Choosy works out of the box with mock data, but for **real live events**, get these free API keys:
+
+### 1. Copy Environment Files
+```bash
+# Backend environment (for API keys)
+cp backend/main.env.example backend/main.env
+
+# Frontend environment (for local development)  
+cp frontend/.env.example frontend/.env.local
+```
+
+### 2. Get API Keys (Free Tiers Available)
+
+**Eventbrite API** (Recommended - Global Events)
+- Get it: https://www.eventbrite.com/platform/api-keys
+- Free: 10,000 requests/day
+- Add to `backend/main.env`: `EVENTBRITE_API_KEY=your_key_here`
+
+**Unsplash API** (For Beautiful Event Images)
+- Get it: https://unsplash.com/developers
+- Free: 1,000 requests/hour
+- Add to `backend/main.env`: `UNSPLASH_ACCESS_KEY=your_key_here`
+
+**Optional APIs** (for more event sources):
+- **Meetup**: https://www.meetup.com/api/
+- **Ticketmaster**: https://developer.ticketmaster.com/
+
+> **Note**: Without API keys, Choosy uses local mock data and placeholder images. Perfect for testing and development!
+
+## 📱 How It Works
+
+1. **Create a Plan** - Choose your vibe: nightlife, food, concerts, adventures, etc.
+2. **Invite Friends** - Share a simple link, no account required
+3. **Swipe to Vote** - Everyone swipes right (❤️) or left (❌) on activities  
+4. **See Results** - Real-time winner with booking integration
+
+## 🔧 Troubleshooting
+
+**Port already in use?**
+```bash
+# Kill processes on ports 3000 and 8000
+lsof -ti:3000 | xargs kill -9
+lsof -ti:8000 | xargs kill -9
+```
+
+**Python/Node.js not found?**
+- Install Python 3.8+: https://python.org/downloads/
+- Install Node.js 16+: https://nodejs.org/download/
+
+**Permission errors on macOS/Linux?**
+```bash
+chmod +x start_choosy.py
+chmod +x launch.sh
+```
+
+**Still having issues?**
+- Check `choosy-backend.log` and `choosy-frontend.log` for error details
+- Open an [issue](https://github.com/rtavarezz/choosy/issues) with your error logs
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Next.js, TypeScript, Tailwind CSS
-- **Animations**: Framer Motion, React Spring
-- **Swipe**: react-tinder-card
-- **Backend**: Supabase (ready for integration)
-- **Deployment**: Vercel
+- **Frontend**: Next.js 14, TypeScript, Tailwind CSS, Framer Motion
+- **Backend**: FastAPI, SQLAlchemy, SQLite/PostgreSQL
+- **Real-time**: WebSockets, Redis caching
+- **APIs**: Eventbrite, Meetup, Ticketmaster, Unsplash
+- **Deployment**: Docker, Vercel, Railway
 
-## 📱 Topics Available
+## 🎯 Project Status
 
-- 🎤 Concerts
-- 🌃 Nightlife  
-- 🍽️ Foodie
-- 💕 Date Night
-- 🏀 Sports
-- 🌳 Parks
-- 🏎️ Go Karting
-- 🏊 Swimming
-- 🍹 Fun Drinks
+- ✅ **MVP Complete** - Full end-to-end functionality
+- ✅ **Mobile Responsive** - Works on all devices
+- ✅ **Real-time Voting** - Live updates across browsers  
+- ✅ **Event Integration** - Live API data
+- 🚧 **Authentication** - Phone verification (optional)
+- 🚧 **Push Notifications** - Vote reminders
+- 💭 **AI Recommendations** - Learning user preferences
 
-## 🚀 Quick Start
+## 🤝 Contributing
 
-```bash
-# Install dependencies
-npm install
+We'd love your help! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Code contribution guidelines
+- Legal requirements (CLA)
+- Development standards
+- Community guidelines
 
-# Run development server
-npm run dev
+## 🔒 Security
 
-# Open http://localhost:3000
-```
+Found a security issue? Please review our [Security Policy](SECURITY.md) for responsible disclosure.
 
-## 📁 Project Structure
+## 📄 License
 
-```
-Choosy/
-├── pages/
-│   ├── index.tsx          # Landing page
-│   ├── create.tsx         # Plan creation flow
-│   ├── vote/[planId].tsx  # Voting interface
-│   ├── results/[planId].tsx # Results display
-│   └── api/
-│       ├── createPlan.ts  # Plan creation API
-│       ├── getResults.ts  # Results fetching API
-│       └── voteOption.ts  # Vote recording API
-├── styles/
-│   └── globals.css        # Global styles
-└── lib/
-    └── supabaseClient.ts  # Supabase configuration
-```
-
-## 🎯 Core Workflows
-
-### 1. Plan Creation
-- Select topic (concerts, nightlife, etc.)
-- Choose group size (solo, date, group)
-- Enter zip code for location
-- Add phone number for sharing
-- Optionally add custom events
-
-### 2. Voting Interface
-- Swipe right to vote ✅, left to skip ❌
-- Manual buttons for precise control
-- Random "Choose for me" generator
-- 15-minute voting timer
-- Real-time friend avatars with vote status
-
-### 3. Results Display
-- Winner announcement with trophy
-- Complete contact information
-- Direct "Call Now" button
-- Share functionality
-- Option to create new plans
-
-## 🔧 Development
-
-### Environment Setup
-```bash
-# Create .env.local
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
-```
-
-### Key Dependencies
-```json
-{
-  "react-tinder-card": "^1.4.0",
-  "framer-motion": "^10.16.4",
-  "@react-spring/web": "^9.7.3"
-}
-```
-
-## 🎨 UI/UX Features
-
-- **Mobile-First Design** - Optimized for phone usage
-- **Gradient Backgrounds** - Purple to blue gradients
-- **Glass Morphism** - Backdrop blur effects
-- **Smooth Animations** - Framer Motion transitions
-- **Responsive Cards** - Swipeable event cards
-- **Timer Display** - Countdown with urgency
-
-## 🔮 Future Enhancements
-
-- [ ] Supabase integration for real data
-- [ ] Real-time voting updates
-- [ ] Push notifications
-- [ ] Event booking integration
-- [ ] Social sharing features
-- [ ] User authentication
-- [ ] Event recommendations API
-
-## 📊 Mock Data Structure
-
-Events are organized by topic and group size:
-```typescript
-MOCK_EVENTS = {
-  concerts: {
-    solo: [...],
-    date: [...],
-    group: [...]
-  },
-  // ... other topics
-}
-```
-
-## 🚀 Deployment
-
-```bash
-# Build for production
-npm run build
-
-# Deploy to Vercel
-vercel --prod
-```
-
-## 📝 License
-
-MIT License - feel free to use this code for your own projects!
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Built with ❤️ for making group decisions easier and more fun!**
+**Built with ❤️ by [rtavarezz](https://github.com/rtavarezz)**  
+*Making group decisions fun again!*

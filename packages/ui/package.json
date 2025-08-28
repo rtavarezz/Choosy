@@ -1,0 +1,22 @@
+{
+  "name": "@choosy/ui",
+  "version": "1.0.0",
+  "description": "Reusable UI components for Choosy",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "lucide-react": "^0.263.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  }
+}
