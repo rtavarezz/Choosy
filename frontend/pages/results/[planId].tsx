@@ -68,20 +68,37 @@ function useResults(planId: string) {
       const response = await fetch(`/api/plans/${planId}/results`);
       if (!response.ok) throw new Error('Failed to fetch results');
       const data = await response.json();
-      
+
+      // Determine winning event with tie-breaking and optional preselected winner
+      const eventsArr: any[] = Array.isArray(data.events) ? data.events : [];
+      let selectedWinner: any | undefined;
+      try {
+        if (typeof window !== 'undefined') {
+          const pre = sessionStorage.getItem(`choosy:selectedWinner:${planId}`);
+          if (pre) {
+            selectedWinner = eventsArr.find(e => e.id === pre);
+          }
+        }
+      } catch { /* ignore */ }
+      if (!selectedWinner && eventsArr.length > 0) {
+        const maxVotes = Math.max(...eventsArr.map(e => e.votes || 0));
+        const top = eventsArr.filter(e => (e.votes || 0) === maxVotes);
+        selectedWinner = top[Math.floor(Math.random() * top.length)] || eventsArr[0];
+      }
+
       return {
         planId,
         topic: data.plan.topic,
         groupSize: data.plan.group_size,
         zip: data.plan.zip_code,
-        winningEvent: data.events.length > 0 ? {
-          id: data.events[0].id,
-          name: data.events[0].name,
-          votes: data.events[0].votes,
-          image_url: data.events[0].image_url,
+        winningEvent: selectedWinner ? {
+          id: selectedWinner.id,
+          name: selectedWinner.name,
+          votes: selectedWinner.votes,
+          image_url: selectedWinner.image_url,
           hours: "2 hours",
           contact: { phone: '(555) 123-4567' },
-          needs_reservation: data.events[0].needs_reservation ?? true
+          needs_reservation: selectedWinner.needs_reservation ?? true
         } : undefined,
         plan: {
           userName: data.plan.host_name,

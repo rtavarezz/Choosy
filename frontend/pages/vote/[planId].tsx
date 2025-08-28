@@ -67,6 +67,9 @@ const VotePage: React.FC = () => {
   // Voting status and progress
   const [completedVoters, setCompletedVoters] = useState(0);
   const [expectedVoters, setExpectedVoters] = useState(1);
+  // Voting session countdown timer
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [timerStarted, setTimerStarted] = useState(false);
 
   // Join/leave active voters for live presence
   useEffect(() => {
@@ -223,6 +226,11 @@ const VotePage: React.FC = () => {
           });
           
           setDeck(events);
+          // Fixed 4-minute timer (240 seconds); initialize only once per session
+          if (!timerStarted) {
+            setTimeLeft(240);
+            setTimerStarted(true);
+          }
         } else {
           console.error('Failed to fetch events:', res.status, res.statusText);
         }
@@ -232,6 +240,43 @@ const VotePage: React.FC = () => {
     })();
     // Authentication is handled by useAuth hook
   }, [planId]);
+
+  // Countdown effect and auto-finalize when time runs out
+  useEffect(() => {
+    if (!timerStarted || timeLeft === null) return;
+    if (timeLeft <= 0) {
+      (async () => {
+        try {
+          const res = await apiFetch(`/api/plans/${planId}/results`);
+          let chosenId: string | null = null;
+          if (res.ok) {
+            const data = await res.json();
+            const events = Array.isArray(data?.events) ? data.events : [];
+            if (events.length > 0) {
+              const maxVotes = Math.max(...events.map((e: any) => e.votes || 0));
+              const top = events.filter((e: any) => (e.votes || 0) === maxVotes);
+              const pick = top[Math.floor(Math.random() * top.length)];
+              chosenId = pick?.id || null;
+            }
+          }
+          if (!chosenId && deck.length > 0) {
+            const pick = deck[Math.floor(Math.random() * deck.length)];
+            chosenId = pick?.id || null;
+          }
+          if (chosenId && typeof window !== 'undefined') {
+            try { sessionStorage.setItem(`choosy:selectedWinner:${planId}`, chosenId); } catch {}
+          }
+        } catch (_) {
+          // ignore errors and continue to results
+        } finally {
+          router.push(`/results/${planId}`);
+        }
+      })();
+      return;
+    }
+    const id = setInterval(() => setTimeLeft((s) => (s !== null ? s - 1 : s)), 1000);
+    return () => clearInterval(id);
+  }, [timeLeft, timerStarted, planId, deck, router]);
 
   // Fetch voting status with live updates
   useEffect(() => {
@@ -388,6 +433,14 @@ const VotePage: React.FC = () => {
       </Head>
       <BackgroundGradient />
       <div className="min-h-screen w-full flex flex-col">
+        {/* Session Timer - Top Right (before Share) */}
+        {typeof timeLeft === 'number' && timeLeft >= 0 && (
+          <div className="fixed top-4 right-36 z-50">
+            <div className="bg-black/40 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm font-medium border border-white/20 whitespace-nowrap">
+              Time left: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </div>
+          </div>
+        )}
         {/* Friends Voting Bar - Top Left */}
         <div className="fixed top-4 left-4 z-50">
           <FriendsVotingBar
