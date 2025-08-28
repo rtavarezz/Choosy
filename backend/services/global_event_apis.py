@@ -19,6 +19,7 @@ from enum import Enum
 import json
 import hashlib
 from .api_config import api_template_manager, EventType
+from core.cache_manager import cache_manager
 
 # Use centralized environment configuration
 from config.environment import env_config
@@ -212,8 +213,238 @@ class GlobalEventAPI:
                 events.append(suggestion_event)
         # --------------------------------------
         
-        print(f"✅ Found {len(events)} total events for {category}")
-        return events[:limit]
+        # Enrich a subset with place details where missing (ratings/hours/address)
+        try:
+            enriched_events = await self._enrich_events_with_places(events, lat, lng)
+        except Exception as e:
+            print(f"Enrichment skipped due to error: {e}")
+            enriched_events = events
+
+        print(f"✅ Found {len(enriched_events)} total events for {category}")
+        return enriched_events[:limit]
+
+    async def _enrich_events_with_places(self, events: List[GlobalEvent], lat: float, lng: float) -> List[GlobalEvent]:
+        """Enrich top events with venue details.
+        Regional priority:
+          - US/EU: Yelp → Foursquare → Google Places
+          - Else:  Foursquare → Google Places → Yelp
+        Cached per venue and area.
+        """
+        fsq_available = bool(self.api_keys.get('foursquare')) or bool(self.api_keys.get('FOURSQUARE')) or bool(os.getenv('FOURSQUARE_API_KEY'))
+        g_places_available = bool(self.api_keys.get('google_places'))
+        yelp_available = bool(os.getenv('YELP_API_KEY') or self.api_keys.get('yelp'))
+        if not fsq_available and not g_places_available:
+            return events
+        # Limit enrichment to first 10 to control rate
+        targets = [e for e in events if (not e.metadata or not e.metadata.get('rating') or not e.metadata.get('hours'))]
+        targets = targets[:10]
+        if not targets:
+            return events
+        import aiohttp
+
+        async def enrich_with_foursquare(session: aiohttp.ClientSession, ev: GlobalEvent):
+            try:
+                name = ev.venue or ev.name
+                if not name:
+                    return False
+                cache_key = f"fsq_enrich:{name}:{round(lat,4)}:{round(lng,4)}"
+                cached = cache_manager.get(cache_key)
+                if cached:
+                    ev.metadata = {**(ev.metadata or {}), **cached}
+                    if not ev.address and cached.get('address'): ev.address = cached.get('address')
+                    return True
+                base = "https://api.foursquare.com/v3/places"
+                headers = {"Authorization": os.getenv('FOURSQUARE_API_KEY') or self.api_keys.get('foursquare'), "Accept": "application/json"}
+                params = {"query": name, "ll": f"{lat},{lng}", "radius": 5000, "limit": 1}
+                async with session.get(f"{base}/search", headers=headers, params=params, timeout=10) as r:
+                    js = await r.json()
+                results = js.get('results') or []
+                if not results:
+                    return False
+                fsq_id = results[0].get('fsq_id')
+                if not fsq_id:
+                    return False
+                fields = "rating,popularity,hours,location,tel,website,name"
+                async with session.get(f"{base}/{fsq_id}", headers=headers, params={"fields": fields}, timeout=10) as r2:
+                    det = await r2.json()
+                # Map FS data
+                rating10 = det.get('rating')
+                rating5 = (rating10 / 2.0) if isinstance(rating10, (int, float)) else None
+                hours = det.get('hours', {})
+                display_hours = hours.get('display') if isinstance(hours, dict) else None
+                location = det.get('location', {})
+                merged = {
+                    'rating': rating5,
+                    'review_count': det.get('popularity'),
+                    'opening_hours': display_hours,
+                    'address': location.get('formatted_address'),
+                    'website': det.get('website'),
+                    'phone': det.get('tel')
+                }
+                ev.metadata = {**(ev.metadata or {}), **{k: v for k, v in merged.items() if v is not None}}
+                if not ev.address and merged.get('address'):
+                    ev.address = merged['address']
+                cache_manager.set(cache_key, ev.metadata, ttl=43200)
+                return True
+            except Exception as e:
+                print(f"Foursquare enrichment error for '{ev.name}': {e}")
+                return False
+
+        async def enrich_with_places(session: aiohttp.ClientSession, ev: GlobalEvent):
+            name = ev.venue or ev.name
+            if not name:
+                return False
+            key = f"places_enrich:{name}:{round(lat,4)}:{round(lng,4)}"
+            cached = cache_manager.get(key)
+            if cached:
+                ev.metadata = {**(ev.metadata or {}), **cached}
+                # Fill common fields if empty
+                if not ev.city and cached.get('address'): ev.address = cached.get('address')
+                return True
+            try:
+                base = "https://maps.googleapis.com/maps/api/place"
+                # Text search near location
+                params = {
+                    'query': name,
+                    'location': f"{lat},{lng}",
+                    'radius': 5000,
+                    'key': self.api_keys['google_places']
+                }
+                async with session.get(f"{base}/textsearch/json", params=params, timeout=10) as r:
+                    js = await r.json()
+                    candidate = (js.get('results') or [None])[0]
+                if not candidate:
+                    return False
+                place_id = candidate.get('place_id')
+                fields = 'rating,user_ratings_total,price_level,opening_hours,formatted_address,website,name'
+                async with session.get(f"{base}/details/json", params={'place_id': place_id, 'fields': fields, 'key': self.api_keys['google_places']}, timeout=10) as r2:
+                    det = await r2.json()
+                result = det.get('result', {})
+                merged = {
+                    'rating': result.get('rating'),
+                    'review_count': result.get('user_ratings_total'),
+                    'price_level': result.get('price_level'),
+                    'opening_hours': result.get('opening_hours', {}).get('weekday_text'),
+                    'address': result.get('formatted_address'),
+                    'website': result.get('website')
+                }
+                # Merge into event metadata and basic fields
+                ev.metadata = {**(ev.metadata or {}), **{k:v for k,v in merged.items() if v is not None}}
+                if not ev.address and merged.get('address'):
+                    ev.address = merged['address']
+                # Try place photo as image_url if none present
+                if not ev.image_url:
+                    photos = result.get('photos') or []
+                    if photos:
+                        ref = photos[0].get('photo_reference')
+                        if ref:
+                            ev.image_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={ref}&key={self.api_keys['google_places']}"
+                # Cache for 12 hours
+                cache_manager.set(key, ev.metadata, ttl=43200)
+                return True
+            except Exception as e:
+                print(f"Places enrichment error for '{name}': {e}")
+                return False
+
+        # Lightweight region detect (approx bounding boxes)
+        def is_us(lat: float, lng: float) -> bool:
+            # Continental US rough bounding box
+            return 24.0 <= lat <= 49.5 and -125.0 <= lng <= -66.0
+        def is_canada(lat: float, lng: float) -> bool:
+            # Canada rough bounding box
+            return 41.7 <= lat <= 83.1 and -141.0 <= lng <= -52.6
+        def is_europe(lat: float, lng: float) -> bool:
+            # Europe rough bounding box (excludes parts of Russia/Turkey for simplicity)
+            return 35.0 <= lat <= 71.0 and -10.0 <= lng <= 40.0
+        in_us_ca = is_us(lat, lng) or is_canada(lat, lng)
+        in_eu = is_europe(lat, lng)
+
+        async with aiohttp.ClientSession() as session:
+            async def enrich_one(ev: GlobalEvent):
+                yelp_key = (os.getenv('YELP_API_KEY') or self.api_keys.get('yelp')) if yelp_available else None
+                if in_us_ca:
+                    # Yelp first in US/Canada
+                    if yelp_key:
+                        oky = await self._enrich_with_yelp(session, ev, lat, lng, yelp_key)
+                        if oky:
+                            return
+                    if fsq_available:
+                        ok = await enrich_with_foursquare(session, ev)
+                        if ok:
+                            return
+                    if g_places_available:
+                        await enrich_with_places(session, ev)
+                elif in_eu:
+                    # Europe: Foursquare first, then Places, Yelp last
+                    if fsq_available:
+                        ok = await enrich_with_foursquare(session, ev)
+                        if ok:
+                            return
+                    if g_places_available:
+                        okp = await enrich_with_places(session, ev)
+                        if okp:
+                            return
+                    if yelp_key:
+                        await self._enrich_with_yelp(session, ev, lat, lng, yelp_key)
+                else:
+                    # Rest of world
+                    if fsq_available:
+                        ok = await enrich_with_foursquare(session, ev)
+                        if ok:
+                            return
+                    if g_places_available:
+                        okp = await enrich_with_places(session, ev)
+                        if okp:
+                            return
+                    if yelp_key:
+                        await self._enrich_with_yelp(session, ev, lat, lng, yelp_key)
+            await asyncio.gather(*(enrich_one(ev) for ev in targets))
+        return events
+
+    async def _enrich_with_yelp(self, session, ev: GlobalEvent, lat: float, lng: float, api_key: str) -> bool:
+        try:
+            name = ev.venue or ev.name
+            if not name:
+                return False
+            cache_key = f"yelp_enrich:{name}:{round(lat,4)}:{round(lng,4)}"
+            cached = cache_manager.get(cache_key)
+            if cached:
+                ev.metadata = {**(ev.metadata or {}), **cached}
+                if not ev.address and cached.get('address'): ev.address = cached.get('address')
+                if not ev.image_url and cached.get('image_url'): ev.image_url = cached.get('image_url')
+                return True
+            headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
+            params = {"term": name, "latitude": lat, "longitude": lng, "radius": 5000, "limit": 1}
+            async with session.get("https://api.yelp.com/v3/businesses/search", headers=headers, params=params, timeout=10) as r:
+                js = await r.json()
+            businesses = js.get('businesses') or []
+            if not businesses:
+                return False
+            biz = businesses[0]
+            biz_id = biz.get('id')
+            # details
+            async with session.get(f"https://api.yelp.com/v3/businesses/{biz_id}", headers=headers, timeout=10) as r2:
+                det = await r2.json()
+            merged = {
+                'rating': det.get('rating'),
+                'review_count': det.get('review_count'),
+                'price': det.get('price'),
+                'address': ", ".join(det.get('location', {}).get('display_address') or []),
+                'website': det.get('url'),
+                'phone': det.get('display_phone'),
+                'reservations_accepted': 'restaurant_reservation' in (det.get('transactions') or [])
+            }
+            if not ev.image_url and det.get('image_url'):
+                merged['image_url'] = det.get('image_url')
+                ev.image_url = det.get('image_url')
+            ev.metadata = {**(ev.metadata or {}), **{k: v for k, v in merged.items() if v is not None}}
+            if not ev.address and merged.get('address'):
+                ev.address = merged['address']
+            cache_manager.set(cache_key, ev.metadata, ttl=43200)
+            return True
+        except Exception as e:
+            print(f"Yelp enrichment error for '{ev.name}': {e}")
+            return False
     
     async def _fetch_eventbrite_events(self, lat: float, lng: float, category: str, radius: int) -> List[GlobalEvent]:
         """Fetch real events with Eventbrite as primary source"""
@@ -2349,12 +2580,18 @@ class GlobalEventAPI:
             latitude = location.get('latitude')
             longitude = location.get('longitude')
             
-            # Get price range
+            # Get price range and currency
             price_ranges = event_data.get('priceRanges', [])
             price = 'Varies'
+            currency = None
+            price_min = None
+            price_max = None
             if price_ranges:
                 min_price = price_ranges[0].get('min', 0)
                 max_price = price_ranges[0].get('max', 0)
+                currency = price_ranges[0].get('currency')
+                price_min = min_price
+                price_max = max_price
                 if min_price == 0:
                     price = 'Free'
                 elif min_price == max_price:
@@ -2451,8 +2688,9 @@ class GlobalEventAPI:
             
             description = base_description
             
-            # Get external URL
+            # Get external URL and seat map
             external_url = event_data.get('url', '')
+            seatmap_url = event_data.get('seatmap', {}).get('staticUrl', '')
             
             return GlobalEvent(
                 id=f"ticketmaster_{event_id}",
@@ -2483,7 +2721,13 @@ class GlobalEventAPI:
                     'status': event_data.get('status', {}).get('code', ''),
                     'accessibility': venue_data.get('accessibleSeatingDetail', ''),
                     'parking': venue_data.get('parkingDetail', ''),
-                    'general_info': venue_data.get('generalInfo', {}).get('generalRule', '')
+                    'general_info': venue_data.get('generalInfo', {}).get('generalRule', ''),
+                    'purchase_url': external_url,
+                    'seatmap_url': seatmap_url,
+                    'price_min': price_min,
+                    'price_max': price_max,
+                    'currency': currency,
+                    'price_text': price
                 }
             )
         except Exception as e:

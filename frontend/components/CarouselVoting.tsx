@@ -18,6 +18,8 @@ interface EventCard {
   venue?: string;
   address?: string;
   price?: string;
+  tickets_required?: boolean;
+  reservations_accepted?: boolean;
   rating?: number;
   reviewCount?: number;
   category?: string;
@@ -25,7 +27,20 @@ interface EventCard {
   contact?: {
     phone?: string;
   };
+  source_type?: string;
 }
+
+const vendorLabel = (s?: string) => {
+  const key = (s || '').toLowerCase();
+  const map: Record<string, string> = {
+    ticketmaster: 'Ticketmaster',
+    eventbrite: 'Eventbrite',
+    google: 'Google Places',
+    yelp: 'Yelp',
+    local: 'Meetup/Local'
+  };
+  return map[key] || (s || '');
+};
 
 interface CarouselVotingProps {
   events: EventCard[];
@@ -248,11 +263,28 @@ const CarouselVoting: React.FC<CarouselVotingProps> = ({
                     
                     {/* Badges */}
                     <div className="absolute top-4 left-0 right-0 px-4 flex justify-between items-start">
-                      {event.category && (
-                        <div className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold uppercase tracking-wide">
-                          {event.category}
-                        </div>
-                      )}
+                      <div className="flex gap-2 items-center">
+                        {event.category && (
+                          <div className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold uppercase tracking-wide">
+                            {event.category}
+                          </div>
+                        )}
+                        {event.source_type && (
+                          <div className="bg-white/20 text-white px-2 py-1 rounded text-[10px] font-semibold">
+                            {vendorLabel(event.source_type)}
+                          </div>
+                        )}
+                        {event.tickets_required && (
+                          <div className="bg-yellow-600 text-white px-2 py-1 rounded text-[10px] font-semibold">
+                            Tickets Required
+                          </div>
+                        )}
+                        {event.reservations_accepted && (
+                          <div className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-semibold">
+                            Reservations
+                          </div>
+                        )}
+                      </div>
                       {event.price && (
                         <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold flex items-center">
                           <DollarSign className="w-3 h-3 mr-1" />

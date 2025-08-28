@@ -50,6 +50,9 @@ interface EventCard {
   reviewCount?: number;
   phone?: string;
   hours?: string;
+  tickets_required?: boolean;
+  reservations_accepted?: boolean;
+  source_type?: string;
 }
 
 const VotePage: React.FC = () => {
@@ -194,9 +197,9 @@ const VotePage: React.FC = () => {
               metadata = e.metadata || {};
             }
             
-            return {
-              id: e.id,
-              name: e.name,
+          return {
+            id: e.id,
+            name: e.name,
               description: e.description || metadata.description || "Experience the best local vibes. Perfect for fun activities and memorable moments.",
               image_url: e.image_url || metadata.image_url || `https://picsum.photos/600/400?random=${e.id?.slice(-6)}`,  // Use image_url from backend
               start_time: e.start_time || metadata.start_time,
@@ -209,6 +212,7 @@ const VotePage: React.FC = () => {
               price: metadata.price || e.price || 'Free',
               category: e.category || metadata.category,
               source: e.source || metadata.source,
+              source_type: e.source_type || e.source || metadata.source,
               external_id: e.external_id || metadata.external_id,
               external_url: e.external_url || metadata.external_url,
               organizer: metadata.organizer || e.organizer || 'Local Organizer',
@@ -217,6 +221,8 @@ const VotePage: React.FC = () => {
               is_free: metadata.is_free || e.is_free,
               is_featured: metadata.is_featured || e.is_featured,
               metadata: metadata,
+              tickets_required: e.tickets_required || metadata.tickets_required,
+              reservations_accepted: e.reservations_accepted || metadata.reservations_accepted,
               // Legacy fields for backwards compatibility
               rating: metadata.rating || e.rating || Math.floor(Math.random() * 2) + 4,
               reviewCount: metadata.review_count || e.reviewCount || Math.floor(Math.random() * 100) + 20,
