@@ -34,6 +34,204 @@ class AuthSystem:
     """Centralized authentication and authorization system"""
     
     @staticmethod
+    async def check_availability(phone: str) -> Dict[str, Any]:
+        """Check if phone number is available for registration"""
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT id FROM users WHERE phone = :phone"),
+                    {"phone": phone}
+                )
+                user = result.fetchone()
+                
+                if user:
+                    return {
+                        "success": True,
+                        "phone_available": False,
+                        "message": "Phone number already registered"
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "phone_available": True,
+                        "message": "Phone number available"
+                    }
+        except Exception as e:
+            logger.error(f"Error checking availability: {e}")
+            return {
+                "success": False,
+                "message": "Error checking availability"
+            }
+    
+    @staticmethod
+    async def register_user(phone: str, name: str, avatar_url: Optional[str] = None) -> Dict[str, Any]:
+        """Register a new user with phone number only"""
+        try:
+            # Check if phone already exists
+            availability = await AuthSystem.check_availability(phone)
+            if not availability.get('phone_available', False):
+                return {
+                    "success": False,
+                    "message": "Phone number already registered"
+                }
+            
+            # Generate user ID
+            user_id = secrets.token_urlsafe(16)
+            
+            # Insert user into database
+            with engine.connect() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO users (id, phone, name, created_at)
+                        VALUES (:id, :phone, :name, :created_at)
+                    """),
+                    {
+                        "id": user_id,
+                        "phone": phone,
+                        "name": name,
+                        "created_at": datetime.utcnow()
+                    }
+                )
+                conn.commit()
+            
+            logger.info(f"User registered successfully: {phone}")
+            return {
+                "success": True,
+                "user_id": user_id,
+                "message": "User registered successfully"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error registering user: {e}")
+            return {
+                "success": False,
+                "message": "Registration failed"
+            }
+    
+    @staticmethod
+    async def login_user(phone: str) -> Dict[str, Any]:
+        """Login user with phone number only"""
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT id, phone, name FROM users WHERE phone = :phone"),
+                    {"phone": phone}
+                )
+                user = result.fetchone()
+                
+                if not user:
+                    return {
+                        "success": False,
+                        "message": "Phone number not registered"
+                    }
+                
+                # Generate session token
+                session_token = AuthSystem.create_access_token(user[0], user[1])
+                
+                return {
+                    "success": True,
+                    "session_token": session_token,
+                    "user_data": {
+                        "id": user[0],
+                        "phone": user[1],
+                        "name": user[2]
+                    },
+                    "message": "Login successful"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error logging in user: {e}")
+            return {
+                "success": False,
+                "message": "Login failed"
+            }
+    
+    @staticmethod
+    async def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by ID"""
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT id, phone, name FROM users WHERE id = :user_id"),
+                    {"user_id": user_id}
+                )
+                user = result.fetchone()
+                
+                if user:
+                    return {
+                        "id": user[0],
+                        "phone": user[1],
+                        "name": user[2]
+                    }
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting user by ID: {e}")
+            return None
+    
+    @staticmethod
+    async def update_user_profile(user_id: str, updates: Dict[str, Any]) -> bool:
+        """Update user profile"""
+        try:
+            # Build update query dynamically
+            set_clauses = []
+            params = {"user_id": user_id}
+            
+            for field, value in updates.items():
+                if field in ['name', 'avatar_url', 'preferences']:
+                    set_clauses.append(f"{field} = :{field}")
+                    params[field] = value
+            
+            if not set_clauses:
+                return True
+            
+            query = f"UPDATE users SET {', '.join(set_clauses)} WHERE id = :user_id"
+            
+            with engine.connect() as conn:
+                conn.execute(text(query), params)
+                conn.commit()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating user profile: {e}")
+            return False
+    
+    @staticmethod
+    async def delete_user(user_id: str) -> bool:
+        """Delete user account"""
+        try:
+            with engine.connect() as conn:
+                conn.execute(
+                    text("DELETE FROM users WHERE id = :user_id"),
+                    {"user_id": user_id}
+                )
+                conn.commit()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting user: {e}")
+            return False
+    
+    @staticmethod
+    async def validate_session(session_token: str) -> Optional[str]:
+        """Validate session token and return user ID"""
+        try:
+            payload = AuthSystem.verify_token(session_token)
+            return payload.get("sub")
+        except:
+            return None
+    
+    @staticmethod
+    async def logout_user(session_token: str) -> bool:
+        """Logout user (invalidate session)"""
+        # For JWT tokens, we can't truly invalidate them without a blacklist
+        # For MVP, we'll just return success
+        # In production, implement a token blacklist in Redis
+        return True
+    
+    @staticmethod
     def create_access_token(user_id: str, user_phone: str) -> str:
         """Create JWT access token"""
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

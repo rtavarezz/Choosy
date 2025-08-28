@@ -56,7 +56,7 @@ function useVotingStatus(planId: string) {
       if (!response.ok) throw new Error('Failed to fetch voting status');
       return response.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 2000,
     enabled: !!planId && planId !== 'demo',
   });
 }
@@ -103,7 +103,7 @@ function useResults(planId: string) {
         }))
       };
     },
-    refetchInterval: 10000,
+    refetchInterval: 3000,
     enabled: !!planId && planId !== 'demo',
   });
 }

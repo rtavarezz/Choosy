@@ -13,7 +13,10 @@ import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import { validateVoteCreate, ValidationError, type EventResponse } from '../../lib/validation';
 import { BackgroundGradient } from '@/components/BackgroundGradient';
+import { useAuth } from '@/lib/auth';
+import { LoginModal } from '@/components/LoginModal';
 import CarouselVoting from '@/components/CarouselVoting';
+import { FriendsVotingBar } from '@/components/FriendsVotingBar';
 import Head from 'next/head';
 
 // Type for a voting card (matches backend event response exactly)
@@ -67,15 +70,26 @@ interface VotingStatusResponse {
 
 const CarouselVotingPage: React.FC = () => {
   const router = useRouter();
-  const { planId } = router.query;
+  const { planId, creator } = router.query;
+  const { user, isAuthenticated, isLoading } = useAuth();
   
+  const isCreator = creator === 'true';
+  
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [events, setEvents] = useState<EventCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [votingStatus, setVotingStatus] = useState<VotingStatusResponse | null>(null);
   const [hasVoted, setHasVoted] = useState<Set<string>>(new Set());
 
-  // Generate a persistent voter ID for this browser/session
+  // Check authentication when component loads (skip for creators)
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !isCreator) {
+      setShowAuthModal(true);
+    }
+  }, [isLoading, isAuthenticated, isCreator]);
+
+  // Generate a persistent voter ID for this browser/session (legacy - now using authenticated user ID)
   const [voterId] = useState(() => {
     // Try to get existing voter ID from localStorage
     const existingVoterId = localStorage.getItem(`voter_id_${planId}`);
@@ -185,6 +199,12 @@ const CarouselVotingPage: React.FC = () => {
   const handleVote = useCallback(async (eventId: string, voteType: 'like' | 'dislike') => {
     if (!planId || hasVoted.has(eventId)) return;
 
+    // Ensure user is authenticated before voting (skip for creators)
+    if (!isCreator && (!isAuthenticated || !user)) {
+      setShowAuthModal(true);
+      return;
+    }
+
     try {
       // Optimistically update UI
       setHasVoted(prev => {
@@ -194,10 +214,17 @@ const CarouselVotingPage: React.FC = () => {
       });
 
       // Validate vote data
+      const currentVoterId = isCreator ? `host_${planId}` : user?.id;
+      
+      if (!currentVoterId) {
+        console.error('No voter ID available');
+        return;
+      }
+      
       const voteData = {
         plan_id: planId as string,
         event_id: eventId,
-        voter_id: voterId,
+        voter_id: currentVoterId,
         vote_type: voteType
       };
 
@@ -236,14 +263,15 @@ const CarouselVotingPage: React.FC = () => {
         setError('Failed to submit vote. Please try again.');
       }
     }
-  }, [planId, voterId, hasVoted]);
+  }, [planId, user?.id, hasVoted, isAuthenticated, isCreator]);
 
   // Handle voting completion
   const handleVotingComplete = useCallback(() => {
     router.push(`/results/${planId}`);
   }, [planId, router]);
 
-  if (loading) {
+  // Show loading screen while auth is being checked
+  if (isLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <BackgroundGradient />
@@ -308,21 +336,14 @@ const CarouselVotingPage: React.FC = () => {
         
         {/* Main content */}
         <div className="relative z-10 h-screen">
-          {/* Header info */}
-          {votingStatus && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute top-6 left-6 z-20"
-            >
-              <div className="bg-black/20 backdrop-blur-md rounded-lg p-3 text-white">
-                <h2 className="font-semibold text-lg capitalize">{votingStatus.topic} Plan</h2>
-                <p className="text-sm text-white/80">
-                  {votingStatus.active_voters} active • {votingStatus.completed_voters} completed
-                </p>
-              </div>
-            </motion.div>
-          )}
+          {/* Friends Voting Bar - Top Left */}
+          <div className="absolute top-4 left-4 z-20">
+            <FriendsVotingBar
+              planId={planId as string}
+              maxVoters={votingStatus?.max_voters || 1}
+              completedVoters={votingStatus?.completed_voters || 0}
+            />
+          </div>
 
           {/* Carousel Voting Component */}
           <CarouselVoting
@@ -364,6 +385,15 @@ const CarouselVotingPage: React.FC = () => {
             <p>← → to navigate • Space for ❤️ • X for ✕</p>
           </div>
         </div>
+
+        {/* Authentication Modal */}
+        <LoginModal
+          isOpen={showAuthModal}
+          onClose={() => {
+            // Always close the modal - if auth failed, it will reopen immediately
+            setShowAuthModal(false);
+          }}
+        />
       </div>
     </>
   );

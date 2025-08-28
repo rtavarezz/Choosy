@@ -24,7 +24,6 @@ gamification_engine = GamificationEngine()
 class UserRegistration(BaseModel):
     phone: str
     name: str
-    email: str
     avatar_url: Optional[str] = None
 
     @validator('phone')
@@ -41,17 +40,8 @@ class UserRegistration(BaseModel):
             raise ValueError('Name must be at least 2 characters long')
         return v.strip()
 
-    @validator('email')
-    def validate_email(cls, v):
-        # Simple email validation regex
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, v):
-            raise ValueError('Please enter a valid email address')
-        return v.lower().strip()
-
 class UserLogin(BaseModel):
     phone: str
-    email: str
 
     @validator('phone')
     def validate_phone(cls, v):
@@ -60,14 +50,6 @@ class UserLogin(BaseModel):
         if len(digits_only) < 10:
             raise ValueError('Phone number must have at least 10 digits')
         return digits_only
-
-    @validator('email')
-    def validate_email(cls, v):
-        # Simple email validation regex
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, v):
-            raise ValueError('Please enter a valid email address')
-        return v.lower().strip()
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -94,18 +76,17 @@ async def get_current_user(authorization: str = Header(None)):
     return user_id
 
 @router.get("/check-availability")
-async def check_availability(phone: Optional[str] = None, email: Optional[str] = None):
-    """Check if phone number or email is available for registration"""
-    if not phone and not email:
-        raise HTTPException(status_code=400, detail="Please provide either phone or email to check")
+async def check_availability(phone: Optional[str] = None):
+    """Check if phone number is available for registration"""
+    if not phone:
+        raise HTTPException(status_code=400, detail="Please provide phone number to check")
     
-    result = await auth_system.check_availability(phone=phone, email=email)
+    result = await auth_system.check_availability(phone=phone)
     
     if result['success']:
         return {
             "success": True,
             "phone_available": result.get('phone_available', True),
-            "email_available": result.get('email_available', True),
             "message": result['message']
         }
     else:
@@ -117,7 +98,6 @@ async def register_user(user_data: UserRegistration):
     result = await auth_system.register_user(
         phone=user_data.phone,
         name=user_data.name,
-        email=user_data.email,
         avatar_url=user_data.avatar_url
     )
     
@@ -132,8 +112,8 @@ async def register_user(user_data: UserRegistration):
 
 @router.post("/login")
 async def login_user(login_data: UserLogin):
-    """Login user with phone number and email verification"""
-    result = await auth_system.login_user_with_email(login_data.phone, login_data.email)
+    """Login user with phone number verification"""
+    result = await auth_system.login_user(login_data.phone)
     
     if result['success']:
         return {

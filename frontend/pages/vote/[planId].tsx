@@ -14,8 +14,11 @@ import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import { validateVoteCreate, ValidationError, type EventResponse } from '../../lib/validation';
 import { BackgroundGradient } from '@/components/BackgroundGradient';
+import { useAuth } from '@/lib/auth';
+import { LoginModal } from '@/components/LoginModal';
 import Head from 'next/head';
 import CarouselVoting from '@/components/CarouselVoting';
+import { FriendsVotingBar } from '@/components/FriendsVotingBar';
 
 // Type for a voting card (matches backend event response exactly)
 interface EventCard {
@@ -50,29 +53,82 @@ interface EventCard {
 
 const VotePage: React.FC = () => {
   const router = useRouter();
-  const { planId } = router.query;
+  const { planId, creator } = router.query;
+  const { user, isAuthenticated, isLoading } = useAuth();
 
-  // Get voter info from localStorage/session (do not prompt for login)
-  const [voterId, setVoterId] = useState<string>('');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isValidCreator, setIsValidCreator] = useState(false);
+  const [creatorValidationChecked, setCreatorValidationChecked] = useState(false);
+  const isCreator = creator === 'true' && isValidCreator;
   const [deck, setDeck] = useState<EventCard[]>([]);
   const [votedEventIds, setVotedEventIds] = useState<Set<string>>(new Set());
   
   // Voting status and progress
-  const [activeVoters, setActiveVoters] = useState<any[]>([]);
   const [completedVoters, setCompletedVoters] = useState(0);
   const [expectedVoters, setExpectedVoters] = useState(1);
-  const [totalEvents, setTotalEvents] = useState(0);
 
-  // Set voter ID from storage when component loads
+  // Validate creator claim if creator=true is in URL
   useEffect(() => {
-    let voterId = localStorage.getItem('voterId') || sessionStorage.getItem('voterId');
-    if (!voterId) {
-      voterId = `host_${planId}`;
-      localStorage.setItem('voterId', voterId);
-      sessionStorage.setItem('voterId', voterId);
+    if (creator === 'true' && planId && !creatorValidationChecked) {
+      (async () => {
+        try {
+          const res = await fetch(`/api/plans/${planId}/validate-creator`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              claimed_creator_id: `host_${planId}` // Use the same ID format as voting
+            })
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            setIsValidCreator(data.is_valid_creator || false);
+          } else {
+            setIsValidCreator(false);
+          }
+        } catch (error) {
+          console.error('Creator validation failed:', error);
+          setIsValidCreator(false);
+        }
+        setCreatorValidationChecked(true);
+      })();
+    } else if (creator !== 'true') {
+      setIsValidCreator(false);
+      setCreatorValidationChecked(true);
     }
-    setVoterId(voterId);
-  }, [planId]);
+  }, [creator, planId, creatorValidationChecked]);
+
+  // Check authentication when component loads (skip ONLY for validated creators)
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !isCreator && creatorValidationChecked) {
+      setShowAuthModal(true);
+    }
+  }, [isLoading, isAuthenticated, isCreator, creatorValidationChecked]);
+
+  // When a friend successfully authenticates, register them with the plan
+  useEffect(() => {
+    if (isAuthenticated && !isCreator && user && planId && creatorValidationChecked) {
+      (async () => {
+        try {
+          const res = await fetch(`/api/plans/${planId}/add-voter`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              voter_id: user.id,
+              voter_name: user.name,
+              voter_phone: user.phone
+            })
+          });
+          
+          if (res.ok) {
+            console.log('Friend successfully registered with plan');
+          }
+        } catch (error) {
+          console.error('Failed to register friend with plan:', error);
+        }
+      })();
+    }
+  }, [isAuthenticated, isCreator, user, planId, creatorValidationChecked]);
 
   // Fetch events for this plan
   useEffect(() => {
@@ -131,7 +187,6 @@ const VotePage: React.FC = () => {
           });
           
           setDeck(events);
-          setTotalEvents(events.length);
         } else {
           console.error('Failed to fetch events:', res.status, res.statusText);
         }
@@ -139,18 +194,14 @@ const VotePage: React.FC = () => {
         console.error('Error fetching events:', error);
       }
     })();
-    // Get voterId from localStorage/session (customize as needed)
-    const stored = localStorage.getItem(`voter_${planId}`) || sessionStorage.getItem(`voter_${planId}`);
-    if (stored) {
-      const v = JSON.parse(stored);
-      setVoterId(v.phone || v.id || v.voter_id);
-    }
+    // Authentication is handled by useAuth hook
   }, [planId]);
 
-  // Fetch voting status
+  // Fetch voting status with live updates
   useEffect(() => {
     if (!planId) return;
-    (async () => {
+    
+    const fetchVotingStatus = async () => {
       try {
         const res = await fetch(`/api/plans/${planId}/voting-status`);
         if (res.ok) {
@@ -161,47 +212,37 @@ const VotePage: React.FC = () => {
       } catch (error) {
         console.error('Error fetching voting status:', error);
       }
-    })();
-  }, [planId]);
-
-  // Fetch active voters
-  useEffect(() => {
-    if (!planId) return;
-    const fetchActiveVoters = async () => {
-      try {
-        const res = await fetch(`/api/plans/${planId}/active-voters`);
-        if (res.ok) {
-          const voters = await res.json();
-          setActiveVoters(voters || []);
-        }
-      } catch (error) {
-        console.error('Error fetching active voters:', error);
-      }
     };
-    fetchActiveVoters();
-    const interval = setInterval(fetchActiveVoters, 3000);
+
+    // Initial fetch
+    fetchVotingStatus();
+    
+    // Live updates every 2 seconds
+    const interval = setInterval(fetchVotingStatus, 2000);
     return () => clearInterval(interval);
   }, [planId]);
 
+
   const handleVote = async (eventId: string, direction: 'like' | 'dislike') => {
-    // Get voter ID directly from storage as fallback if state isn't ready yet
-    let currentVoterId = voterId;
-    if (!currentVoterId || currentVoterId === '') {
-      currentVoterId = localStorage.getItem('voterId') || sessionStorage.getItem('voterId') || '';
-      if (!currentVoterId) {
-        console.warn('❌ No voter ID found, waiting for initialization...');
-        return;
-      }
-      // Update state for next time
-      setVoterId(currentVoterId);
+    // Ensure user is authenticated before voting (skip for creators)
+    if (!isCreator && (!isAuthenticated || !user)) {
+      setShowAuthModal(true);
+      return;
     }
     
     try {
       // Validate vote data before sending
+      const voterId = isCreator ? `host_${planId}` : user?.id;
+      
+      if (!voterId) {
+        console.error('No voter ID available');
+        return;
+      }
+      
       const voteData = {
         plan_id: planId as string,
         event_id: eventId,
-        voter_id: currentVoterId,
+        voter_id: voterId,
         vote_type: direction
       };
       
@@ -214,7 +255,6 @@ const VotePage: React.FC = () => {
       });
       
       if (res.ok) {
-        const result = await res.json();
         // Track voted events instead of removing from deck
         setVotedEventIds(prev => {
           const newSet = new Set(prev);
@@ -234,6 +274,32 @@ const VotePage: React.FC = () => {
   };
 
 
+
+  // Show loading screen while auth is being checked
+  if (isLoading) {
+    return (
+      <>
+        <Head>
+          <title>Loading • Choosy</title>
+        </Head>
+        <BackgroundGradient />
+        <div className="min-h-screen flex items-center justify-center">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center"
+          >
+            <div className="relative mb-6">
+              <div className="w-16 h-16 rounded-full border-4 border-white/20 border-t-white/80 animate-spin mx-auto" />
+              <div className="absolute inset-0 w-16 h-16 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/20 blur-xl mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Loading Voting Session</h2>
+            <p className="text-white/70">Preparing your voting experience...</p>
+          </motion.div>
+        </div>
+      </>
+    );
+  }
 
   // Check if all events are voted on instead of deck length
   if (deck.length > 0 && votedEventIds.size >= deck.length) {
@@ -286,44 +352,14 @@ const VotePage: React.FC = () => {
       </Head>
       <BackgroundGradient />
       <div className="min-h-screen w-full flex flex-col">
-        {/* Active Voters Display */}
-        {activeVoters.length > 0 && (
-          <div className="mx-auto mb-4 max-w-2xl w-full">
-            <div className="bg-white/75 dark:bg-neutral-900/80 backdrop-blur-md rounded-lg p-3 inline-block border border-white/40 dark:border-white/10">
-              <div className="flex items-center gap-2">
-                <span className="text-neutral-900 dark:text-white font-semibold text-sm">👥</span>
-                <span className="text-neutral-900 dark:text-white text-sm">
-                  {activeVoters.length} {activeVoters.length === 1 ? 'person' : 'people'} voting now
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {activeVoters.map((voter, index) => (
-                  <div key={index} className="flex items-center gap-1 bg-white/20 dark:bg-white/10 rounded-full px-2 py-1">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                      {voter.name?.charAt(0)?.toUpperCase() || '?'}
-                    </div>
-                    <span className="text-neutral-900 dark:text-white text-xs">{voter.name}</span>
-                  </div>
-                ))}
-              </div>
-              {/* Group Progress Bar */}
-              {expectedVoters > 1 && (
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-xs text-neutral-900 dark:text-white mb-1">
-                    <span>Group Progress</span>
-                    <span>{completedVoters}/{expectedVoters} completed</span>
-                  </div>
-                  <div className="w-full bg-white/20 dark:bg-white/10 rounded-full h-2">
-                    <div 
-                      className="bg-gradient-to-r from-purple-500 to-blue-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min((completedVoters / expectedVoters) * 100, 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Friends Voting Bar - Top Left */}
+        <div className="fixed top-4 left-4 z-50">
+          <FriendsVotingBar
+            planId={planId as string}
+            maxVoters={expectedVoters}
+            completedVoters={completedVoters}
+          />
+        </div>
         {/* Carousel Voting Area */}
         <div className="relative w-full h-screen">
           <CarouselVoting
@@ -335,6 +371,15 @@ const VotePage: React.FC = () => {
             initialVotedEventIds={votedEventIds}
           />
         </div>
+
+        {/* Authentication Modal */}
+        <LoginModal
+          isOpen={showAuthModal}
+          onClose={() => {
+            // Always close the modal - if auth failed, it will reopen immediately
+            setShowAuthModal(false);
+          }}
+        />
       </div>
     </>
   );

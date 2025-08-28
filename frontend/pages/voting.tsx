@@ -8,6 +8,8 @@ import { Filter } from 'bad-words';
 import { EventCard } from '@/components/EventCard';
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { useAuth } from '@/lib/auth';
+import { LoginModal } from '@/components/LoginModal';
 
 // Add CSS styles for swipe animations and gamification
 const swipeStyles = `

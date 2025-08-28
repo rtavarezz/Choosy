@@ -881,14 +881,49 @@ def get_voting_status(plan_id: str):
             # Get completed voter IDs
             completed_voter_ids = [row[0] for row in completed_voters_result]
 
+            # Get registered participants (friends who joined but may not have voted yet)
+            participants_result = conn.execute(
+                text("SELECT DISTINCT voter_id FROM voter_participation WHERE plan_id = :plan_id"),
+                {"plan_id": plan_id}
+            ).fetchall()
+            participant_ids = [row[0] for row in participants_result]
+
             # active_voter_ids and active_voters_count are already set above from Redis
 
-            # Group size is always the number of unique voters (active or completed)
-            unique_voter_ids = set(active_voter_ids + completed_voter_ids)
-            if len(unique_voter_ids) == 0:
-                max_voters = 1  # Default to 1 if no one has joined yet
-            else:
-                max_voters = len(unique_voter_ids)
+            # Smart voter counting logic:
+            # 1. Count people who have voted (completed or in progress)
+            # 2. Count people actively voting (in Redis)
+            # 3. Count recent participants (joined in last 10 minutes and might be voting)
+            
+            actual_voter_ids = set()
+            
+            # Add voters who have cast at least 1 vote
+            for row in conn.execute(text("SELECT DISTINCT voter_id FROM votes WHERE plan_id = :plan_id"), {"plan_id": plan_id}).fetchall():
+                actual_voter_ids.add(row[0])
+            
+            # Add currently active voters (in Redis)
+            actual_voter_ids.update(active_voter_ids)
+            
+            # Add recent participants (joined in last 10 minutes) - they might be about to vote
+            recent_participants = conn.execute(
+                text("""
+                    SELECT DISTINCT voter_id FROM voter_participation 
+                    WHERE plan_id = :plan_id 
+                    AND created_at > datetime('now', '-10 minutes')
+                """),
+                {"plan_id": plan_id}
+            ).fetchall()
+            
+            for row in recent_participants:
+                actual_voter_ids.add(row[0])
+            
+            # Always include the creator if this is a shared plan (has participants)
+            if participant_ids:  # If anyone has joined, include creator
+                creator_id = f"host_{plan_id}"
+                actual_voter_ids.add(creator_id)
+            
+            # Default to 1 if no activity yet (solo plan)
+            max_voters = len(actual_voter_ids) if actual_voter_ids else 1
 
             # Fix all_voters_completed logic
             all_voters_completed = False
@@ -897,14 +932,6 @@ def get_voting_status(plan_id: str):
             else:
                 all_voters_completed = (max_voters > 0 and completed_voters >= max_voters)
             voting_limit_reached = all_voters_completed
-
-            print(f"📊 Voting Status for plan {plan_id}:")
-            print(f"   Active voters: {active_voters_count}")
-            print(f"   Completed voters: {completed_voters}")
-            print(f"   Max voters: {max_voters}")
-            print(f"   All completed: {all_voters_completed}")
-            print(f"   Active voter IDs: {active_voter_ids}")
-            print(f"   Completed voter IDs: {completed_voter_ids}")
             
             return {
                 "plan_id": plan_id,
@@ -1532,6 +1559,124 @@ def get_active_voters(plan_id: str):
         return {"active_voters": voters_list}
     except Exception as e:
         logger.error(f"Error getting active voters: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/plans/{plan_id}/validate-creator")
+def validate_creator(plan_id: str, data: dict):
+    """Validate if the claimed creator ID is actually the creator of the plan"""
+    try:
+        claimed_creator_id = data.get("claimed_creator_id")
+        
+        if not claimed_creator_id:
+            return {"is_valid_creator": False, "message": "No creator ID provided"}
+        
+        # Check if the claimed creator ID matches the expected format for this plan
+        expected_creator_id = f"host_{plan_id}"
+        
+        # Validate that the claimed creator ID matches the expected format
+        is_valid = claimed_creator_id == expected_creator_id
+        
+        # Additionally, check if the plan exists
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT id FROM plans WHERE id = :plan_id LIMIT 1"),
+                {"plan_id": plan_id}
+            )
+            plan_exists = result.fetchone() is not None
+        
+        return {
+            "is_valid_creator": is_valid and plan_exists,
+            "message": "Creator validation completed",
+            "plan_exists": plan_exists
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/plans/{plan_id}/add-voter")
+def add_voter_to_plan(plan_id: str, data: dict):
+    """Add a voter to a plan and increment max_voters"""
+    try:
+        voter_id = data.get("voter_id")
+        voter_name = data.get("voter_name")
+        voter_phone = data.get("voter_phone")
+        
+        if not voter_id:
+            return {"success": False, "message": "Voter ID required"}
+        
+        with engine.connect() as conn:
+            # Check if plan exists
+            plan_result = conn.execute(
+                text("SELECT id FROM plans WHERE id = :plan_id"),
+                {"plan_id": plan_id}
+            )
+            plan_data = plan_result.fetchone()
+            
+            if not plan_data:
+                return {"success": False, "message": "Plan not found"}
+            
+            # Get current max_voters (computed dynamically like in get_voting_status)
+            unique_voters_result = conn.execute(
+                text("SELECT DISTINCT voter_id FROM votes WHERE plan_id = :plan_id"),
+                {"plan_id": plan_id}
+            ).fetchall()
+            
+            # Also include registered participants who haven't voted yet
+            participants_result = conn.execute(
+                text("SELECT DISTINCT voter_id FROM voter_participation WHERE plan_id = :plan_id"),
+                {"plan_id": plan_id}
+            ).fetchall()
+            
+            # Combine voter IDs from both sources
+            all_voter_ids = set()
+            for row in unique_voters_result:
+                all_voter_ids.add(row[0])
+            for row in participants_result:
+                all_voter_ids.add(row[0])
+            
+            current_max_voters = len(all_voter_ids) if all_voter_ids else 1
+            
+            # Check if voter is already registered with this plan
+            voter_check = conn.execute(
+                text("""
+                    SELECT 1 FROM voter_participation 
+                    WHERE plan_id = :plan_id AND voter_id = :voter_id
+                """),
+                {"plan_id": plan_id, "voter_id": voter_id}
+            )
+            
+            if voter_check.fetchone():
+                return {"success": True, "message": "Voter already registered", "already_registered": True}
+            
+            # Add voter to voter_participation table
+            participation_id = str(uuid.uuid4())
+            conn.execute(
+                text("""
+                    INSERT INTO voter_participation (id, plan_id, voter_id, created_at)
+                    VALUES (:id, :plan_id, :voter_id, :created_at)
+                """),
+                {
+                    "id": participation_id,
+                    "plan_id": plan_id,
+                    "voter_id": voter_id,
+                    "created_at": datetime.utcnow()
+                }
+            )
+            
+            conn.commit()
+            
+            # Calculate new max_voters after adding this voter
+            new_max_voters = current_max_voters + 1 if voter_id not in all_voter_ids else current_max_voters
+            
+            return {
+                "success": True, 
+                "message": "Voter added to plan successfully",
+                "max_voters": new_max_voters,
+                "voter_id": voter_id
+            }
+            
+    except Exception as e:
+        logger.error(f"Error adding voter to plan: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/config/topics")
